@@ -1,7 +1,6 @@
 import questionary
 import setup
 from api import app
-import os
 from utils import displayTitle
 
 
@@ -13,6 +12,7 @@ def main_menu():
             choices=[
                 "Start API Server",
                 "Download Minecraft Server",
+                "Run Minecraft Server",
                 "Exit"
             ]
         ).ask()
@@ -21,6 +21,10 @@ def main_menu():
             start_server()
         elif choice == "Download Minecraft Server":
             setup.installMinecraftServer()
+        elif choice == "Run Minecraft Server":
+            setup.runMinecraftServer()
+        elif choice == "Attach to Server":
+            setup.attachToServer()
         elif choice == "Exit":
             questionary.print("\nGoodbye!", style="bold fg:green")
             break
