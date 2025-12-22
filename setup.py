@@ -76,7 +76,7 @@ def installMinecraftServer():
     downloadPath = os.path.join("servers", serverName) + "/server.jar"
     downloadFile(downloadUrl, downloadPath)
 
-def createRunScript():
+def createRunScript(path):
     fileName = ""
     command = utils.getConfig()["startMinecraftServerCommand"]
     if(os.name == "nt"):  # Windows
@@ -84,20 +84,22 @@ def createRunScript():
     else:
         fileName = "launch.sh"
 
-    if(not os.path.exists(fileName)):
-        with open(fileName, "w") as f:
+    filePath = os.path.join(path, fileName)
+
+    if(not os.path.exists(filePath)):
+        with open(filePath, "w") as f:
             f.write(command)
         # Only set permissions on Unix-like systems, on windows it is not needed
         if(os.name != "nt"):
-            os.chmod(fileName, 0o755)
+            os.chmod(filePath, 0o755)
 
     else:
         questionary.print(f"Overwriting launch script.", style="fg:yellow")
-        with open(fileName, "w") as f:
+        with open(filePath, "w") as f:
             f.write(command)
         # Same here, only set permissions on Unix-like systems, on windows it is not needed
         if(os.name != "nt"):
-            os.chmod(fileName, 0o755)
+            os.chmod(filePath, 0o755)
 
     return
 
