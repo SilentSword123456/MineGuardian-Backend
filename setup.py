@@ -1,6 +1,9 @@
 import os
 import questionary
-
+import threading
+import sys
+import subprocess
+import time
 import utils
 from utils import displayTitle, downloadFile
 import requests
@@ -83,7 +86,9 @@ def installMinecraftServer():
         questionary.print(f"You must accept the EULA to run the Minecraft server. Installation aborted. You can always edit the file manually found at {downloadPath}/eula.txt", style="fg:red")
         return
 
-    runMinecraftServer(downloadPath, serverName)
+    acceptEula(downloadPath)
+
+    runMinecraftServer(downloadPath)
 
 
 def createRunScript(path):
@@ -114,9 +119,11 @@ def createRunScript(path):
     return
 
 
-def runMinecraftServer(path, server_name=None):
-    if server_name is None:
-        server_name = os.path.basename(path)
+def runMinecraftServer(path = None):
+    if path is None:
+        path = questionary.path("Enter the path to the Minecraft server directory", default=os.path.join("servers/")).ask()
+
+    path = os.path.normpath(path)
 
     fileName = ""
     if(os.name == "nt"):  # Windows
@@ -126,11 +133,16 @@ def runMinecraftServer(path, server_name=None):
     filePath = os.path.join(path, fileName)
 
     if(os.path.exists(filePath)):
-        return utils.startServerProcess(server_name, filePath, path)
+        questionary.print(f"\nStarting Minecraft server '{os.path.basename(path)}' in background...", style="fg:green")
+
+        utils.runCommand(fileName, cwd=path)
+
+        input("\nPress Enter to return to menu...")
+        return
     else:
         questionary.print(f"Launch script not found at {filePath}", style="fg:red")
+        input("\nPress Enter to continue...")
         return None
-
 
 
 def acceptEula(path):
@@ -140,3 +152,5 @@ def acceptEula(path):
 
     return
 
+def attachToServer():
+    return
