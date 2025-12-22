@@ -73,8 +73,16 @@ def installMinecraftServer():
 
     questionary.print(f"Downloading {serverSoftware} on version {serverVersion} from {downloadUrl}", style="fg:green")
 
-    downloadPath = os.path.join("servers", serverName) + "/server.jar"
-    downloadFile(downloadUrl, downloadPath)
+    downloadPath = os.path.join("servers", serverName)
+    downloadFile(downloadUrl, downloadPath + "/server.jar")
+
+    createRunScript(downloadPath)
+
+    choice = questionary.confirm("Do you accept the Minecraft EULA? Please read and make sure you read the eula before accepting!", default=False).ask()
+    if(not choice):
+        questionary.print(f"You must accept the EULA to run the Minecraft server. Installation aborted. You can always edit the file manually found at {downloadPath}/eula.txt", style="fg:red")
+        return
+
 
 def createRunScript(path):
     fileName = ""
@@ -102,6 +110,11 @@ def createRunScript(path):
             os.chmod(filePath, 0o755)
 
     return
+
+def acceptEula(path):
+    eulaPath = os.path.join(path, "eula.txt")
+    with open(eulaPath, "w") as f:
+        f.write("eula=true\n")
 
 
 
