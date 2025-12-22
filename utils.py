@@ -1,8 +1,7 @@
 import os
-
 import questionary
 import requests
-
+import json
 
 def displayTitle():
     questionary.print("\n" + "="*50, style="bold")
@@ -23,3 +22,15 @@ def downloadFile(url, dest):
         #questionary.print(f"Downloaded file to {dest}", style="fg:green")
     except requests.exceptions.RequestException as e:
         questionary.print(f"Error downloading file from {url}: {e}", style="fg:red")
+
+def getConfig():
+    if(not os.path.isfile("config.json")):
+        questionary.print("Configuration file not found.", style="fg:red")
+        return None
+    try:
+        with open("config.json", "r") as f:
+            config = json.load(f)
+            return config
+    except json.JSONDecodeError as e:
+        questionary.print(f"Error reading configuration file: {e}", style="fg:red")
+        return None
