@@ -1,24 +1,28 @@
 import questionary
+import setup
 from api import app
+import os
+from utils import displayTitle
+
 
 def main_menu():
     while True:
-        questionary.print("\n" + "="*50, style="bold")
-        questionary.print("MineGuardian Backend CLI", style="bold fg:cyan")
-        questionary.print("="*50 + "\n", style="bold")
-
+        displayTitle()
         choice = questionary.select(
             "What would you like to do?",
             choices=[
                 "Start API Server",
+                "Download Minecraft Server",
                 "Exit"
             ]
         ).ask()
 
         if choice == "Start API Server":
             start_server()
+        elif choice == "Download Minecraft Server":
+            setup.installMinecraftServer()
         elif choice == "Exit":
-            questionary.print("\n👋 Goodbye!", style="bold fg:green")
+            questionary.print("\nGoodbye!", style="bold fg:green")
             break
 
 def start_server():
@@ -41,5 +45,8 @@ def start_server():
         input("\nPress Enter to continue...")
 
 if __name__ == '__main__':
+    if(not os.path.isfile("config.json")):
+        setup.firstLauch()
+
     main_menu()
 
