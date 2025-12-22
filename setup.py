@@ -65,9 +65,9 @@ def installMinecraftServer():
         except requests.exceptions.RequestException as e:
             questionary.print(f"Error fetching version info from {downloadUrl}: {e}", style="fg:red")
             return
-
-
-
+    elif(serverSoftware == "spigot"):
+        questionary.print("Spigot server installation is not yet implemented.", style="fg:red")
+        return
 
     questionary.print(f"Downloading {serverSoftware} on version {serverVersion} from {downloadUrl}", style="fg:green")
 
