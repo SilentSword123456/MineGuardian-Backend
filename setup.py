@@ -1,5 +1,7 @@
 import os
 import questionary
+
+import utils
 from utils import displayTitle, downloadFile
 import requests
 
@@ -73,6 +75,31 @@ def installMinecraftServer():
 
     downloadPath = os.path.join("servers", serverName) + "/server.jar"
     downloadFile(downloadUrl, downloadPath)
+
+def createRunScript():
+    fileName = ""
+    command = utils.getConfig()["startMinecraftServerCommand"]
+    if(os.name == "nt"):  # Windows
+        fileName = "launch.bat"
+    else:
+        fileName = "launch.sh"
+
+    if(not os.path.exists(fileName)):
+        with open(fileName, "w") as f:
+            f.write(command)
+        # Only set permissions on Unix-like systems, on windows it is not needed
+        if(os.name != "nt"):
+            os.chmod(fileName, 0o755)
+
+    else:
+        questionary.print(f"Overwriting launch script.", style="fg:yellow")
+        with open(fileName, "w") as f:
+            f.write(command)
+        # Same here, only set permissions on Unix-like systems, on windows it is not needed
+        if(os.name != "nt"):
+            os.chmod(fileName, 0o755)
+
+    return
 
 
 
