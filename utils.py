@@ -4,6 +4,8 @@ import requests
 import json
 import subprocess
 import threading
+import platform
+import shlex
 
 running_servers = {}
 
@@ -44,6 +46,17 @@ def runCommand(command):
 
 def startServerProcess(server_name, command, working_dir):
     try:
+        # Handle path quoting based on OS
+        if platform.system() == "Windows":
+            # Windows: Use quotes for paths with spaces
+            if not command.startswith('"') and ' ' in command:
+                command = f'"{command}"'
+        else:
+            # Linux/Mac: Use shlex.quote for proper escaping
+            # But only if it's a file path (not already a complex command)
+            if not command.startswith(('./', '/', '"', "'")):
+                command = shlex.quote(command)
+
         process = subprocess.Popen(
             command,
             stdin=subprocess.PIPE,
