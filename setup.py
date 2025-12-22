@@ -83,6 +83,8 @@ def installMinecraftServer():
         questionary.print(f"You must accept the EULA to run the Minecraft server. Installation aborted. You can always edit the file manually found at {downloadPath}/eula.txt", style="fg:red")
         return
 
+    runMinecraftServer(downloadPath, serverName)
+
 
 def createRunScript(path):
     fileName = ""
@@ -124,7 +126,7 @@ def runMinecraftServer(path, server_name=None):
     filePath = os.path.join(path, fileName)
 
     if(os.path.exists(filePath)):
-        return utils.startServerProcess(server_name, f'"{filePath}"', path)
+        return utils.startServerProcess(server_name, filePath, path)
     else:
         questionary.print(f"Launch script not found at {filePath}", style="fg:red")
         return None
