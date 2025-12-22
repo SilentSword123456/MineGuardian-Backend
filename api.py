@@ -1,30 +1,50 @@
 from flask import Flask, jsonify, request
+import psutil
+import os
+
+DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
     return jsonify({
-        'message': 'Welcome to MineGuardian API',
-        'status': 'running'
+        'status': 'API is running'
     })
 
 
-@app.route('/api/data', methods=['GET'])
-def get_data():
+@app.route('/resources', methods=['GET'])
+def get_resources():
+    cpuUsage = psutil.cpu_percent(interval=1)
+    memory = psutil.virtual_memory()
+    disk = psutil.disk_usage(DIR)
     return jsonify({
-        'data': [],
-        'count': 0
+        'cpu': cpuUsage,
+        'memory': {
+            'total': memory.total,
+            'available': memory.available,
+            'used': memory.used,
+            'percent': memory.percent
+        },
+        'disk': {
+            'total': disk.total,
+            'used': disk.used,
+            'free': disk.free,
+            'percent': disk.percent
+        }
     })
 
+@app.route('/files/<path:location>', methods=['GET'])
+def list_files(location):
+    target_dir = os.path.join(DIR, location)
+    if not os.path.exists(target_dir) or not os.path.isdir(target_dir):
+        return jsonify({'error': 'Directory not found'}), 404
 
-@app.route('/api/data', methods=['POST'])
-def create_data():
-    data = request.get_json()
+    files = os.listdir(target_dir)
     return jsonify({
-        'message': 'Data received',
-        'data': data
-    }), 201
+        'location': location,
+        'files': files
+    })
 
 
 if __name__ == '__main__':
