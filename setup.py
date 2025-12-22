@@ -111,11 +111,30 @@ def createRunScript(path):
 
     return
 
+
+def runMinecraftServer(path, server_name=None):
+    if server_name is None:
+        server_name = os.path.basename(path)
+
+    fileName = ""
+    if(os.name == "nt"):  # Windows
+        fileName = "launch.bat"
+    else:
+        fileName = "launch.sh"
+    filePath = os.path.join(path, fileName)
+
+    if(os.path.exists(filePath)):
+        return utils.startServerProcess(server_name, f'"{filePath}"', path)
+    else:
+        questionary.print(f"Launch script not found at {filePath}", style="fg:red")
+        return None
+
+
+
 def acceptEula(path):
     eulaPath = os.path.join(path, "eula.txt")
     with open(eulaPath, "w") as f:
         f.write("eula=true\n")
 
-
-
+    return
 
