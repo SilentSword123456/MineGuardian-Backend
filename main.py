@@ -45,8 +45,8 @@ def start_server():
         input("\nPress Enter to continue...")
 
 if __name__ == '__main__':
-    if(not os.path.isfile("config.json")):
-        setup.firstLauch()
+    #if(not os.path.isfile("config.json")):
+    #    setup.firstLauch()
 
     main_menu()
 
