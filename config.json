@@ -1,3 +1,7 @@
 {
-  "startMinecraftServerCommand": "java -Xmx1024M -Xms1024M -jar server.jar nogui"
+  "startMinecraftServerCommand": "java -Xmx1024M -Xms1024M -jar server.jar nogui",
+  "flaskConfig": {
+    "SECRET_KEY": "",
+    "SOCKETIO_CORS_ALLOWED_ORIGINS": "*"
+  }
 }
