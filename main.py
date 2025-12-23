@@ -13,6 +13,7 @@ def main_menu():
                 "Start API Server",
                 "Download Minecraft Server",
                 "Run Minecraft Server",
+                "Attach to Server",
                 "Exit"
             ]
         ).ask()
