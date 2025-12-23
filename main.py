@@ -1,7 +1,7 @@
 import questionary
 import setup
 import utils
-from api import app
+from api import app, socketio
 from utils import displayTitle
 
 
@@ -46,7 +46,7 @@ def start_server():
     questionary.print("Press Ctrl+C to stop\n", style="fg:yellow")
 
     try:
-        app.run(debug=debug, host=host, port=int(port), use_reloader=False)
+        socketio.run(app, debug=debug, host=host, port=int(port), use_reloader=False)
     except KeyboardInterrupt:
         questionary.print("\nServer stopped!", style="fg:yellow")
     except Exception as e:
