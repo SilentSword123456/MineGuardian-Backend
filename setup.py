@@ -1,12 +1,11 @@
 import os
 import questionary
-import threading
-import sys
-import subprocess
-import time
+import serverSessionsManager
 import utils
 from utils import displayTitle, downloadFile
 import requests
+
+runningServers = {}
 
 def firstLauch():
     displayTitle()
@@ -87,8 +86,8 @@ def installMinecraftServer():
         return
 
     acceptEula(downloadPath)
-
-    runMinecraftServer(downloadPath)
+    server = setupServerInstance(downloadPath, serverName)
+    server.start()
 
 
 def createRunScript(path):
@@ -119,28 +118,25 @@ def createRunScript(path):
     return
 
 
-def runMinecraftServer(path = None):
-    if path is None:
-        path = questionary.path("Enter the path to the Minecraft server directory", default=os.path.join("servers/")).ask()
+def runMinecraftServer(serverName = None, path = "servers"):
+    if serverName is None:
+        serverName = questionary.select("Select a server to run:", choices=[name for name in os.listdir(path)
+        if os.path.isdir(os.path.join(path, name))]).ask()
 
-    path = os.path.normpath(path)
+    if serverName not in runningServers:
+        setupServerInstance(path+"/"+serverName, serverName)
 
-    fileName = ""
-    if(os.name == "nt"):  # Windows
-        fileName = "launch.bat"
+    if(serverName in runningServers):
+        server = runningServers[serverName]
+        if not server.running:
+            questionary.print(f"\nStarting Minecraft server '{serverName}' in background...", style="fg:green")
+            server.start()
+            input("\nPress Enter to return to menu...")
+        else:
+            questionary.print(f"\nServer '{serverName}' is already running.", style="fg:yellow")
+            input("\nPress Enter to return to menu...")
     else:
-        fileName = "launch.sh"
-    filePath = os.path.join(path, fileName)
-
-    if(os.path.exists(filePath)):
-        questionary.print(f"\nStarting Minecraft server '{os.path.basename(path)}' in background...", style="fg:green")
-
-        utils.runCommand(fileName, cwd=path)
-
-        input("\nPress Enter to return to menu...")
-        return
-    else:
-        questionary.print(f"Launch script not found at {filePath}", style="fg:red")
+        questionary.print(f"Server '{serverName}' not found.", style="fg:red")
         input("\nPress Enter to continue...")
         return None
 
