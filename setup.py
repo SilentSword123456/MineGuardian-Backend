@@ -149,7 +149,7 @@ def acceptEula(path):
     return
 
 def setupServerInstance(path, serverName):
-    server = program.ServerSession(serverName, utils.getConfig()["startMinecraftServerCommand"], path)
+    server = serverSessionsManager.ServerSession(serverName, utils.getConfig()["startMinecraftServerCommand"], path)
     runningServers[serverName] = server
     return server
 
