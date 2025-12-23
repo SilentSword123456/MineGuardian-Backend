@@ -161,3 +161,10 @@ def attachToServer():
     else:
         questionary.print(f"Server '{serverName}' not found.", style="fg:red")
     return
+
+def closeAllServers():
+    for serverName, server in runningServers.items():
+        if server.running:
+            questionary.print(f"\nStopping server '{serverName}'...", style="fg:yellow")
+            server.stop()
+    return
