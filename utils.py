@@ -60,7 +60,7 @@ def generateFlaskKey():
     if config is None:
         return
 
-    if not 'flaskConfig' in config:
+    if config.get('flaskConfig', {}).get('SECRET_KEY'):
         return
 
     secretKey = secrets.token_urlsafe(32)
