@@ -152,5 +152,16 @@ def acceptEula(path):
 
     return
 
+def setupServerInstance(path, serverName):
+    server = program.ServerSession(serverName, utils.getConfig()["startMinecraftServerCommand"], path)
+    runningServers[serverName] = server
+    return server
+
 def attachToServer():
+    serverName = questionary.select("Select a server to attach to:", choices=list(runningServers.keys())).ask()
+    if(serverName in runningServers):
+        server = runningServers[serverName]
+        server.attach()
+    else:
+        questionary.print(f"Server '{serverName}' not found.", style="fg:red")
     return
