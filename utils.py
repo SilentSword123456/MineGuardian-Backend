@@ -38,6 +38,13 @@ def getConfig():
         questionary.print(f"Error reading configuration file: {e}", style="fg:red")
         return None
 
+def storeConfig(config):
+    try:
+        with open("config.json", "w") as f:
+            json.dump(config, f, indent=4)
+    except Exception as e:
+        questionary.print(f"Error saving configuration file: {e}", style="fg:red")
+
 def runCommand(command, cwd=None):
     if cwd:
         original_dir = os.getcwd()
@@ -46,3 +53,16 @@ def runCommand(command, cwd=None):
         os.chdir(original_dir)
     else:
         os.system(command)
+
+def generateFlaskKey():
+    config = getConfig()
+    if config is None:
+        return
+
+    if not 'flaskConfig' in config:
+        return
+
+    secretKey = 123
+    config['flaskConfig']['SECRET_KEY'] = secretKey
+
+    storeConfig(config)
