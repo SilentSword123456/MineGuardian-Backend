@@ -34,7 +34,6 @@ def installMinecraftServer():
         questionary.print("Invalid server software selected. Please chose between Vanilla or Spigot", style="fg:red")
         return
 
-    #questionary.print(f"\nInstalling {serverSoftware} on version {serverVersion}\n", style="bold fg:cyan")
 
     downloadUrl = ""
 
