@@ -1,5 +1,6 @@
 import questionary
 import setup
+import utils
 from api import app
 from utils import displayTitle
 
@@ -19,6 +20,7 @@ def main_menu():
         ).ask()
 
         if choice == "Start API Server":
+            utils.generateFlaskKey()
             start_server()
         elif choice == "Download Minecraft Server":
             setup.installMinecraftServer()
