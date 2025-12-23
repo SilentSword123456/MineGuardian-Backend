@@ -62,7 +62,7 @@ def generateFlaskKey():
     if not 'flaskConfig' in config:
         return
 
-    secretKey = 123
+    secretKey = secrets.token_urlsafe(32)
     config['flaskConfig']['SECRET_KEY'] = secretKey
 
     storeConfig(config)
