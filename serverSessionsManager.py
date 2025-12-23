@@ -7,7 +7,7 @@ class ServerSession:
     def __init__(self, name, command, working_dir=None):
         self.name = name
         self.command = command.split()
-        self.working_dir = working_dir  # Directory where the server runs
+        self.working_dir = working_dir
         self.process = None
         self.output_queue = queue.Queue()
         self.running = False
@@ -85,7 +85,7 @@ class ServerSession:
             while self.running and not stop_display.is_set():
                 try:
                     line = self.output_queue.get(timeout=0.1)
-                    print(f"[SERVER] {line}")
+                    print(f"[SERVER + {self.name}] {line}")
                 except queue.Empty:
                     continue
 
