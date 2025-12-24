@@ -53,8 +53,6 @@ class ServerSession:
                 self.output_queue.put(line.rstrip())
         except Exception as e:
             self.output_queue.put(f"[ERROR: {e}]")
-        finally:
-            self.running = False
 
     def send_command(self, command):
         if not self.running or not self.process:
@@ -117,7 +115,7 @@ class ServerSession:
 
     def stop(self, timeout=30):
 
-        if not self.running:
+        if not self.is_running():
             print(f"Server '{self.name}' is not running")
             return False
 
