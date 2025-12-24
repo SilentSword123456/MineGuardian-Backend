@@ -38,12 +38,47 @@ def list_servers():
     for name in os.listdir(os.path.join(DIR, "servers")):
         servers.append({
             'name': name,
-            'id': i
+            'id': i,
+            'isRunning': (setup.runningServers[name].is_running() if name in setup.runningServers else False)
         })
         i += 1
     return jsonify({
         'servers': servers
     })
+
+@app.route('/start_server', methods=['POST'])
+def start_server():
+    data = request.json
+    serverName = data.get('serverName')
+
+    if not serverName:
+        return jsonify({'error': 'No serverName provided'}), 400
+
+    if serverName in setup.runningServers:
+        return jsonify({'error': f"Server '{serverName}' is already running"}), 400
+
+    serverInstance = setup.setupServerInstance(os.path.join(DIR, "servers", serverName), serverName)
+    serverInstance.start()
+
+    return (jsonify({'message': f"Server '{serverName}' started successfully"}), 200)
+
+
+@app.route('/stop_server', methods=['POST'])
+def stop_server():
+    data = request.json
+    serverName = data.get('serverName')
+
+    if not serverName:
+        return jsonify({'error': 'No serverName provided'}), 400
+
+    if serverName not in setup.runningServers:
+        return jsonify({'error': f"No instance found for Server '{serverName}'"}), 400
+
+    serverInstance = setup.setupServerInstance(os.path.join(DIR, "servers", serverName), serverName)
+    serverInstance.stop()
+
+    return jsonify({'message': f"Server '{serverName}' stopped successfully"}), 200
+
 
 @socketio.on('connect')
 def handle_connect():
@@ -133,6 +168,9 @@ def stopServer():
     for serverName in list(stopEvents.keys()):
         stopEvents[serverName].set()
     socketio.stop()
+
+
+
 
 """
 if __name__ == '__main__':
