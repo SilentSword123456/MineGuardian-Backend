@@ -1,7 +1,7 @@
-import subprocess  # Module to run other programs
-import threading   # Module to do multiple things at once
-import queue       # Module to safely share data between threads
-import time        # Module for waiting/sleeping
+import subprocess
+import threading
+import queue
+import time
 
 class ServerSession:
     def __init__(self, name, command, working_dir=None):
