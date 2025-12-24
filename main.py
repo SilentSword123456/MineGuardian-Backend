@@ -40,7 +40,7 @@ def start_server():
 
     host = questionary.text("Host:", default="0.0.0.0").ask()
     port = questionary.text("Port:", default="5000").ask()
-    debug = questionary.confirm("Enable debug mode?", default=True).ask()
+    debug = questionary.confirm("Enable debug mode?", default=False).ask()
 
     questionary.print(f"\nStarting server on {host}:{port}", style="fg:green")
     questionary.print("Press Ctrl+C to stop\n", style="fg:yellow")
