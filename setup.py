@@ -174,14 +174,3 @@ def closeAllServers():
             server.stop()
     return
 
-def getServerInstance(serverName):
-    questionary.print(f"Trying to get server instance for {serverName}", style="fg:cyan")
-    if serverName in runningServers:
-        questionary.print(f"\nServer '{serverName}' is running.", style="fg:yellow")
-        return runningServers[serverName]
-
-    questionary.print(f"\nServer '{serverName}' not found.", style="fg:red")
-    questionary.print(f"Here are the current running servers: {runningServers}", style="fg:cyan")
-    for name in runningServers.keys():
-        questionary.print(f"- {name}", style="fg:cyan")
-    return None
