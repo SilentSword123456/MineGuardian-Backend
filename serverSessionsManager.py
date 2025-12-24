@@ -53,6 +53,9 @@ class ServerSession:
                 self.output_queue.put(line.rstrip())
         except Exception as e:
             self.output_queue.put(f"[ERROR: {e}]")
+        finally:
+            if self.process and self.process.poll() is not None:
+                self.running = False
 
     def send_command(self, command):
         if not self.running or not self.process:
