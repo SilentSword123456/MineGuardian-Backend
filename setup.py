@@ -153,8 +153,14 @@ def setupServerInstance(path, serverName):
     return server
 
 def attachToServer():
+    if not runningServers:
+        questionary.print("No running servers to attach to.", style="fg:red")
+        return
+
+    questionary.print(f"RunningServers: {runningServers}", style="fg:green")
+
     serverName = questionary.select("Select a server to attach to:", choices=list(runningServers.keys())).ask()
-    if(serverName in runningServers):
+    if serverName in runningServers:
         server = runningServers[serverName]
         server.attach()
     else:
@@ -167,3 +173,15 @@ def closeAllServers():
             questionary.print(f"\nStopping server '{serverName}'...", style="fg:yellow")
             server.stop()
     return
+
+def getServerInstance(serverName):
+    questionary.print(f"Trying to get server instance for {serverName}", style="fg:cyan")
+    if serverName in runningServers:
+        questionary.print(f"\nServer '{serverName}' is running.", style="fg:yellow")
+        return runningServers[serverName]
+
+    questionary.print(f"\nServer '{serverName}' not found.", style="fg:red")
+    questionary.print(f"Here are the current running servers: {runningServers}", style="fg:cyan")
+    for name in runningServers.keys():
+        questionary.print(f"- {name}", style="fg:cyan")
+    return None
