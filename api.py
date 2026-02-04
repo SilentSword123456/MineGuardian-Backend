@@ -18,7 +18,7 @@ CORS(app)
 socketio = SocketIO(
     app,
     cors_allowed_origins=app.config["SOCKETIO_CORS_ALLOWED_ORIGINS"],
-    async_mode="eventlet"
+    async_mode="threading"
 )
 
 activeDisplayThreads = {}
@@ -100,8 +100,16 @@ def handle_connect():
     print(f'Client connected to server room: {serverName} (total clients: {roomClientCount[serverName]})')
     emit('message', {'data': f"Connected to server {serverName}"})
 
+    serverInstance = setup.runningServers[serverName]
+    
+    # Replay history to the new client
+    for line in list(serverInstance.console_history):
+        emit('console', {'data': line})
+
+    if serverName in stopEvents:
+        stopEvents[serverName].clear()
+
     if serverName not in activeDisplayThreads or not activeDisplayThreads[serverName].is_alive():
-        serverInstance = setup.runningServers[serverName]
         stopEvents[serverName] = threading.Event()
 
         def display_output():
@@ -144,6 +152,10 @@ def handle_disconnect():
 @socketio.on('message')
 def handleMessage(data):
     serverName = request.args.get('serverName')
+    if not data or not isinstance(data, dict) or 'message' not in data:
+        emit('error', {'data': 'Invalid message format'})
+        return
+
     print(f'Message from server {serverName}: {data}')
     emit('message', {'data': f"Server {serverName} received: {data['message']}"})
 
@@ -152,6 +164,10 @@ def handleConsole(data):
     serverName = request.args.get('serverName')
     if not serverName:
         emit('error', {'data': 'No serverName provided'})
+        return
+
+    if not data or not isinstance(data, dict) or 'message' not in data:
+        emit('error', {'data': 'Invalid console command format'})
         return
 
     if serverName not in setup.runningServers:
