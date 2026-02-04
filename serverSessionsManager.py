@@ -2,6 +2,7 @@ import subprocess
 import threading
 import queue
 import time
+from collections import deque
 
 class ServerSession:
     def __init__(self, name, command, working_dir=None):
@@ -10,6 +11,7 @@ class ServerSession:
         self.working_dir = working_dir
         self.process = None
         self.output_queue = queue.Queue()
+        self.console_history = deque(maxlen=100)
         self.running = False
         self.output_thread = None
 
@@ -50,9 +52,13 @@ class ServerSession:
     def _read_output(self):
         try:
             for line in self.process.stdout:
-                self.output_queue.put(line.rstrip())
+                line_stripped = line.rstrip()
+                self.output_queue.put(line_stripped)
+                self.console_history.append(line_stripped)
         except Exception as e:
-            self.output_queue.put(f"[ERROR: {e}]")
+            err_msg = f"[ERROR: {e}]"
+            self.output_queue.put(err_msg)
+            self.console_history.append(err_msg)
         finally:
             if self.process and self.process.poll() is not None:
                 self.running = False
