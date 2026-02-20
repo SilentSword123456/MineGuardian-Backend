@@ -1,6 +1,5 @@
 import subprocess
 import threading
-import queue
 import time
 
 class ServerSession:
@@ -9,9 +8,30 @@ class ServerSession:
         self.command = command.split()
         self.working_dir = working_dir
         self.process = None
-        self.output_queue = queue.Queue()
+        self.listeners = []
+        self.log_history = []
+        self.max_history = 100
         self.running = False
         self.output_thread = None
+
+    def add_listener(self, callback):
+        if callback not in self.listeners:
+            self.listeners.append(callback)
+
+    def remove_listener(self, callback):
+        if callback in self.listeners:
+            self.listeners.remove(callback)
+
+    def _broadcast(self, line):
+        self.log_history.append(line)
+        if len(self.log_history) > self.max_history:
+            self.log_history.pop(0)
+        
+        for listener in self.listeners:
+            try:
+                listener(line)
+            except Exception as e:
+                print(f"Error in listener callback: {e}")
 
     def start(self):
         if self.running:
@@ -50,9 +70,11 @@ class ServerSession:
     def _read_output(self):
         try:
             for line in self.process.stdout:
-                self.output_queue.put(line.rstrip())
+                stripped_line = line.rstrip()
+                self._broadcast(stripped_line)
+                time.sleep(0) # Yield for context switching
         except Exception as e:
-            self.output_queue.put(f"[ERROR: {e}]")
+            self._broadcast(f"[ERROR: {e}]")
         finally:
             if self.process and self.process.poll() is not None:
                 self.running = False
@@ -82,18 +104,10 @@ class ServerSession:
         print(f"\n========== ATTACHED TO '{self.name}' ==========")
         print("Type commands below. Type 'detach' or 'exit' to exit.\n")
 
-        def display_output():
-            while self.running and not stop_display.is_set():
-                try:
-                    line = self.output_queue.get(timeout=0.1)
-                    print(f"[SERVER + {self.name}] {line}")
-                except queue.Empty:
-                    continue
+        def display_callback(line):
+            print(f"[SERVER + {self.name}] {line}")
 
-        stop_display = threading.Event()
-
-        display_thread = threading.Thread(target=display_output, daemon=True)
-        display_thread.start()
+        self.add_listener(display_callback)
 
         try:
             while self.running:
@@ -113,7 +127,7 @@ class ServerSession:
                 except KeyboardInterrupt:
                     print("\nPress Ctrl+D or type 'detach'/'exit' to exit")
         finally:
-            stop_display.set()
+            self.remove_listener(display_callback)
             print(f"\n========== DETACHED FROM '{self.name}' ==========\n")
 
     def stop(self, timeout=30):
