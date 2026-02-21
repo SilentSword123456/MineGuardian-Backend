@@ -1,9 +1,10 @@
+serverInstances = {}
+
 import subprocess
 import threading
 import time
 import psutil
 import utils
-
 
 class ServerSession:
     def __init__(self, name, command, working_dir=None):
