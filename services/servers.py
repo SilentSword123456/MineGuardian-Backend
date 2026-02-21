@@ -1,4 +1,6 @@
 from flask import Blueprint, jsonify, request
+
+import setup
 from services.server_services import get_all_servers, start_server, stop_server
 import api
 
@@ -7,6 +9,27 @@ servers_bp = Blueprint('servers', __name__)
 @servers_bp.route('/servers', methods=['GET'])
 def list_servers():
     return jsonify({'servers': get_all_servers()})
+
+@servers_bp.route('/servers/<serverName>', methods=['GET'])
+def getGeneralServerInfo(serverName):
+     servers = get_all_servers()
+
+     match = None
+     for s in servers:
+        if s['name'] == serverName:
+            match = s
+            break
+
+
+     if not match:
+             return jsonify({'error': 'Server not found'}), 404
+
+     serverInstance = setup.serverInstances.get(serverName)
+     if serverInstance and serverInstance.is_running():
+             return jsonify(serverInstance.get_process_info())
+
+     # Not running: return basic metadata
+     return jsonify(match)
 
 @servers_bp.route('/start_server', methods=['POST'])
 def start_server_route():
