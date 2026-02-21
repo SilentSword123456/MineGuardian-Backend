@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, request
 import os
 from flask_cors import CORS
+
+import serverSessionsManager
 import setup
 from utils import getConfig
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -41,7 +43,7 @@ def handle_connect():
         emit('error', {'data': 'No serverName provided in connection'})
         return False
 
-    if serverName not in setup.serverInstances:
+    if serverName not in serverSessionsManager.serverInstances:
         emit('error', {'data': f"Server '{serverName}' is not running"})
         return False
 
@@ -49,7 +51,7 @@ def handle_connect():
     print(f'Client connected to server room: {serverName}')
     emit('message', {'data': f"Connected to server {serverName}"})
 
-    serverInstance = setup.serverInstances[serverName]
+    serverInstance = serverSessionsManager.serverInstances[serverName]
     
     # Ensure SocketIO listener is registered (especially if server was started via CLI)
     register_socketio_listener(serverName, serverInstance)
@@ -81,11 +83,11 @@ def handleConsole(data):
         emit('error', {'data': 'No serverName provided'})
         return
 
-    if serverName not in setup.serverInstances:
+    if serverName not in serverSessionsManager.serverInstances:
         emit('console', {'data': f"Server '{serverName}' is not running."})
         return
 
-    serverInstance = setup.serverInstances[serverName]
+    serverInstance = serverSessionsManager.serverInstances[serverName]
     serverInstance.send_command(data['message'])
 
 def startServer(debug=False, port=5000, host="0.0.0.0"):
