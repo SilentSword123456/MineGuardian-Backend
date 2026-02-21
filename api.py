@@ -1,7 +1,6 @@
 from flask import Flask, jsonify, request
 import os
 from flask_cors import CORS
-
 import setup
 from utils import getConfig
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -17,6 +16,9 @@ socketio = SocketIO(
     async_mode="threading"
 )
 
+from services.servers import servers_bp
+app.register_blueprint(servers_bp)
+
 def register_socketio_listener(serverName, serverInstance):
     """Ensures a SocketIO broadcast listener is registered for the server instance."""
     if not hasattr(serverInstance, '_socketio_listener_added'):
@@ -31,58 +33,6 @@ def home():
     return jsonify({
         'status': 'API is running'
     })
-
-@app.route('/servers', methods=['GET'])
-def list_servers():
-    servers = []
-    i = 1
-    for name in os.listdir(os.path.join(DIR, "servers")):
-        servers.append({
-            'name': name,
-            'id': i,
-            'isRunning': (setup.runningServers[name].is_running() if name in setup.runningServers else False)
-        })
-        i += 1
-    return jsonify({
-        'servers': servers
-    })
-
-@app.route('/start_server', methods=['POST'])
-def start_server():
-    data = request.json
-    serverName = data.get('serverName')
-
-    if not serverName:
-        return jsonify({'error': 'No serverName provided'}), 400
-
-    if serverName in setup.runningServers:
-        return jsonify({'error': f"Server '{serverName}' is already running"}), 400
-
-    serverInstance = setup.setupServerInstance(os.path.join(DIR, "servers", serverName), serverName)
-    
-    # Register listener for SocketIO broadcasting
-    register_socketio_listener(serverName, serverInstance)
-    serverInstance.start()
-
-    return (jsonify({'message': f"Server '{serverName}' started successfully"}), 200)
-
-
-@app.route('/stop_server', methods=['POST'])
-def stop_server():
-    data = request.json
-    serverName = data.get('serverName')
-
-    if not serverName:
-        return jsonify({'error': 'No serverName provided'}), 400
-
-    if serverName not in setup.runningServers:
-        return jsonify({'error': f"No instance found for Server '{serverName}'"}), 400
-
-    serverInstance = setup.runningServers[serverName]
-    serverInstance.stop()
-
-    return jsonify({'message': f"Server '{serverName}' stopped successfully"}), 200
-
 
 @socketio.on('connect')
 def handle_connect():
