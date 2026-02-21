@@ -31,7 +31,7 @@ def main_menu():
         elif choice == "Attach to Server":
             setup.attachToServer()
         elif choice == "Exit":
-            if(setup.runningServers):
+            if(setup.serverInstances):
                 questionary.print("\nHold on, let me close all the running servers first.", style="fg:yellow")
                 setup.closeAllServers()
             questionary.print("\nGoodbye!", style="bold fg:green")
