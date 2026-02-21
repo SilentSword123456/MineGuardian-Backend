@@ -1,0 +1,33 @@
+from flask import Blueprint, jsonify, request
+from services.server_services import get_all_servers, start_server, stop_server
+import api
+
+servers_bp = Blueprint('servers', __name__)
+
+@servers_bp.route('/servers', methods=['GET'])
+def list_servers():
+    return jsonify({'servers': get_all_servers()})
+
+@servers_bp.route('/start_server', methods=['POST'])
+def start_server_route():
+    serverName = request.json.get('serverName')
+    if not serverName:
+        return jsonify({'error': 'No serverName provided'}), 400
+    try:
+        serverInstance = start_server(serverName)
+        api.register_socketio_listener(serverName, serverInstance)
+        serverInstance.start()
+        return jsonify({'message': f"Server '{serverName}' started successfully"}), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+@servers_bp.route('/stop_server', methods=['POST'])
+def stop_server_route():
+    serverName = request.json.get('serverName')
+    if not serverName:
+        return jsonify({'error': 'No serverName provided'}), 400
+    try:
+        stop_server(serverName)
+        return jsonify({'message': f"Server '{serverName}' stopped successfully"}), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
