@@ -1,4 +1,5 @@
 serverInstances = {}
+usedPorts = set()
 
 import subprocess
 import threading
@@ -17,7 +18,8 @@ class ServerSession:
         self.max_history = 100
         self.running = False
         self.output_thread = None
-        self.rcon_port = utils.getRconInfo(name)["port"] if utils.getRconInfo(name) else 25575
+        self.port = utils.assignNewPort(self,utils.getNewPort(type="server"), type="server")
+        self.rcon_port = utils.assignNewPort(self,utils.getNewPort(type="rcon"), type="rcon")
 
     def add_listener(self, callback):
         if callback not in self.listeners:
