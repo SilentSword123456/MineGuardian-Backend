@@ -1,11 +1,9 @@
 import os
 import questionary
-import serverSessionsManager
 import utils
-from utils import displayTitle, downloadFile
+from utils import displayTitle, downloadFile, createRunScript, setupServerInstance
 import requests
 
-serverInstances = {}
 
 def firstLauch():
     displayTitle()
@@ -92,134 +90,9 @@ def installMinecraftServer():
     server.start()
 
 
-def createRunScript(path):
-    fileName = ""
-    command = utils.getConfig()["startMinecraftServerCommand"]
-    if(os.name == "nt"):  # Windows
-        fileName = "launch.bat"
-    else:
-        fileName = "launch.sh"
-
-    filePath = os.path.join(path, fileName)
-
-    if(not os.path.exists(filePath)):
-        with open(filePath, "w") as f:
-            f.write(command)
-        # Only set permissions on Unix-like systems, on windows it is not needed
-        if(os.name != "nt"):
-            os.chmod(filePath, 0o755)
-
-    else:
-        questionary.print(f"Overwriting launch script.", style="fg:yellow")
-        with open(filePath, "w") as f:
-            f.write(command)
-        # Same here, only set permissions on Unix-like systems, on windows it is not needed
-        if(os.name != "nt"):
-            os.chmod(filePath, 0o755)
-
-    return
-
-
-def runMinecraftServer(serverName = None, path = "servers"):
-    if serverName is None:
-        serverName = questionary.select("Select a server to run:", choices=[name for name in os.listdir(path)
-        if os.path.isdir(os.path.join(path, name))]).ask()
-
-    if serverName not in serverInstances:
-        setupServerInstance(path+"/"+serverName, serverName)
-
-    if(serverName in serverInstances):
-        server = serverInstances[serverName]
-        if not server.running:
-            questionary.print(f"\nStarting Minecraft server '{serverName}' in background...", style="fg:green")
-            server.start()
-            input("\nPress Enter to return to menu...")
-        else:
-            questionary.print(f"\nServer '{serverName}' is already running.", style="fg:yellow")
-            input("\nPress Enter to return to menu...")
-    else:
-        questionary.print(f"Server '{serverName}' not found.", style="fg:red")
-        input("\nPress Enter to continue...")
-        return None
-
-
 def acceptEula(path):
     eulaPath = os.path.join(path, "eula.txt")
     with open(eulaPath, "w") as f:
         f.write("eula=true\n")
 
     return
-
-def _patch_server_properties(path: str, overrides: dict):
-    """
-    Read server.properties from `path`, apply key=value `overrides`, and write it back.
-    Creates the file if it doesn't exist yet (Minecraft will merge on first boot).
-    """
-    props_path = os.path.join(path, "server.properties")
-    lines = []
-
-    if os.path.isfile(props_path):
-        with open(props_path, "r") as f:
-            lines = f.readlines()
-
-    # Track which keys we've already patched
-    patched = set()
-    new_lines = []
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("#") or "=" not in stripped:
-            new_lines.append(line)
-            continue
-        key = stripped.split("=", 1)[0]
-        if key in overrides:
-            new_lines.append(f"{key}={overrides[key]}\n")
-            patched.add(key)
-        else:
-            new_lines.append(line)
-
-    # Append any keys that weren't already in the file
-    for key, value in overrides.items():
-        if key not in patched:
-            new_lines.append(f"{key}={value}\n")
-
-    with open(props_path, "w") as f:
-        f.writelines(new_lines)
-
-
-def setupServerInstance(path, serverName):
-    server = serverSessionsManager.ServerSession(serverName, utils.getConfig()["startMinecraftServerCommand"], path)
-    serverInstances[serverName] = server
-
-    # Inject RCON settings so the server is ready to accept RCON connections
-    rcon_password = utils.getConfig().get("rconPassword", "")
-    if rcon_password:
-        _patch_server_properties(path, {
-            "enable-rcon": "true",
-            "rcon.port":   "25575",
-            "rcon.password": rcon_password,
-        })
-
-    return server
-
-def attachToServer():
-    if not serverInstances:
-        questionary.print("No running servers to attach to.", style="fg:red")
-        return
-
-    questionary.print(f"RunningServers: {serverInstances}", style="fg:green")
-
-    serverName = questionary.select("Select a server to attach to:", choices=list(serverInstances.keys())).ask()
-    if serverName in serverInstances:
-        server = serverInstances[serverName]
-        server.attach()
-    else:
-        questionary.print(f"Server '{serverName}' not found.", style="fg:red")
-    return
-
-def closeAllServers():
-    for serverName, server in serverInstances.items():
-        if server.running:
-            questionary.print(f"\nStopping server '{serverName}'...", style="fg:yellow")
-            server.stop()
-    return
-
