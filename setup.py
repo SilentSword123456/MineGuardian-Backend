@@ -14,6 +14,9 @@ def firstLauch():
         questionary.print("\n👋 Goodbye!", style="bold fg:green")
         exit(0)
 
+    utils.generateRconPassword()
+    utils.generateFlaskKey()
+
     questionary.print("\nGreat! Let's set up the application!", style="bold fg:cyan")
 
     choice = questionary.confirm("Do you want to install the Minecraft Server automatically?", default=True).ask()
@@ -147,9 +150,55 @@ def acceptEula(path):
 
     return
 
+def _patch_server_properties(path: str, overrides: dict):
+    """
+    Read server.properties from `path`, apply key=value `overrides`, and write it back.
+    Creates the file if it doesn't exist yet (Minecraft will merge on first boot).
+    """
+    props_path = os.path.join(path, "server.properties")
+    lines = []
+
+    if os.path.isfile(props_path):
+        with open(props_path, "r") as f:
+            lines = f.readlines()
+
+    # Track which keys we've already patched
+    patched = set()
+    new_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("#") or "=" not in stripped:
+            new_lines.append(line)
+            continue
+        key = stripped.split("=", 1)[0]
+        if key in overrides:
+            new_lines.append(f"{key}={overrides[key]}\n")
+            patched.add(key)
+        else:
+            new_lines.append(line)
+
+    # Append any keys that weren't already in the file
+    for key, value in overrides.items():
+        if key not in patched:
+            new_lines.append(f"{key}={value}\n")
+
+    with open(props_path, "w") as f:
+        f.writelines(new_lines)
+
+
 def setupServerInstance(path, serverName):
     server = serverSessionsManager.ServerSession(serverName, utils.getConfig()["startMinecraftServerCommand"], path)
     serverInstances[serverName] = server
+
+    # Inject RCON settings so the server is ready to accept RCON connections
+    rcon_password = utils.getConfig().get("rconPassword", "")
+    if rcon_password:
+        _patch_server_properties(path, {
+            "enable-rcon": "true",
+            "rcon.port":   "25575",
+            "rcon.password": rcon_password,
+        })
+
     return server
 
 def attachToServer():
