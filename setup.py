@@ -5,7 +5,7 @@ import utils
 from utils import displayTitle, downloadFile
 import requests
 
-runningServers = {}
+serverInstances = {}
 
 def firstLauch():
     displayTitle()
@@ -122,11 +122,11 @@ def runMinecraftServer(serverName = None, path = "servers"):
         serverName = questionary.select("Select a server to run:", choices=[name for name in os.listdir(path)
         if os.path.isdir(os.path.join(path, name))]).ask()
 
-    if serverName not in runningServers:
+    if serverName not in serverInstances:
         setupServerInstance(path+"/"+serverName, serverName)
 
-    if(serverName in runningServers):
-        server = runningServers[serverName]
+    if(serverName in serverInstances):
+        server = serverInstances[serverName]
         if not server.running:
             questionary.print(f"\nStarting Minecraft server '{serverName}' in background...", style="fg:green")
             server.start()
@@ -149,26 +149,26 @@ def acceptEula(path):
 
 def setupServerInstance(path, serverName):
     server = serverSessionsManager.ServerSession(serverName, utils.getConfig()["startMinecraftServerCommand"], path)
-    runningServers[serverName] = server
+    serverInstances[serverName] = server
     return server
 
 def attachToServer():
-    if not runningServers:
+    if not serverInstances:
         questionary.print("No running servers to attach to.", style="fg:red")
         return
 
-    questionary.print(f"RunningServers: {runningServers}", style="fg:green")
+    questionary.print(f"RunningServers: {serverInstances}", style="fg:green")
 
-    serverName = questionary.select("Select a server to attach to:", choices=list(runningServers.keys())).ask()
-    if serverName in runningServers:
-        server = runningServers[serverName]
+    serverName = questionary.select("Select a server to attach to:", choices=list(serverInstances.keys())).ask()
+    if serverName in serverInstances:
+        server = serverInstances[serverName]
         server.attach()
     else:
         questionary.print(f"Server '{serverName}' not found.", style="fg:red")
     return
 
 def closeAllServers():
-    for serverName, server in runningServers.items():
+    for serverName, server in serverInstances.items():
         if server.running:
             questionary.print(f"\nStopping server '{serverName}'...", style="fg:yellow")
             server.stop()
