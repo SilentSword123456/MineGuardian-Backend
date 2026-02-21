@@ -1,5 +1,7 @@
 import os
 import secrets
+import time
+
 import questionary
 import requests
 import json
@@ -65,3 +67,10 @@ def generateFlaskKey():
     config['flaskConfig']['SECRET_KEY'] = secretKey
 
     storeConfig(config)
+
+def getPlayersOnline(serverInstance):
+    server = serverInstance
+    server.send_command("list")
+    # Wait a moment for the command to be processed and output to be captured
+    time.sleep(1)
+
