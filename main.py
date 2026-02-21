@@ -23,6 +23,7 @@ def main_menu():
 
         if choice == "Start API Server":
             utils.generateFlaskKey()
+            utils.generateRconPassword()
             start_server()
         elif choice == "Download Minecraft Server":
             setup.installMinecraftServer()
