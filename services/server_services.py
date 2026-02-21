@@ -1,5 +1,8 @@
 import os
+
+import serverSessionsManager
 import setup
+import utils
 
 DIR = os.path.dirname(os.path.abspath(__file__ + "/.."))
 
@@ -10,21 +13,22 @@ def get_all_servers():
         servers.append({
             'name': name,
             'id': i,
-            'isRunning': (setup.serverInstances[name].is_running() if name in setup.serverInstances else False)
+            'isRunning': (
+                serverSessionsManager.serverInstances[name].is_running() if name in serverSessionsManager.serverInstances else False)
         })
         i += 1
     return servers
 
 def start_server(serverName):
-    if serverName in setup.serverInstances and setup.serverInstances[serverName].is_running():
+    if serverName in serverSessionsManager.serverInstances and serverSessionsManager.serverInstances[serverName].is_running():
         raise ValueError(f"Server '{serverName}' is already running")
 
-    if serverName not in setup.serverInstances:
-        return setup.setupServerInstance(os.path.join(DIR, "servers", serverName), serverName)
+    if serverName not in serverSessionsManager.serverInstances:
+        return utils.setupServerInstance(os.path.join(DIR, "servers", serverName), serverName)
 
-    return setup.serverInstances[serverName]
+    return serverSessionsManager.serverInstances[serverName]
 
 def stop_server(serverName):
-    if serverName not in setup.serverInstances:
+    if serverName not in serverSessionsManager.serverInstances:
         raise ValueError(f"No instance found for Server '{serverName}'")
-    setup.serverInstances[serverName].stop()
+    serverSessionsManager.serverInstances[serverName].stop()
