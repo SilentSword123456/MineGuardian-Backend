@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 
+import serverSessionsManager
 import setup
 from services.server_services import get_all_servers, start_server, stop_server
 import api
@@ -24,7 +25,7 @@ def getGeneralServerInfo(serverName):
      if not match:
              return jsonify({'error': 'Server not found'}), 404
 
-     serverInstance = setup.serverInstances.get(serverName)
+     serverInstance = serverSessionsManager.serverInstances.get(serverName)
      if serverInstance and serverInstance.is_running():
              return jsonify(serverInstance.get_process_info())
 
