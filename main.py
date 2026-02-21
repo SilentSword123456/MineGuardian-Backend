@@ -1,6 +1,6 @@
 import os
-
 import questionary
+import serverSessionsManager
 import setup
 import utils
 import api
@@ -28,13 +28,13 @@ def main_menu():
         elif choice == "Download Minecraft Server":
             setup.installMinecraftServer()
         elif choice == "Run Minecraft Server":
-            setup.runMinecraftServer()
+            utils.runMinecraftServer()
         elif choice == "Attach to Server":
-            setup.attachToServer()
+            utils.attachToServer()
         elif choice == "Exit":
-            if(setup.serverInstances):
+            if(serverSessionsManager.serverInstances):
                 questionary.print("\nHold on, let me close all the running servers first.", style="fg:yellow")
-                setup.closeAllServers()
+                utils.closeAllServers()
             questionary.print("\nGoodbye!", style="bold fg:green")
             break
 
