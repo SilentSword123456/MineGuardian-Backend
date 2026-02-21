@@ -10,21 +10,21 @@ def get_all_servers():
         servers.append({
             'name': name,
             'id': i,
-            'isRunning': (setup.runningServers[name].is_running() if name in setup.runningServers else False)
+            'isRunning': (setup.serverInstances[name].is_running() if name in setup.serverInstances else False)
         })
         i += 1
     return servers
 
 def start_server(serverName):
-    if serverName in setup.runningServers and setup.runningServers[serverName].is_running():
+    if serverName in setup.serverInstances and setup.serverInstances[serverName].is_running():
         raise ValueError(f"Server '{serverName}' is already running")
 
-    if serverName not in setup.runningServers:
+    if serverName not in setup.serverInstances:
         return setup.setupServerInstance(os.path.join(DIR, "servers", serverName), serverName)
 
-    return setup.runningServers[serverName]
+    return setup.serverInstances[serverName]
 
 def stop_server(serverName):
-    if serverName not in setup.runningServers:
+    if serverName not in setup.serverInstances:
         raise ValueError(f"No instance found for Server '{serverName}'")
-    setup.runningServers[serverName].stop()
+    setup.serverInstances[serverName].stop()
