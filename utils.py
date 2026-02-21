@@ -5,8 +5,6 @@ import requests
 import json
 
 
-running_servers = {}
-
 def displayTitle():
     questionary.print("\n" + "="*50, style="bold")
     questionary.print("MineGuardian Backend CLI", style="bold fg:cyan")
