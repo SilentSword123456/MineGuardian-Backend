@@ -3,6 +3,8 @@ import threading
 import time
 import psutil
 
+import utils
+
 
 class ServerSession:
     def __init__(self, name, command, working_dir=None):
@@ -15,6 +17,7 @@ class ServerSession:
         self.max_history = 100
         self.running = False
         self.output_thread = None
+        self.rcon_port = utils.getRconInfo(name)["port"] if utils.getRconInfo(name) else 25575
 
     def add_listener(self, callback):
         if callback not in self.listeners:
@@ -232,7 +235,8 @@ class ServerSession:
                 "pid": self.process.pid,
                 "memory_usage_mb": round(total_rss / (1024 * 1024), 2),
                 "cpu_usage_percent": round(total_cpu_percent, 2),
-                "uptime_seconds": round(uptime, 2)
+                "uptime_seconds": round(uptime, 2),
+                "online_players": utils.getPlayersOnline(self)
             }
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             return None
