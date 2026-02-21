@@ -1,3 +1,5 @@
+import os
+
 import questionary
 import setup
 import utils
@@ -35,12 +37,15 @@ def main_menu():
             questionary.print("\nGoodbye!", style="bold fg:green")
             break
 
-def start_server():
+def start_server(host=None,port=None,debug=None):
     questionary.print("\nStart API Server\n", style="bold fg:cyan")
 
-    host = questionary.text("Host:", default="0.0.0.0").ask()
-    port = questionary.text("Port:", default="5000").ask()
-    debug = questionary.confirm("Enable debug mode?", default=False).ask()
+    if(host is None):
+        host = questionary.text("Host:", default="0.0.0.0").ask()
+    if(port is None):
+        port = questionary.text("Port:", default="5000").ask()
+    if(debug is None):
+        debug = questionary.confirm("Enable debug mode?", default=False).ask()
 
     questionary.print(f"\nStarting server on {host}:{port}", style="fg:green")
     questionary.print("Press Ctrl+C to stop\n", style="fg:yellow")
@@ -56,8 +61,14 @@ def start_server():
         input("\nPress Enter to continue...")
 
 if __name__ == '__main__':
-    #if(not os.path.isfile("config.json")):
-    #    setup.firstLauch()
+    if(not os.path.isfile("config.json")):
+        setup.firstLauch()
+
+    if(utils.getConfig() is None):
+        questionary.print("Configuration error. Please fix your config.json file and restart the application.", style="fg:red")
+
+    if(utils.getConfig()["autoStartApiServer"]):
+        start_server(**utils.getConfig()["defaultApiServerConfig"])
 
     main_menu()
 
