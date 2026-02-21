@@ -82,7 +82,7 @@ def generateRconPassword():
 
     storeConfig(config)
 
-def getPlayersOnline(serverInstance, port: int = 25575) -> dict[str, int | list[str]]:
+def getPlayersOnline(serverInstance) -> dict[str, int | list[str]]:
     """
     Send the 'list' command to a running server via RCON and return the response.
     Requires the server to have RCON enabled with the password from config.json.
@@ -235,16 +235,6 @@ def _patch_server_properties(path: str, overrides: dict):
 def setupServerInstance(path, serverName):
     server = serverSessionsManager.ServerSession(serverName, getConfig()["startMinecraftServerCommand"], path)
     serverSessionsManager.serverInstances[serverName] = server
-
-    # Inject RCON settings so the server is ready to accept RCON connections
-    rcon_password = getConfig().get("rconPassword", "")
-    if rcon_password:
-        _patch_server_properties(path, {
-            "enable-rcon": "true",
-            "rcon.port":   "25575",
-            "rcon.password": rcon_password,
-        })
-
     return server
 
 
@@ -270,3 +260,56 @@ def closeAllServers():
             questionary.print(f"\nStopping server '{serverName}'...", style="fg:yellow")
             server.stop()
     return
+
+def getNewPort(usedPorts: set | None=None, type="server") -> int:
+    if usedPorts is None:
+        usedPorts = serverSessionsManager.usedPorts
+
+    if type not in ("server", "rcon"):
+        raise ValueError("type must be 'server' or 'rcon'")
+
+    basePort = 25565
+    if type == "rcon":
+        basePort = 25575
+
+    while basePort in usedPorts:
+        basePort += 1
+        if basePort > 65535:
+            raise RuntimeError("No available ports")
+
+    return basePort
+
+def assignNewPort(serverInstance: serverSessionsManager.serverSession, port: int, type, usedPorts: set | None=None):
+    if type not in ("server", "rcon"):
+        raise ValueError("type must be 'server' or 'rcon'")
+    if usedPorts is None:
+        usedPorts = serverSessionsManager.usedPorts
+
+    if port in usedPorts:
+        raise ValueError(f"Port {port} is already in use")
+
+    if type == "server":
+        updateServerSettings(serverInstance.working_dir, port)
+    else:
+        updateRconSettings(serverInstance.working_dir, port)
+
+    usedPorts.add(port)
+    return port
+
+def updateServerSettings(path, port: int = 25565):
+    # Inject server port settings so the server is ready to run on the assigned port
+    _patch_server_properties(path, {
+        "server-port": port,
+        "query.port": port,
+    })
+
+
+def updateRconSettings(path, port: int = 25575):
+    # Inject RCON settings so the server is ready to accept RCON connections
+    rcon_password = getConfig().get("rconPassword", "")
+    if rcon_password:
+        _patch_server_properties(path, {
+            "enable-rcon": "true",
+            "rcon.port": port,
+            "rcon.password": rcon_password,
+        })
