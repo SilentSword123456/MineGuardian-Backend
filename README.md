@@ -5,11 +5,12 @@ A Python-based backend and CLI tool for managing Minecraft servers. It allows yo
 ## Features
 
 - **CLI Interface**: Interactive menu to manage servers.
-- **REST API**: Endpoints to list, start, and stop servers.
+- **REST API**: Modular endpoints to list, start, and stop servers.
 - **Real-time Console**: Stream Minecraft server logs via SocketIO with 100-line history replay on connection.
 - **Hardened API**: Robust websocket handlers that prevent server crashes from invalid client data.
 - **Automatic Installation**: Helper scripts to download Vanilla Minecraft servers.
 - **Server Management**: Run multiple servers in the background.
+- **Auto-start API**: Configuration option to automatically launch the API server on startup.
 - **Demo Client**: Minimal Python client for testing websocket connectivity.
 
 ## Stack
@@ -68,8 +69,8 @@ From the menu, you can:
 
 The API can be started directly from `main.py` or by calling `api.py` (though `main.py` is the preferred way as it handles setup).
 
-- **Host**: Default `0.0.0.0`
-- **Port**: Default `5000`
+- **Auto-start**: Can be enabled in `config.json` via `autoStartApiServer`.
+- **Host/Port**: Default `0.0.0.0:5000`, configurable in `config.json`.
 
 #### API Endpoints
 
@@ -100,12 +101,20 @@ The project uses a `config.json` file for settings:
     "flaskConfig": {
         "SECRET_KEY": "your-secret-key",
         "SOCKETIO_CORS_ALLOWED_ORIGINS": "*"
+    },
+    "autoStartApiServer": true,
+    "defaultApiServerConfig": {
+        "host": "0.0.0.0",
+        "port": 5000,
+        "debug": true
     }
 }
 ```
 
 - `startMinecraftServerCommand`: The command used to launch the Minecraft `.jar` file.
 - `flaskConfig`: Standard Flask and SocketIO configurations.
+- `autoStartApiServer`: If set to `true`, the API server will start automatically when `main.py` is launched.
+- `defaultApiServerConfig`: Default settings (host, port, debug) used when the API server starts automatically.
 
 ## Project Structure
 
@@ -116,6 +125,9 @@ The project uses a `config.json` file for settings:
 ├── tests/                  # Automated test suite
 │   ├── test_api_websockets.py
 │   └── reproduce_errors.py
+├── services/               # Modular service layer and blueprints
+│   ├── servers.py          # API Routes for server management
+│   └── server_services.py  # Business logic for server operations
 ├── api.py                  # Flask and SocketIO implementation
 ├── main.py                 # CLI entry point and menu logic
 ├── setup.py                # Server installation and instance setup logic
