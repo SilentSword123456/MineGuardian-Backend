@@ -276,10 +276,7 @@ class ServerSession:
                 "name": self.name,
                 "is_running": True,
                 "pid": self.process.pid,
-                "memory_usage_mb": self.get_memory_usage_mb(),
-                "cpu_usage_percent": self.get_cpu_usage_percent(),
-                "uptime_seconds": round(uptime, 2),
-                "online_players": utils.getPlayersOnline(self)
+                "uptime_seconds": round(uptime, 2)
             }
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             return None
