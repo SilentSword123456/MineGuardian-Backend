@@ -181,57 +181,94 @@ class ServerSession:
 
 
 
-    def get_process_info(self):
+    def _ensure_psutil_proc(self):
         if not self.is_running() or self.process is None:
-            return None
+            return False
 
         try:
             # Cache the psutil.Process object to allow cpu_percent() to work across calls
             if not hasattr(self, '_psutil_proc') or self._psutil_proc.pid != self.process.pid:
                 self._psutil_proc = psutil.Process(self.process.pid)
                 self._child_procs = {} # Reset child cache for new process
-            
-            p = self._psutil_proc
-            
-            total_rss = 0
-            total_cpu_percent = 0.0
-            
-            # Using oneshot() makes multiple attribute retrieval more efficient
-            try:
-                with p.oneshot():
-                    total_rss += p.memory_info().rss
-                    # The first call to cpu_percent(None) on a new object returns 0.0
-                    # but subsequent calls on the SAME object will return correct values
-                    total_cpu_percent += p.cpu_percent(interval=None)
-                    create_time = p.create_time()
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                return None
+            return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return False
 
-            # Aggregate usage from all child processes (the actual Minecraft server)
+    def get_memory_usage_mb(self):
+        if not self._ensure_psutil_proc():
+            return 0.0
+
+        try:
+            p = self._psutil_proc
+            total_rss = 0
+
+            try:
+                total_rss += p.memory_info().rss
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                return 0.0
+
+            try:
+                for child in p.children(recursive=True):
+                    try:
+                        total_rss += child.memory_info().rss
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+
+            return round(total_rss / (1024 * 1024), 2)
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            return 0.0
+
+    def get_cpu_usage_percent(self):
+        if not self._ensure_psutil_proc():
+            return 0.0
+
+        try:
+            p = self._psutil_proc
+            total_cpu_percent = 0.0
+
+            try:
+                total_cpu_percent += p.cpu_percent(interval=None)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                return 0.0
+
             try:
                 children = p.children(recursive=True)
                 current_child_pids = set()
-                
+
                 for child in children:
                     pid = child.pid
                     current_child_pids.add(pid)
-                    
-                    # Cache children as well so their cpu_percent(None) works across calls
+
                     if pid not in self._child_procs:
                         self._child_procs[pid] = child
-                        
+
                     try:
-                        with self._child_procs[pid].oneshot():
-                            total_rss += self._child_procs[pid].memory_info().rss
-                            total_cpu_percent += self._child_procs[pid].cpu_percent(interval=None)
+                        total_cpu_percent += self._child_procs[pid].cpu_percent(interval=None)
                     except (psutil.NoSuchProcess, psutil.AccessDenied):
                         continue
-                
+
                 # Cleanup dead children from cache
                 self._child_procs = {pid: proc for pid, proc in self._child_procs.items() if pid in current_child_pids}
-                
+
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
+
+            return round(total_cpu_percent / (psutil.cpu_count() or 1), 2)
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            return 0.0
+
+    def get_process_info(self):
+        if not self._ensure_psutil_proc():
+            return None
+
+        try:
+            p = self._psutil_proc
+            try:
+                create_time = p.create_time()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                return None
 
             uptime = time.time() - create_time
 
@@ -239,8 +276,8 @@ class ServerSession:
                 "name": self.name,
                 "is_running": True,
                 "pid": self.process.pid,
-                "memory_usage_mb": round(total_rss / (1024 * 1024), 2),
-                "cpu_usage_percent": round(total_cpu_percent, 2),
+                "memory_usage_mb": self.get_memory_usage_mb(),
+                "cpu_usage_percent": self.get_cpu_usage_percent(),
                 "uptime_seconds": round(uptime, 2),
                 "online_players": utils.getPlayersOnline(self)
             }
