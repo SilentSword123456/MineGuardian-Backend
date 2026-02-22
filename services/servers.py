@@ -31,8 +31,10 @@ def getGeneralServerInfo(serverName):
      # Not running: return basic metadata
      return jsonify(match)
 
+
+
 @servers_bp.route('/servers/<serverName>/start', methods=['POST'])
-def start_server_route(serverName):
+def start_server(serverName):
     if not serverName:
         return jsonify({'error': 'No serverName provided'}), 400
     try:
@@ -43,8 +45,10 @@ def start_server_route(serverName):
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
 
+
+
 @servers_bp.route('/servers/<serverName>/stop', methods=['POST'])
-def stop_server_route(serverName):
+def stop_server(serverName):
     if not serverName:
         return jsonify({'error': 'No serverName provided'}), 400
     try:
@@ -52,6 +56,8 @@ def stop_server_route(serverName):
         return jsonify({'message': f"Server '{serverName}' stopped successfully"}), 200
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
+
+
 
 @servers_bp.route('/servers/<serverName>/stats', methods=['GET'])
 def get_server_stats(serverName):
@@ -62,14 +68,21 @@ def get_server_stats(serverName):
     if not serverInstance or not serverInstance.is_running():
         return jsonify({'error': f"Server '{serverName}' is not running"}), 404
 
+    # Use cached stats if available and fresh (less than 10s old)
+    import time
+    if serverInstance.last_stats and (time.time() - serverInstance.last_stats_time < 10):
+        return jsonify(serverInstance.last_stats), 200
+
     try:
-        return jsonify(
-            {
-                'cpu_usage_percent': serverInstance.get_cpu_usage_percent(),
-                'memory_usage_mb': serverInstance.get_memory_usage_mb(),
-                "online_players": getPlayersOnline(serverInstance)
-            }
-        ), 200
+        stats = {
+            'cpu_usage_percent': serverInstance.get_cpu_usage_percent(),
+            'memory_usage_mb': serverInstance.get_memory_usage_mb(),
+            "online_players": getPlayersOnline(serverInstance)
+        }
+        # Update cache
+        serverInstance.last_stats = stats
+        serverInstance.last_stats_time = time.time()
+        return jsonify(stats), 200
     except Exception as e:
         return jsonify({'error': f"Failed to retrieve stats: {str(e)}"}), 500
 
