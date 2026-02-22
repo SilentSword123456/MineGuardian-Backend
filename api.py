@@ -1,9 +1,11 @@
 from flask import Flask, jsonify, request
 import os
+import time
 from flask_cors import CORS
 
 import serverSessionsManager
 import setup
+import utils
 from utils import getConfig
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
@@ -89,6 +91,39 @@ def handleConsole(data):
 
     serverInstance = serverSessionsManager.serverInstances[serverName]
     serverInstance.send_command(data['message'])
+
+def _broadcast_stats():
+    """Background task to broadcast server stats via SocketIO every 5 seconds."""
+    while True:
+        socketio.sleep(5)
+        # Use list() to avoid dictionary modification issues
+        for serverName, serverInstance in list(serverSessionsManager.serverInstances.items()):
+            if serverInstance.is_running():
+                try:
+                    # Collect CPU and Memory stats
+                    stats = {
+                        'cpu_usage_percent': serverInstance.get_cpu_usage_percent(),
+                        'memory_usage_mb': serverInstance.get_memory_usage_mb(),
+                    }
+
+                    # Try to get player info via RCON
+                    try:
+                        stats['online_players'] = utils.getPlayersOnline(serverInstance)
+                    except Exception:
+                        # RCON might not be ready or enabled yet
+                        stats['online_players'] = {"online": 0, "max": 0, "players": []}
+
+                    # Store in instance for caching (Option B benefit)
+                    serverInstance.last_stats = stats
+                    serverInstance.last_stats_time = time.time()
+
+                    # Emit to specific room for this server
+                    socketio.emit('stats', stats, to=serverName)
+                    print("Broadcasted stats for server '{}': {}".format(serverName, stats))
+                except Exception as e:
+                    print(f"Error broadcasting stats for '{serverName}': {e}")
+
+socketio.start_background_task(_broadcast_stats)
 
 def startServer(debug=False, port=5000, host="0.0.0.0"):
     socketio.run(app, debug=debug, port=port, host=host, allow_unsafe_werkzeug=True)
