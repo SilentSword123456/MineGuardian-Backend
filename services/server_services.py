@@ -19,7 +19,7 @@ def get_all_servers():
         i += 1
     return servers
 
-def start_server(serverName):
+def get_server_instance(serverName):
     if serverName in serverSessionsManager.serverInstances and serverSessionsManager.serverInstances[serverName].is_running():
         raise ValueError(f"Server '{serverName}' is already running")
 
