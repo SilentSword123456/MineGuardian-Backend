@@ -32,9 +32,8 @@ def getGeneralServerInfo(serverName):
      # Not running: return basic metadata
      return jsonify(match)
 
-@servers_bp.route('/start_server', methods=['POST'])
-def start_server_route():
-    serverName = request.json.get('serverName')
+@servers_bp.route('/servers/<serverName>/start', methods=['POST'])
+def start_server_route(serverName):
     if not serverName:
         return jsonify({'error': 'No serverName provided'}), 400
     try:
@@ -45,9 +44,8 @@ def start_server_route():
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
 
-@servers_bp.route('/stop_server', methods=['POST'])
-def stop_server_route():
-    serverName = request.json.get('serverName')
+@servers_bp.route('/servers/<serverName>/stop', methods=['POST'])
+def stop_server_route(serverName):
     if not serverName:
         return jsonify({'error': 'No serverName provided'}), 400
     try:
@@ -55,3 +53,4 @@ def stop_server_route():
         return jsonify({'message': f"Server '{serverName}' stopped successfully"}), 200
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
+
