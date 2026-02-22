@@ -26,10 +26,20 @@ app.register_blueprint(servers_bp)
 def register_socketio_listener(serverName, serverInstance):
     """Ensures a SocketIO broadcast listener is registered for the server instance."""
     if not hasattr(serverInstance, '_socketio_listener_added'):
-        def socketio_listener(line):
+        # Existing console listener
+        def socketio_console_listener(line):
             socketio.emit('console', {'data': line}, to=serverName)
             socketio.sleep(0) # Yield for the event loop
-        serverInstance.add_listener(socketio_listener)
+        serverInstance.add_listener(socketio_console_listener)
+
+        # New status listener (the "hook" in action)
+        def socketio_status_listener(is_running):
+            socketio.emit('status', {'running': is_running}, to=serverName)
+            socketio.sleep(0)
+
+        # Register the status listener to the server instance
+        serverInstance.add_status_listener(socketio_status_listener)
+
         serverInstance._socketio_listener_added = True
 
 @app.route('/')
@@ -46,8 +56,12 @@ def handle_connect():
         return False
 
     if serverName not in serverSessionsManager.serverInstances:
-        emit('error', {'data': f"Server '{serverName}' is not running"})
-        return False
+        try:
+            serverInstance = utils.setupServerInstance(os.path.join(DIR, "servers", serverName), serverName)
+            register_socketio_listener(serverName, serverInstance)
+        except ValueError as e:
+            emit('error', {'data': str(e)})
+            return False
 
     join_room(serverName)
     print(f'Client connected to server room: {serverName}')
@@ -61,6 +75,9 @@ def handle_connect():
     # Send recent history to the newly connected client
     for line in serverInstance.log_history:
         emit('console', {'data': line})
+
+    socketio.emit('status', {'running': serverInstance.running}, to=serverName)
+
 
 
 @socketio.on('disconnect')
@@ -118,7 +135,7 @@ def _broadcast_stats():
                     serverInstance.last_stats_time = time.time()
 
                     # Emit to specific room for this server
-                    socketio.emit('stats', stats, to=serverName)
+                    socketio.emit('resources', stats, to=serverName)
                     print("Broadcasted stats for server '{}': {}".format(serverName, stats))
                 except Exception as e:
                     print(f"Error broadcasting stats for '{serverName}': {e}")
