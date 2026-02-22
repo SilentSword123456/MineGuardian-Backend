@@ -30,15 +30,18 @@ class ServerSession:
             self.listeners.remove(callback)
 
     def _broadcast(self, line):
-        self.log_history.append(line)
-        if len(self.log_history) > self.max_history:
-            self.log_history.pop(0)
-        
+        self._updateHistory(line)
+
         for listener in self.listeners:
             try:
                 listener(line)
             except Exception as e:
                 print(f"Error in listener callback: {e}")
+
+    def _updateHistory(self, line):
+        self.log_history.append(line)
+        if len(self.log_history) > self.max_history:
+            self.log_history.pop(0)
 
     def start(self):
         if self.running:
@@ -97,6 +100,7 @@ class ServerSession:
         try:
             self.process.stdin.write(command + "\n")
             self.process.stdin.flush()
+            self._updateHistory(f"> {command}") # TODO: after adding auth and authorisation, we can mark commands from the user differently in the history
             print(f"Sent command: {command}")
             return True
         except Exception as e:
