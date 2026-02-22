@@ -14,12 +14,25 @@ class ServerSession:
         self.working_dir = working_dir
         self.process = None
         self.listeners = []
+        self.status_listeners = []
         self.log_history = []
         self.max_history = 100
-        self.running = False
+        self._running = False
         self.output_thread = None
         self.port = utils.assignNewPort(self,utils.getNewPort(type="server"), type="server")
         self.rcon_port = utils.assignNewPort(self,utils.getNewPort(type="rcon"), type="rcon")
+
+    @property
+    def running(self):
+        """Getter for the running state."""
+        return self._running
+
+    @running.setter
+    def running(self, value):
+        """Setter that triggers a broadcast if the value actually changes."""
+        if self._running != value:
+            self._running = value
+            self._broadcast_status(value)
 
     def add_listener(self, callback):
         if callback not in self.listeners:
@@ -28,6 +41,19 @@ class ServerSession:
     def remove_listener(self, callback):
         if callback in self.listeners:
             self.listeners.remove(callback)
+
+    def add_status_listener(self, callback):
+        """Register a callback for status changes (running state)."""
+        if callback not in self.status_listeners:
+            self.status_listeners.append(callback)
+
+    def _broadcast_status(self, is_running):
+        """Notify all registered status listeners."""
+        for listener in self.status_listeners:
+            try:
+                listener(is_running)
+            except Exception as e:
+                print(f"Error in status listener callback: {e}")
 
     def _broadcast(self, line):
         self._updateHistory(line)
