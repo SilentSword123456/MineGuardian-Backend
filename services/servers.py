@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify
 import serverSessionsManager
-from services.server_services import get_all_servers, start_server, stop_server
+from services.server_services import get_all_servers, get_server_instance, stop_server
 import api
 from utils import getPlayersOnline
 
@@ -34,11 +34,11 @@ def getGeneralServerInfo(serverName):
 
 
 @servers_bp.route('/servers/<serverName>/start', methods=['POST'])
-def start_server(serverName):
+def start_minecraft_server(serverName):
     if not serverName:
         return jsonify({'error': 'No serverName provided'}), 400
     try:
-        serverInstance = start_server(serverName)
+        serverInstance = get_server_instance(serverName)
         api.register_socketio_listener(serverName, serverInstance)
         serverInstance.start()
         return jsonify({'message': f"Server '{serverName}' started successfully"}), 200
@@ -48,7 +48,7 @@ def start_server(serverName):
 
 
 @servers_bp.route('/servers/<serverName>/stop', methods=['POST'])
-def stop_server(serverName):
+def stop_minecraft_server(serverName):
     if not serverName:
         return jsonify({'error': 'No serverName provided'}), 400
     try:
