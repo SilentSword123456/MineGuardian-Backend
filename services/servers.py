@@ -1,9 +1,8 @@
-from flask import Blueprint, jsonify, request
-
+from flask import Blueprint, jsonify
 import serverSessionsManager
-import setup
 from services.server_services import get_all_servers, start_server, stop_server
 import api
+from utils import getPlayersOnline
 
 servers_bp = Blueprint('servers', __name__)
 
@@ -53,4 +52,24 @@ def stop_server_route(serverName):
         return jsonify({'message': f"Server '{serverName}' stopped successfully"}), 200
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
+
+@servers_bp.route('/servers/<serverName>/stats', methods=['GET'])
+def get_server_stats(serverName):
+    if not serverName:
+        return jsonify({'error': 'No serverName provided'}), 400
+
+    serverInstance = serverSessionsManager.serverInstances.get(serverName)
+    if not serverInstance or not serverInstance.is_running():
+        return jsonify({'error': f"Server '{serverName}' is not running"}), 404
+
+    try:
+        return jsonify(
+            {
+                'cpu_usage_percent': serverInstance.get_cpu_usage_percent(),
+                'memory_usage_mb': serverInstance.get_memory_usage_mb(),
+                "online_players": getPlayersOnline(serverInstance)
+            }
+        ), 200
+    except Exception as e:
+        return jsonify({'error': f"Failed to retrieve stats: {str(e)}"}), 500
 
