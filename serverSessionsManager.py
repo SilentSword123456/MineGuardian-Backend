@@ -21,6 +21,8 @@ class ServerSession:
         self.output_thread = None
         self.port = utils.assignNewPort(self,utils.getNewPort(type="server"), type="server")
         self.rcon_port = utils.assignNewPort(self,utils.getNewPort(type="rcon"), type="rcon")
+        self.last_stats = None
+        self.last_stats_time = 0
 
     @property
     def running(self):
