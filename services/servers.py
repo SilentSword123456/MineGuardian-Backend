@@ -1,8 +1,8 @@
 from flask import Blueprint, jsonify
 import serverSessionsManager
-from services.server_services import get_all_servers, get_server_instance, stop_server
+import utils
 import api
-from utils import getPlayersOnline
+from services.server_services import get_all_servers, get_server_instance, stop_server
 
 servers_bp = Blueprint('servers', __name__)
 
@@ -60,7 +60,7 @@ def stop_minecraft_server(serverName):
 
 
 @servers_bp.route('/servers/<serverName>/stats', methods=['GET'])
-def get_server_stats(serverName):
+def get_server_stats_endpoint(serverName):
     if not serverName:
         return jsonify({'error': 'No serverName provided'}), 400
 
@@ -68,20 +68,9 @@ def get_server_stats(serverName):
     if not serverInstance or not serverInstance.is_running():
         return jsonify({'error': f"Server '{serverName}' is not running"}), 404
 
-    # Use cached stats if available and fresh (less than 10s old)
-    import time
-    if serverInstance.last_stats and (time.time() - serverInstance.last_stats_time < 10):
-        return jsonify(serverInstance.last_stats), 200
-
     try:
-        stats = {
-            'cpu_usage_percent': serverInstance.get_cpu_usage_percent(),
-            'memory_usage_mb': serverInstance.get_memory_usage_mb(),
-            "online_players": getPlayersOnline(serverInstance)
-        }
-        # Update cache
-        serverInstance.last_stats = stats
-        serverInstance.last_stats_time = time.time()
+        # Use the centralized function (it handles caching internally)
+        stats = utils.get_server_stats(serverInstance)
         return jsonify(stats), 200
     except Exception as e:
         return jsonify({'error': f"Failed to retrieve stats: {str(e)}"}), 500
