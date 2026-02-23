@@ -26,6 +26,7 @@ app.register_blueprint(servers_bp)
 def register_socketio_listener(serverName, serverInstance):
     """Ensures a SocketIO broadcast listener is registered for the server instance."""
     if not hasattr(serverInstance, '_socketio_listener_added'):
+        print(f"Registering SocketIO listeners for server '{serverName}'")
         # Existing console listener
         def socketio_console_listener(line):
             socketio.emit('console', {'data': line}, to=serverName)
@@ -41,6 +42,8 @@ def register_socketio_listener(serverName, serverInstance):
         serverInstance.add_status_listener(socketio_status_listener)
 
         serverInstance._socketio_listener_added = True
+    else:
+        print(f"SocketIO listeners already registered for server '{serverName}'")
 
 @app.route('/')
 def home():
@@ -52,31 +55,40 @@ def home():
 def handle_connect():
     serverName = request.args.get('serverName')
     if not serverName:
+        print("Connection attempt without serverName")
         emit('error', {'data': 'No serverName provided in connection'})
         return False
 
-    if serverName not in serverSessionsManager.serverInstances:
-        try:
+    try:
+        if serverName not in serverSessionsManager.serverInstances:
+            print(f"Initializing new server instance for '{serverName}' during connection")
             serverInstance = utils.setupServerInstance(os.path.join(DIR, "servers", serverName), serverName)
-            register_socketio_listener(serverName, serverInstance)
-        except ValueError as e:
-            emit('error', {'data': str(e)})
-            return False
+        else:
+            serverInstance = serverSessionsManager.serverInstances[serverName]
 
-    join_room(serverName)
-    print(f'Client connected to server room: {serverName}')
-    emit('message', {'data': f"Connected to server {serverName}"})
+        register_socketio_listener(serverName, serverInstance)
 
-    serverInstance = serverSessionsManager.serverInstances[serverName]
-    
-    # Ensure SocketIO listener is registered (especially if server was started via CLI)
-    register_socketio_listener(serverName, serverInstance)
+        join_room(serverName)
+        print(f'Client connected to server room: {serverName}')
+        emit('message', {'data': f"Connected to server {serverName}"})
 
-    # Send recent history to the newly connected client
-    for line in serverInstance.log_history:
-        emit('console', {'data': line})
+        for line in serverInstance.log_history:
+            emit('console', {'data': line})
 
-    socketio.emit('status', {'running': serverInstance.running}, to=serverName)
+        emit('status', {'running': serverInstance.running})
+
+        #if serverInstance.is_running():
+        stats = utils.get_server_stats(serverInstance)
+        emit('resources', stats)
+
+        socketio.emit('status', {'running': serverInstance.running}, to=serverName, include_self=False)
+
+    except Exception as e:
+        print(f"ERROR in handle_connect for '{serverName}': {e}")
+        import traceback
+        traceback.print_exc()
+        emit('error', {'data': f"Connection error: {str(e)}"})
+        return False
 
 
 
@@ -117,22 +129,8 @@ def _broadcast_stats():
         for serverName, serverInstance in list(serverSessionsManager.serverInstances.items()):
             if serverInstance.is_running():
                 try:
-                    # Collect CPU and Memory stats
-                    stats = {
-                        'cpu_usage_percent': serverInstance.get_cpu_usage_percent(),
-                        'memory_usage_mb': serverInstance.get_memory_usage_mb(),
-                    }
-
-                    # Try to get player info via RCON
-                    try:
-                        stats['online_players'] = utils.getPlayersOnline(serverInstance)
-                    except Exception:
-                        # RCON might not be ready or enabled yet
-                        stats['online_players'] = {"online": 0, "max": 0, "players": []}
-
-                    # Store in instance for caching (Option B benefit)
-                    serverInstance.last_stats = stats
-                    serverInstance.last_stats_time = time.time()
+                    # Collect stats using the centralized function (force=True to get fresh data for broadcast)
+                    stats = utils.get_server_stats(serverInstance, force=True)
 
                     # Emit to specific room for this server
                     socketio.emit('resources', stats, to=serverName)
