@@ -3,6 +3,7 @@ import secrets
 import questionary
 import requests
 import json
+import time
 from rcon import RconClient
 import serverSessionsManager
 
@@ -81,29 +82,50 @@ def generateRconPassword():
     config['rconPassword'] = rconPassword
 
     storeConfig(config)
+    
+def getMaxPlayers(serverInstance) -> int:
+    if serverInstance is None or not getattr(serverInstance, 'working_dir', None):
+        return 20
+
+    path = os.path.join(serverInstance.working_dir, "server.properties")
+    
+    if not os.path.isfile(path):
+        return 20  # Default Minecraft max players
+    
+    try:
+        with open(path, "r") as f:
+            for line in f:
+                if line.startswith("max-players="):
+                    return int(line.split("=", 1)[1].strip())
+    except Exception as e:
+        questionary.print(f"Error reading max players from server.properties: {e}", style="fg:red")
+
+    return 20  # Default if not found in file
 
 def getPlayersOnline(serverInstance) -> dict[str, int | list[str]]:
     """
     Send the 'list' command to a running server via RCON and return the response.
-    Requires the server to have RCON enabled with the password from config.json.
+    Returns a dictionary with 'online', 'max', and 'players' if successful.
+    If the server is not running or RCON communication fails, returns ONLY 'max'
+    to avoid reporting potentially inaccurate '0 players online' data.
     """
     if serverInstance is None or not serverInstance.running:
-        raise RuntimeError("Server instance is not running")
+        return {"max": getMaxPlayers(serverInstance)}
 
     host = "127.0.0.1"
     port = serverInstance.rcon_port
     config = getConfig()
     if config is None:
-        raise RuntimeError("Could not load config.json")
+        return {"max": getMaxPlayers(serverInstance)}
 
     password = config.get('rconPassword')
     if not password:
-        raise RuntimeError("No rconPassword found in config.json. Run generateRconPassword() first.")
+        return {"max": getMaxPlayers(serverInstance)}
 
-    with RconClient(host, port, password) as rcon:
-        output = rcon.send_command("list")
-        # The output should be in a format of "There are X of a max of Y players online: player1, player2, ..."
-        try:
+    try:
+        with RconClient(host, port, password) as rcon:
+            output = rcon.send_command("list")
+            # The output should be in a format of "There are X of a max of Y players online: player1, player2, ..."
             # Split on ": " to separate the counts sentence from the player names
             parts = output.split(": ", 1)
             counts_part = parts[0]   # "There are X of a max of Y players online"
@@ -122,10 +144,41 @@ def getPlayersOnline(serverInstance) -> dict[str, int | list[str]]:
                 "max": max_players,
                 "players": players
             }
-        except (IndexError, ValueError) as e:
-            raise RuntimeError(
-                f"Failed to parse RCON list response: '{output}' — {e}"
-            ) from e
+    except Exception:
+        # If RCON connection, authentication, or parsing fails, return only max capacity
+        return {"max": getMaxPlayers(serverInstance)}
+
+def get_server_stats(serverInstance, force=False):
+    """
+    Collects stats for a server instance. Uses cached data if it's recent (e.g., < 5s)
+    unless 'force' is True.
+    """
+    # Check cache (assumes last_stats and last_stats_time are initialized on the instance)
+    now = time.time()
+    last_stats = getattr(serverInstance, 'last_stats', None)
+    last_time = getattr(serverInstance, 'last_stats_time', 0)
+
+    if not force and last_stats and (now - last_time < 5):
+        return last_stats
+
+    # Collect new stats
+    stats = {
+        'cpu_usage_percent': serverInstance.get_cpu_usage_percent(),
+        'memory_usage_mb': serverInstance.get_memory_usage_mb(),
+    }
+
+    # Safely try to get player info
+    try:
+        stats['online_players'] = getPlayersOnline(serverInstance)
+    except Exception:
+        # Final safety fallback if getPlayersOnline fails unexpectedly
+        stats['online_players'] = {"max": getMaxPlayers(serverInstance)}
+
+    # Update cache
+    serverInstance.last_stats = stats
+    serverInstance.last_stats_time = now
+
+    return stats
 
 def getRconInfo(serverName):
     file = f"servers/{serverName}/rcon_info.json"
