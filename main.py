@@ -1,7 +1,7 @@
 import os
 import questionary
 import serverSessionsManager
-import setup
+import manageLocalServers
 import utils
 import api
 from utils import displayTitle
@@ -25,8 +25,6 @@ def main_menu():
             utils.generateFlaskKey()
             utils.generateRconPassword()
             start_server()
-        elif choice == "Download Minecraft Server":
-            setup.installMinecraftServer()
         elif choice == "Run Minecraft Server":
             utils.runMinecraftServer()
         elif choice == "Attach to Server":
@@ -61,9 +59,23 @@ def start_server(host=None,port=None,debug=None):
         api.stopServer()
         input("\nPress Enter to continue...")
 
+
+def firstLaunch():
+    displayTitle()
+    choice = questionary.confirm(
+        "It looks like this is your first time running the application. Would you like to set it up now?",
+        default=True).ask()
+    if (not choice):
+        questionary.print("\nGoodbye!", style="bold fg:green")
+        exit(0)
+
+    utils.generateRconPassword()
+    utils.generateFlaskKey()
+
+
 if __name__ == '__main__':
     if(not os.path.isfile("config.json")):
-        setup.firstLauch()
+        firstLaunch()
 
     if(utils.getConfig() is None):
         questionary.print("Configuration error. Please fix your config.json file and restart the application.", style="fg:red")
