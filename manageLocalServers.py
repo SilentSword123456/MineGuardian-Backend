@@ -64,6 +64,37 @@ def installMinecraftServer(serverSoftware=None, serverVersion=None, serverName=N
     return True
 
 
+def getAvailableVersions(serverSoftware):
+    """
+    Returns a flat list of available Minecraft version IDs for the given server software.
+    Format: ["latest", "1.21.11", "1.21.10", ...] ordered newest to oldest.
+    """
+    if serverSoftware == "vanilla":
+        allVersionsUrl = "https://launchermeta.mojang.com/mc/game/version_manifest.json"
+        try:
+            response = requests.get(allVersionsUrl)
+            response.raise_for_status()
+            versionData = response.json()
+
+            versions = ["latest"] + [
+                ver["id"]
+                for ver in versionData["versions"]
+                if ver["type"] == "release"
+            ]
+
+            return {"versions": versions}
+
+        except requests.exceptions.RequestException as e:
+            return {"error": f"Error fetching version data: {e}"}
+
+    elif serverSoftware == "spigot":
+        return {"error": "Spigot version listing is not yet implemented."}
+
+    else:
+        return {"error": "Invalid server software. Please choose between \"vanilla\" or \"spigot\""}
+
+
+
 def addAcceptEula(path):
     eulaPath = os.path.join(path, "eula.txt")
     with open(eulaPath, "w") as f:
