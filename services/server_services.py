@@ -1,7 +1,5 @@
 import os
-
 import serverSessionsManager
-import setup
 import utils
 
 DIR = os.path.dirname(os.path.abspath(__file__ + "/.."))
