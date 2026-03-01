@@ -4,7 +4,7 @@ import time
 from flask_cors import CORS
 
 import serverSessionsManager
-import setup
+import manageLocalServers
 import utils
 from utils import getConfig
 from flask_socketio import SocketIO, emit, join_room, leave_room
