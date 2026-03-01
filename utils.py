@@ -366,3 +366,7 @@ def updateRconSettings(path, port: int = 25575):
             "rcon.port": port,
             "rcon.password": rcon_password,
         })
+
+def getLocalServers():
+    return [name for name in os.listdir("servers") if os.path.isdir(os.path.join("servers", name))]
+
