@@ -1,4 +1,6 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
+
+import manageLocalServers
 import serverSessionsManager
 import utils
 import api
@@ -74,4 +76,35 @@ def get_server_stats_endpoint(serverName):
         return jsonify(stats), 200
     except Exception as e:
         return jsonify({'error': f"Failed to retrieve stats: {str(e)}"}), 500
+
+@servers_bp.route('/manage/addServer', methods=['POST'])
+def add_server():
+    args = request.get_json()
+    if not args or 'serverName' not in args or 'serverSoftware' not in args or 'serverVersion' not in args:
+        return jsonify({'error': 'Missing required parameters: serverName, serverSoftware, serverVersion'}), 400
+
+    serverName = args['serverName']
+    serverSoftware = args['serverSoftware'].lower()
+    serverVersion = args['serverVersion']
+    acceptEula = args.get('acceptEula', False)
+
+    return jsonify(manageLocalServers.installMinecraftServer(serverSoftware, serverVersion, serverName, acceptEula))
+
+
+@servers_bp.route('/manage/<software>/getAvailableVersions', methods=['GET'])
+def get_available_software(software):
+    result = manageLocalServers.getAvailableVersions(software.lower())
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result), 200
+
+
+
+@servers_bp.route('/servers/<serverName>/uninstall', methods=['DELETE'])
+def remove_server(serverName):
+    if not serverName:
+        return jsonify({'error': 'No serverName provided'}), 400
+
+    return jsonify(manageLocalServers.uninstallMinecraftServer(serverName))
+
 
