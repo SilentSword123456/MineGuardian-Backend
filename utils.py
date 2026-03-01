@@ -232,7 +232,7 @@ def runMinecraftServer(serverName = None, path = "servers"):
         if os.path.isdir(os.path.join(path, name))]).ask()
 
     if serverName not in serverSessionsManager.serverInstances:
-        setupServerInstance(path+"/"+serverName, serverName)
+        setupServerInstance(os.path.join(path, serverName), serverName)
 
     if(serverName in serverSessionsManager.serverInstances):
         server = serverSessionsManager.serverInstances[serverName]
@@ -254,7 +254,23 @@ def _patch_server_properties(path: str, overrides: dict):
     Read server.properties from `path`, apply key=value `overrides`, and write it back.
     Creates the file if it doesn't exist yet (Minecraft will merge on first boot).
     """
-    props_path = os.path.join(path, "server.properties")
+    if not path:
+        raise ValueError("_patch_server_properties: path must not be empty or None")
+
+    abs_path = os.path.abspath(path)
+    servers_dir = os.path.abspath("servers")
+
+    # Ensure the target directory is inside the servers/ folder, never the project root or above
+    if not abs_path.startswith(servers_dir + os.sep):
+        raise ValueError(
+            f"_patch_server_properties: refusing to write to '{abs_path}' — "
+            f"path must be inside the servers/ directory ('{servers_dir}')"
+        )
+
+    if not os.path.isdir(abs_path):
+        raise ValueError(f"_patch_server_properties: server directory does not exist: '{abs_path}'")
+
+    props_path = os.path.join(abs_path, "server.properties")
     lines = []
 
     if os.path.isfile(props_path):
@@ -286,7 +302,7 @@ def _patch_server_properties(path: str, overrides: dict):
 
 
 def setupServerInstance(path, serverName):
-    server = serverSessionsManager.ServerSession(serverName, getConfig()["startMinecraftServerCommand"], path)
+    server = serverSessionsManager.ServerSession(serverName, getConfig()["startMinecraftServerCommand"], os.path.abspath(path))
     serverSessionsManager.serverInstances[serverName] = server
     return server
 
