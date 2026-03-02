@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 import secrets
 import questionary
@@ -348,7 +349,7 @@ def getNewPort(usedPorts: set | None=None, type="server") -> int:
 
     return basePort
 
-def assignNewPort(serverInstance: serverSessionsManager.serverSession, port: int, type, usedPorts: set | None=None):
+def assignNewPort(serverInstance: serverSessionsManager.ServerSession, port: int, type, usedPorts: set | None=None):
     if type not in ("server", "rcon"):
         raise ValueError("type must be 'server' or 'rcon'")
     if usedPorts is None:
