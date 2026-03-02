@@ -14,7 +14,6 @@ def main_menu():
             "What would you like to do?",
             choices=[
                 "Start API Server",
-                "Download Minecraft Server",
                 "Run Minecraft Server",
                 "Attach to Server",
                 "Exit"
