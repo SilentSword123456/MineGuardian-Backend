@@ -199,9 +199,16 @@ def getRconInfo(serverName):
         return None
 
 
-def createRunScript(path):
+def createRunScript(path) -> str | None:
+    config = getConfig()
+    if config is None:
+        return None
+    command = config.get("startMinecraftServerCommand")
+    if not command:
+        questionary.print("'startMinecraftServerCommand' not set in config.", style="fg:red")
+        return None
+
     fileName = ""
-    command = getConfig()["startMinecraftServerCommand"]
     if(os.name == "nt"):  # Windows
         fileName = "launch.bat"
     else:
@@ -209,22 +216,17 @@ def createRunScript(path):
 
     filePath = os.path.join(path, fileName)
 
-    if(not os.path.exists(filePath)):
-        with open(filePath, "w") as f:
-            f.write(command)
-        # Only set permissions on Unix-like systems, on windows it is not needed
-        if(os.name != "nt"):
-            os.chmod(filePath, 0o755)
-
-    else:
+    if os.path.exists(filePath):
         questionary.print(f"Overwriting launch script.", style="fg:yellow")
-        with open(filePath, "w") as f:
-            f.write(command)
-        # Same here, only set permissions on Unix-like systems, on windows it is not needed
-        if(os.name != "nt"):
-            os.chmod(filePath, 0o755)
 
-    return
+    with open(filePath, "w") as f:
+        f.write(command)
+
+    # Only set permissions on Unix-like systems, on windows it is not needed
+    if os.name != "nt":
+        os.chmod(filePath, 0o755)
+
+    return command
 
 
 def runMinecraftServer(serverName = None, path = "servers"):
@@ -321,13 +323,9 @@ def getLaunchCommand(path):
         return None
 
 def setupServerInstance(path, serverName):
-    launchCommand = getLaunchCommand(path)
+    launchCommand = getLaunchCommand(path) or createRunScript(path)
     if launchCommand is None:
-        createRunScript(path)
-
-    launchCommand = getLaunchCommand(path)
-    if launchCommand is None:
-        questionary.print(f"Failed to create launch script for server '{serverName}'.", style="fg:red")
+        questionary.print(f"Failed to get/create launch script for server '{serverName}'.", style="fg:red")
         return None
 
     server = serverSessionsManager.ServerSession(serverName, launchCommand, os.path.abspath(path))
@@ -414,20 +412,25 @@ def updateRconSettings(path, port: int = 25575):
 def getLocalServers():
     return [name for name in os.listdir("servers") if os.path.isdir(os.path.join("servers", name))]
 
-def getMaxMemory(serverInstance):
-    if serverInstance is None or not getattr(serverInstance, 'working_dir', None):
-        return -1
-
-    path = os.path.join(serverInstance.working_dir, "server.properties")
-
-    if not os.path.isfile(path):
+def getMaxMemoryMB(serverPath):
+    if serverPath is None:
         return -1
 
     try:
-        with open(path, "r") as f:
-            for line in f:
-                if line.startswith("max-memory="):
-                    return int(line.split("=", 1)[1].strip())
+        launchCommand = getLaunchCommand(serverPath)
+        if launchCommand is None:
+            return -1
+        # Look for -Xmx flag in the launch command to determine max memory allocation
+        tokens = launchCommand.split()
+        for i, token in enumerate(tokens):
+            if token.startswith("-Xmx"):
+                mem_str = token[4:]
+                if mem_str.endswith("G"):
+                    return int(mem_str[:-1]) * 1024
+                elif mem_str.endswith("M"):
+                    return int(mem_str[:-1])
+                else:
+                    return int(mem_str) // (1024 * 1024)  # Assume bytes if no unit
     except Exception as e:
         questionary.print(f"Error reading max memory from server.properties: {e}", style="fg:red")
 
