@@ -302,8 +302,35 @@ def _patch_server_properties(path: str, overrides: dict):
         f.writelines(new_lines)
 
 
+def getLaunchCommand(path):
+    fileName = ""
+    if(os.name == "nt"):  # Windows
+        fileName = "launch.bat"
+    else:
+        fileName = "launch.sh"
+
+    filePath = os.path.join(path, fileName)
+    if os.path.isfile(filePath):
+        try:
+            with open(filePath, "r") as f:
+                command = f.read().strip()
+                return command
+        except Exception as e:
+            return None
+    else:
+        return None
+
 def setupServerInstance(path, serverName):
-    server = serverSessionsManager.ServerSession(serverName, getConfig()["startMinecraftServerCommand"], os.path.abspath(path))
+    launchCommand = getLaunchCommand(path)
+    if launchCommand is None:
+        createRunScript(path)
+
+    launchCommand = getLaunchCommand(path)
+    if launchCommand is None:
+        questionary.print(f"Failed to create launch script for server '{serverName}'.", style="fg:red")
+        return None
+
+    server = serverSessionsManager.ServerSession(serverName, launchCommand, os.path.abspath(path))
     serverSessionsManager.serverInstances[serverName] = server
     return server
 
@@ -387,3 +414,21 @@ def updateRconSettings(path, port: int = 25575):
 def getLocalServers():
     return [name for name in os.listdir("servers") if os.path.isdir(os.path.join("servers", name))]
 
+def getMaxMemory(serverInstance):
+    if serverInstance is None or not getattr(serverInstance, 'working_dir', None):
+        return -1
+
+    path = os.path.join(serverInstance.working_dir, "server.properties")
+
+    if not os.path.isfile(path):
+        return -1
+
+    try:
+        with open(path, "r") as f:
+            for line in f:
+                if line.startswith("max-memory="):
+                    return int(line.split("=", 1)[1].strip())
+    except Exception as e:
+        questionary.print(f"Error reading max memory from server.properties: {e}", style="fg:red")
+
+    return 1024  # Default if not found in file
