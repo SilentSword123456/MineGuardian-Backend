@@ -304,7 +304,8 @@ class ServerSession:
                 "name": self.name,
                 "is_running": True,
                 "pid": self.process.pid,
-                "uptime_seconds": round(uptime, 2)
+                "uptime_seconds": round(uptime, 2),
+                "max_memory_mb": utils.getMaxMemory(self),
             }
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             return None
