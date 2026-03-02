@@ -12,7 +12,8 @@ def get_all_servers():
             'name': name,
             'id': i,
             'isRunning': (
-                serverSessionsManager.serverInstances[name].is_running() if name in serverSessionsManager.serverInstances else False)
+                serverSessionsManager.serverInstances[name].is_running() if name in serverSessionsManager.serverInstances else False),
+            "max_memory_mb": utils.getMaxMemoryMB(os.path.join(DIR, "servers", name))
         })
         i += 1
     return servers
