@@ -6,6 +6,7 @@ import threading
 import time
 import psutil
 import utils
+from rcon import RconClient, RconError, RconAuthError
 
 class ServerSession:
     def __init__(self, name, command, working_dir=None):
@@ -23,6 +24,8 @@ class ServerSession:
         self.rcon_port = utils.assignNewPort(self,utils.getNewPort(type="rcon"), type="rcon")
         self.last_stats = None
         self.last_stats_time = 0
+        self._rcon: RconClient | None = None
+        self._rcon_lock = threading.Lock()
 
     @property
     def running(self):
@@ -117,6 +120,57 @@ class ServerSession:
             if self.process and self.process.poll() is not None:
                 self.running = False
 
+    def _connect_rcon(self) -> bool:
+        """
+        Create and connect a new persistent RconClient.
+        Must be called while already holding self._rcon_lock.
+        Returns True on success, False on failure.
+        """
+        config = utils.getConfig()
+        if not config:
+            return False
+        password = config.get('rconPassword', '')
+        if not password:
+            return False
+
+        client = RconClient("127.0.0.1", self.rcon_port, password)
+        try:
+            client.connect()
+            self._rcon = client
+            print(f"[RCON] Connected for '{self.name}' on port {self.rcon_port}.")
+            return True
+        except Exception as e:
+            print(f"[RCON] Failed to connect for '{self.name}': {e}")
+            client.disconnect()
+            return False
+
+    def send_rcon_command(self, command: str) -> str | None:
+        """
+        Send a command over the persistent RCON connection and return the response.
+        Lazily connects on the first call. Attempts one reconnect if the connection
+        has gone stale. Returns None if RCON is unavailable.
+        """
+        with self._rcon_lock:
+            if self._rcon is None:
+                if not self._connect_rcon():
+                    return None
+
+            try:
+                return self._rcon.send_command(command)
+            except (RconError, RconAuthError, OSError) as e:
+                print(f"[RCON] Connection lost for '{self.name}' ({e}), reconnecting…")
+                self._rcon.disconnect()
+                self._rcon = None
+                if not self._connect_rcon():
+                    return None
+                try:
+                    return self._rcon.send_command(command)
+                except Exception as e2:
+                    print(f"[RCON] Reconnect attempt failed for '{self.name}': {e2}")
+                    self._rcon.disconnect()
+                    self._rcon = None
+                    return None
+
     def send_command(self, command):
         if not self.running or not self.process:
             print(f"Can't send command - server not running")
@@ -171,6 +225,12 @@ class ServerSession:
 
     def cleanup(self):
         """Release ports held by this instance back to the available pool."""
+        with self._rcon_lock:
+            if self._rcon is not None:
+                self._rcon.disconnect()
+                self._rcon = None
+                print(f"[RCON] Persistent connection closed for '{self.name}'.")
+
         usedPorts.discard(self.port)
         usedPorts.discard(self.rcon_port)
 
