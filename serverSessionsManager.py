@@ -169,6 +169,11 @@ class ServerSession:
             self.remove_listener(display_callback)
             print(f"\n========== DETACHED FROM '{self.name}' ==========\n")
 
+    def cleanup(self):
+        """Release ports held by this instance back to the available pool."""
+        usedPorts.discard(self.port)
+        usedPorts.discard(self.rcon_port)
+
     def stop(self, timeout=30):
 
         if not self.is_running():
@@ -184,6 +189,7 @@ class ServerSession:
             if self.process.poll() is not None:
                 print("Server stopped successfully!")
                 self.running = False
+                self.cleanup()
                 return True
 
             if (i + 1) % 5 == 0:
@@ -200,6 +206,7 @@ class ServerSession:
 
         self.running = False
         print("Server stopped (forced)")
+        self.cleanup()
         return True
 
     def is_running(self):
