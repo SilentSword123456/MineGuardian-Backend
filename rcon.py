@@ -6,11 +6,6 @@ import struct
 _TYPE_LOGIN      = 3
 _TYPE_COMMAND    = 2
 _TYPE_RESPONSE   = 0
-# Sentinel type: invalid packet type 0xC8 = 200. The server echoes it back
-# as a Type-0 "Unknown request c8" response, marking the end of a
-# potentially fragmented multi-packet reply.
-# Reference: https://minecraft.wiki/w/RCON#Fragmented_response_packets
-_TYPE_TERMINATOR = 200  # 0xC8
 
 _AUTH_FAILURE_ID = -1
 
@@ -32,11 +27,6 @@ class RconClient:
 
     Packet layout (little-endian):
         [Length: int32][Request ID: int32][Type: int32][Payload: UTF-8 null-terminated][Pad: 0x00]
-
-    Fragmented responses are handled by sending a sentinel packet (type 200 / 0xC8)
-    immediately after every command packet. The server echoes it back as a Type-0
-    packet with payload "Unknown request c8". All Type-0 packets received before
-    that sentinel reply are fragments of the real response and are concatenated.
 
     Usage:
         with RconClient("127.0.0.1", 25575, "password") as rcon:
@@ -78,28 +68,34 @@ class RconClient:
             raise RconError(f"Could not connect to RCON at {self.host}:{self.port} — {e}") from e
 
         # Send login packet (type 3) with the password as payload
-        req_id = self._next_id()
-        self._send_packet(req_id, _TYPE_LOGIN, self.password)
+        try:
+            req_id = self._next_id()
+            self._send_packet(req_id, _TYPE_LOGIN, self.password)
 
-        resp_id, resp_type, _ = self._recv_packet()
+            resp_id, resp_type, _ = self._recv_packet()
 
-        if resp_id == _AUTH_FAILURE_ID:
+            if resp_id == _AUTH_FAILURE_ID:
+                raise RconAuthError("RCON authentication failed: wrong password.")
+
+            if resp_id != req_id:
+                raise RconError(f"Unexpected response ID during login: expected {req_id}, got {resp_id}.")
+        except Exception:
             self.disconnect()
-            raise RconAuthError("RCON authentication failed: wrong password.")
+            raise
 
-        if resp_id != req_id:
-            self.disconnect()
-            raise RconError(f"Unexpected response ID during login: expected {req_id}, got {resp_id}.")
+        # Auth succeeded — remove the timeout so the socket stays open indefinitely
+        # between commands (a persistent connection must not time out from inactivity).
+        self._sock.settimeout(None)
 
     def send_command(self, command: str) -> str:
         """
         Send a command and return the full response, handling fragmented replies.
 
-        After the command packet (Type 2), a sentinel packet with invalid type
-        200 (0xC8) is sent immediately. The server echoes it back as a Type-0
-        packet with payload "Unknown request c8". All Type-0 packets arriving
-        before that sentinel reply are fragments of the real response and are
-        concatenated in order.
+        Vanilla Minecraft splits responses larger than ~4KB across multiple packets,
+        all sharing the same request ID. After receiving the first matching response
+        packet, the socket is checked for immediately available follow-up packets
+        using a short-timeout peek. Collection stops when no more data is buffered.
+        Stray packets (e.g. broadcast messages) are silently skipped.
         """
         if self._sock is None:
             raise RconError("Not connected. Call connect() first.")
@@ -107,25 +103,42 @@ class RconClient:
         cmd_id = self._next_id()
         self._send_packet(cmd_id, _TYPE_COMMAND, command)
 
-        # Send the sentinel immediately so we know when the response ends.
-        sentinel_id = self._next_id()
-        self._send_packet(sentinel_id, _TYPE_TERMINATOR, "")
-
-        # Collect all response fragments until the sentinel reply arrives.
+        # Read until we get the first response packet for this command,
+        # skipping any stray packets (e.g. from broadcast messages).
         fragments = []
-        while True:
+        got_first = False
+        max_packets = 100
+
+        for _ in range(max_packets):
             resp_id, resp_type, payload = self._recv_packet()
 
             if resp_id == _AUTH_FAILURE_ID:
                 raise RconAuthError("RCON session is no longer authenticated.")
 
-            # The sentinel reply — server echoes a Type-0 packet with the sentinel's ID.
-            if resp_id == sentinel_id:
-                break
-
-            # Any Type-0 packet matching the command's request ID is a response fragment.
             if resp_id == cmd_id and resp_type == _TYPE_RESPONSE:
                 fragments.append(payload)
+                got_first = True
+                break
+
+        if not got_first:
+            raise RconError(f"No matching response received after {max_packets} packets.")
+
+        # Collect any additional fragment packets already buffered in the socket.
+        # A 0.1s timeout is enough: fragments arrive back-to-back; if nothing
+        # comes within that window the response is complete.
+        self._sock.settimeout(0.1)
+        try:
+            while True:
+                resp_id, resp_type, payload = self._recv_packet()
+                if resp_id == cmd_id and resp_type == _TYPE_RESPONSE:
+                    fragments.append(payload)
+                else:
+                    break
+        except (OSError, RconError):
+            # Timeout or no more data — fragment collection complete.
+            pass
+        finally:
+            self._sock.settimeout(None)
 
         return "".join(fragments)
 
@@ -175,8 +188,10 @@ class RconClient:
         raw_length = self._recv_exactly(4)
         (length,) = struct.unpack("<i", raw_length)
 
-        if length < 10:  # Minimum valid packet body: 4+4+1+1 = 10 bytes
+        if length < 10:  # Minimum valid packet body: 4 (id) + 4 (type) + 0 (payload) + 2 (nulls) = 10
             raise RconError(f"Received malformed RCON packet (length={length}).")
+        if length > 4096:  # RCON spec max payload is 4096 bytes; guard against huge/malicious values
+            raise RconError(f"Received oversized RCON packet (length={length}), possible protocol error.")
 
         body = self._recv_exactly(length)
 
