@@ -363,11 +363,15 @@ def getNewPort(usedPorts: set | None=None, type="server") -> int:
     if type not in ("server", "rcon"):
         raise ValueError("type must be 'server' or 'rcon'")
 
+    questionary.print(f"Currently used ports: {usedPorts}", style="fg:yellow")
     basePort = 25565
     if type == "rcon":
         basePort = 25575
 
+    questionary.print(f"Using baseport: {basePort}", style="fg:yellow")
+
     while basePort in usedPorts:
+        questionary.print(f"Last port not available, using: {basePort+1}", style="fg:yellow")
         basePort += 1
         if basePort > 65535:
             raise RuntimeError("No available ports")
