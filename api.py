@@ -46,10 +46,12 @@ def register_socketio_listener(serverName, serverInstance):
         print(f"SocketIO listeners already registered for server '{serverName}'")
 
 @app.route('/')
+@app.route('/health')
 def home():
     return jsonify({
-        'status': 'API is running'
-    })
+        'status': 'ok',
+        'timestamp': time.time()
+    }), 200
 
 @socketio.on('connect')
 def handle_connect():
