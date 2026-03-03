@@ -5,7 +5,6 @@ import questionary
 import requests
 import json
 import time
-from rcon import RconClient
 import serverSessionsManager
 
 
@@ -113,38 +112,30 @@ def getPlayersOnline(serverInstance) -> dict[str, int | list[str]]:
     if serverInstance is None or not serverInstance.running:
         return {"max": getMaxPlayers(serverInstance)}
 
-    host = "127.0.0.1"
-    port = serverInstance.rcon_port
-    config = getConfig()
-    if config is None:
-        return {"max": getMaxPlayers(serverInstance)}
-
-    password = config.get('rconPassword')
-    if not password:
-        return {"max": getMaxPlayers(serverInstance)}
-
     try:
-        with RconClient(host, port, password) as rcon:
-            output = rcon.send_command("list")
-            # The output should be in a format of "There are X of a max of Y players online: player1, player2, ..."
-            # Split on ": " to separate the counts sentence from the player names
-            parts = output.split(": ", 1)
-            counts_part = parts[0]   # "There are X of a max of Y players online"
-            names_part  = parts[1] if len(parts) > 1 else ""
+        output = serverInstance.send_rcon_command("list")
+        if output is None:
+            return {"max": getMaxPlayers(serverInstance)}
 
-            # Extract X and Y from the counts sentence
-            tokens = counts_part.split()
-            online      = int(tokens[2])   # "There are X ..."
-            max_players = int(tokens[7])   # "... of a max of Y ..."
+        # The output should be in a format of "There are X of a max of Y players online: player1, player2, ..."
+        # Split on ": " to separate the counts sentence from the player names
+        parts = output.split(": ", 1)
+        counts_part = parts[0]   # "There are X of a max of Y players online"
+        names_part  = parts[1] if len(parts) > 1 else ""
 
-            # Parse player names, filtering empty strings when no players are online
-            players = [name.strip() for name in names_part.split(",") if name.strip()]
+        # Extract X and Y from the counts sentence
+        tokens = counts_part.split()
+        online      = int(tokens[2])   # "There are X ..."
+        max_players = int(tokens[7])   # "... of a max of Y ..."
 
-            return {
-                "online": online,
-                "max": max_players,
-                "players": players
-            }
+        # Parse player names, filtering empty strings when no players are online
+        players = [name.strip() for name in names_part.split(",") if name.strip()]
+
+        return {
+            "online": online,
+            "max": max_players,
+            "players": players
+        }
     except Exception:
         # If RCON connection, authentication, or parsing fails, return only max capacity
         return {"max": getMaxPlayers(serverInstance)}
