@@ -111,6 +111,7 @@ def uninstallMinecraftServer(serverName):
         if serverSessionsManager.serverInstances[serverName].is_running():
             return {"error": f"Server '{serverName}' is currently running. Please stop it before uninstalling."}
         else:
+            serverSessionsManager.serverInstances[serverName].cleanup()
             del serverSessionsManager.serverInstances[serverName]
 
     try:
