@@ -1,8 +1,10 @@
 serverInstances = {}
 usedPorts = set()
 
+import eventlet
+import eventlet.tpool
+import os
 import subprocess
-import threading
 import time
 import psutil
 import utils
@@ -11,7 +13,10 @@ from rcon import RconClient, RconError, RconAuthError
 class ServerSession:
     def __init__(self, name, command, working_dir=None):
         self.name = name
-        self.command = command.split()
+        if isinstance(command, str):
+            self.command = command.split()
+        else:
+            self.command = command
         self.working_dir = working_dir
         self.process = None
         self.listeners = []
@@ -25,7 +30,8 @@ class ServerSession:
         self.last_stats = None
         self.last_stats_time = 0
         self._rcon: RconClient | None = None
-        self._rcon_lock = threading.Lock()
+        self._rcon_lock = eventlet.semaphore.Semaphore()
+        self._stats_lock = eventlet.semaphore.Semaphore()
 
     @property
     def running(self):
@@ -80,6 +86,9 @@ class ServerSession:
             return False
 
         try:
+            # We must use eventlet.patcher.original('subprocess') if we want the real one, 
+            # but we want the green one. 
+            # On Windows, subprocess + pipes + eventlet can be tricky.
             self.process = subprocess.Popen(
                 self.command,
                 stdin=subprocess.PIPE,
@@ -88,17 +97,14 @@ class ServerSession:
                 text=True,
                 bufsize=1,
                 universal_newlines=True,
-                cwd=self.working_dir
+                cwd=self.working_dir,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
             )
 
 
             self.running = True
 
-            self.output_thread = threading.Thread(
-                target=self._read_output,
-                daemon=True
-            )
-            self.output_thread.start()
+            self.output_thread = eventlet.spawn(self._read_output)
 
             print(f"Server '{self.name}' started!")
             print(f"Process ID: {self.process.pid}")
@@ -110,10 +116,14 @@ class ServerSession:
 
     def _read_output(self):
         try:
-            for line in self.process.stdout:
+            while True:
+                # Use tpool to avoid blocking the eventlet hub on Windows
+                line = eventlet.tpool.execute(self.process.stdout.readline)
+                if not line:
+                    break
                 stripped_line = line.rstrip()
                 self._broadcast(stripped_line)
-                time.sleep(0) # Yield for context switching
+                eventlet.sleep(0) # Yield for context switching
         except Exception as e:
             self._broadcast(f"[ERROR: {e}]")
         finally:
@@ -140,7 +150,13 @@ class ServerSession:
             print(f"[RCON] Connected for '{self.name}' on port {self.rcon_port}.")
             return True
         except Exception as e:
-            print(f"[RCON] Failed to connect for '{self.name}': {e}")
+            # Silently fail if connection refused (common during server startup)
+            # Log as a more neutral status if it's just a refusal, or an error otherwise.
+            if isinstance(e, ConnectionRefusedError) or (hasattr(e, 'errno') and e.errno == 10061):
+                 # This is expected during startup, no need to clutter the logs with errors
+                 pass
+            else:
+                 print(f"[RCON] Failed to connect for '{self.name}': {e}")
             client.disconnect()
             return False
 
@@ -180,8 +196,9 @@ class ServerSession:
             return False
 
         try:
-            self.process.stdin.write(command + "\n")
-            self.process.stdin.flush()
+            # Use tpool to avoid blocking the hub on Windows when writing to pipe
+            eventlet.tpool.execute(self.process.stdin.write, command + "\n")
+            eventlet.tpool.execute(self.process.stdin.flush)
             self._updateHistory(f"> {command}") # TODO: after adding auth and authorisation, we can mark commands from the user differently in the history
             print(f"Sent command: {command}")
             return True
