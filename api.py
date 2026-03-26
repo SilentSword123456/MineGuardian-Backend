@@ -1,18 +1,17 @@
-from flask import Flask, jsonify, request
+from flask import jsonify, request
+from apiflask import APIFlask
 import os
 import time
 import eventlet
 from flask_cors import CORS
-
 import serverSessionsManager
-import manageLocalServers
 import utils
 from utils import getConfig
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 
-app = Flask(__name__)
+app = APIFlask(__name__)
 app.config.update(getConfig()['flaskConfig'])
 CORS(app)
 socketio = SocketIO(
@@ -46,7 +45,6 @@ def register_socketio_listener(serverName, serverInstance):
     else:
         print(f"SocketIO listeners already registered for server '{serverName}'")
 
-@app.route('/')
 @app.route('/health')
 def home():
     return jsonify({
