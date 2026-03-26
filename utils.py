@@ -145,7 +145,7 @@ def get_server_stats(serverInstance, force=False):
     Collects stats for a server instance. Uses cached data if it's recent (e.g., < 5s)
     unless 'force' is True.
     """
-    # Check cache (assumes last_stats and last_stats_time are initialized on the instance)
+    # Quick check without lock
     now = time.time()
     last_stats = getattr(serverInstance, 'last_stats', None)
     last_time = getattr(serverInstance, 'last_stats_time', 0)
@@ -153,24 +153,51 @@ def get_server_stats(serverInstance, force=False):
     if not force and last_stats and (now - last_time < 5):
         return last_stats
 
-    # Collect new stats
-    stats = {
-        'cpu_usage_percent': serverInstance.get_cpu_usage_percent(),
-        'memory_usage_mb': serverInstance.get_memory_usage_mb(),
-    }
+    # Ensure only one collection runs at a time for this instance
+    lock = getattr(serverInstance, '_stats_lock', None)
+    if lock:
+        # Using a timeout on the lock to avoid forever-hanging in the background task
+        # if something goes terribly wrong, though eventlet locks are usually safe.
+        acquired = lock.acquire(timeout=10)
+        if not acquired:
+            # If we can't get the lock in 10s, just return cached stats (even if old)
+            return last_stats if last_stats else {
+                'cpu_usage_percent': 0.0,
+                'memory_usage_mb': 0.0,
+                'online_players': {"max": getMaxPlayers(serverInstance)}
+            }
+        
+        try:
+            # Re-check cache after acquiring lock
+            now = time.time()
+            if not force and serverInstance.last_stats and (now - serverInstance.last_stats_time < 5):
+                return serverInstance.last_stats
 
-    # Safely try to get player info
-    try:
-        stats['online_players'] = getPlayersOnline(serverInstance)
-    except Exception:
-        # Final safety fallback if getPlayersOnline fails unexpectedly
-        stats['online_players'] = {"max": getMaxPlayers(serverInstance)}
+            # Collect new stats
+            stats = {
+                'cpu_usage_percent': serverInstance.get_cpu_usage_percent(),
+                'memory_usage_mb': serverInstance.get_memory_usage_mb(),
+            }
 
-    # Update cache
-    serverInstance.last_stats = stats
-    serverInstance.last_stats_time = now
+            try:
+                stats['online_players'] = getPlayersOnline(serverInstance)
+            except Exception:
+                stats['online_players'] = {"max": getMaxPlayers(serverInstance)}
 
-    return stats
+            # Update cache
+            serverInstance.last_stats = stats
+            serverInstance.last_stats_time = now
+            return stats
+        finally:
+            lock.release()
+    else:
+        # Fallback if no lock present
+        stats = {
+            'cpu_usage_percent': serverInstance.get_cpu_usage_percent(),
+            'memory_usage_mb': serverInstance.get_memory_usage_mb(),
+            'online_players': getPlayersOnline(serverInstance)
+        }
+        return stats
 
 def getRconInfo(serverName):
     file = f"servers/{serverName}/rcon_info.json"
@@ -358,8 +385,19 @@ def getNewPort(usedPorts: set | None=None, type="server") -> int:
     if type == "rcon":
         basePort = 25575
 
+    def is_port_physically_free(port):
+        """Check if a port is actually available on the local machine."""
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                # We try to bind to see if the port is taken by any process
+                # (including ones from previous runs that didn't exit).
+                s.bind(('127.0.0.1', port))
+                return True
+            except OSError:
+                return False
 
-    while basePort in usedPorts:
+    while basePort in usedPorts or not is_port_physically_free(basePort):
         basePort += 1
         if basePort > 65535:
             raise RuntimeError("No available ports")
