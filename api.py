@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request
 import os
 import time
+import eventlet
 from flask_cors import CORS
 
 import serverSessionsManager
@@ -17,7 +18,7 @@ CORS(app)
 socketio = SocketIO(
     app,
     cors_allowed_origins=app.config["SOCKETIO_CORS_ALLOWED_ORIGINS"],
-    async_mode="threading"
+    async_mode="eventlet"
 )
 
 from services.servers import servers_bp
@@ -30,13 +31,13 @@ def register_socketio_listener(serverName, serverInstance):
         # Existing console listener
         def socketio_console_listener(line):
             socketio.emit('console', {'data': line}, to=serverName)
-            socketio.sleep(0) # Yield for the event loop
+            eventlet.sleep(0) # Yield for the event loop
         serverInstance.add_listener(socketio_console_listener)
 
         # New status listener (the "hook" in action)
         def socketio_status_listener(is_running):
             socketio.emit('status', {'running': is_running}, to=serverName)
-            socketio.sleep(0)
+            eventlet.sleep(0)
 
         # Register the status listener to the server instance
         serverInstance.add_status_listener(socketio_status_listener)
@@ -54,7 +55,7 @@ def home():
     }), 200
 
 @socketio.on('connect')
-def handle_connect():
+def handle_connect(auth=None):
     serverName = request.args.get('serverName')
     if not serverName:
         print("Connection attempt without serverName")
@@ -125,25 +126,59 @@ def handleConsole(data):
 
 def _broadcast_stats():
     """Background task to broadcast server stats via SocketIO every 5 seconds."""
+    # Ensure this task only runs once in the current process
+    if getattr(_broadcast_stats, '_running', False):
+        return
+    _broadcast_stats._running = True
+
     while True:
         socketio.sleep(5)
         # Use list() to avoid dictionary modification issues
         for serverName, serverInstance in list(serverSessionsManager.serverInstances.items()):
             if serverInstance.is_running():
-                try:
-                    # Collect stats using the centralized function (force=True to get fresh data for broadcast)
-                    stats = utils.get_server_stats(serverInstance, force=True)
+                # Spawn separate greenlets to collect stats in parallel for each server
+                socketio.start_background_task(_emit_server_stats, serverName, serverInstance)
 
-                    # Emit to specific room for this server
-                    socketio.emit('resources', stats, to=serverName)
-                    print("Broadcasted stats for server '{}': {}".format(serverName, stats))
-                except Exception as e:
-                    print(f"Error broadcasting stats for '{serverName}': {e}")
+def _emit_server_stats(serverName, serverInstance):
+    """Worker greenlet to collect and emit stats for a single server."""
+    try:
+        # Collect stats using the centralized function (force=True to get fresh data for broadcast)
+        # get_server_stats now handles its own per-server locking
+        stats = utils.get_server_stats(serverInstance, force=True)
 
-socketio.start_background_task(_broadcast_stats)
+        # Emit to specific room for this server
+        socketio.emit('resources', stats, to=serverName)
+        # print(f"Broadcasted stats for server '{serverName}'")
+    except Exception as e:
+        print(f"Error broadcasting stats for '{serverName}': {e}")
+
+# Background task management
+_broadcast_stats_started = False
+
+def start_background_tasks():
+    global _broadcast_stats_started
+    if _broadcast_stats_started:
+        return
+    
+    # In debug mode, Werkzeug's reloader starts the app twice. 
+    # We only want the background task in the child process.
+    if app.debug and os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        return
+
+    print("Starting background stats broadcast task...")
+    socketio.start_background_task(_broadcast_stats)
+    _broadcast_stats_started = True
+
+# We don't call it here at module level anymore
+# start_background_tasks()
 
 def startServer(debug=False, port=5000, host="0.0.0.0"):
-    socketio.run(app, debug=debug, port=port, host=host, allow_unsafe_werkzeug=True)
+    # Ensure background tasks are started (only once per process)
+    # If using reloader, only start in the child process.
+    if not debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        start_background_tasks()
+
+    socketio.run(app, debug=debug, port=port, host=host)
 
 def stopServer():
     socketio.stop()
