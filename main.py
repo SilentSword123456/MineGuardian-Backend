@@ -1,3 +1,10 @@
+import eventlet
+eventlet.monkey_patch(all=True)
+
+import warnings
+# Suppress the DeprecationWarning from eventlet and other benign warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 import os
 import questionary
 import serverSessionsManager
