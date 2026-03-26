@@ -164,6 +164,7 @@ def get_server_stats(serverInstance, force=False):
             return last_stats if last_stats else {
                 'cpu_usage_percent': 0.0,
                 'memory_usage_mb': 0.0,
+                'max_memory_mb': getMaxMemoryMB(getattr(serverInstance, 'working_dir', None)),
                 'online_players': {"max": getMaxPlayers(serverInstance)}
             }
         
@@ -177,6 +178,7 @@ def get_server_stats(serverInstance, force=False):
             stats = {
                 'cpu_usage_percent': serverInstance.get_cpu_usage_percent(),
                 'memory_usage_mb': serverInstance.get_memory_usage_mb(),
+                'max_memory_mb': getMaxMemoryMB(getattr(serverInstance, 'working_dir', None)),
             }
 
             try:
@@ -195,6 +197,7 @@ def get_server_stats(serverInstance, force=False):
         stats = {
             'cpu_usage_percent': serverInstance.get_cpu_usage_percent(),
             'memory_usage_mb': serverInstance.get_memory_usage_mb(),
+            'max_memory_mb': getMaxMemoryMB(getattr(serverInstance, 'working_dir', None)),
             'online_players': getPlayersOnline(serverInstance)
         }
         return stats
