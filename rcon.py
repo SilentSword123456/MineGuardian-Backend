@@ -83,9 +83,8 @@ class RconClient:
             self.disconnect()
             raise
 
-        # Auth succeeded — remove the timeout so the socket stays open indefinitely
-        # between commands (a persistent connection must not time out from inactivity).
-        self._sock.settimeout(None)
+        # Auth succeeded — keep a reasonable timeout for subsequent commands.
+        self._sock.settimeout(self.timeout)
 
     def send_command(self, command: str) -> str:
         """
@@ -138,7 +137,7 @@ class RconClient:
             # Timeout or no more data — fragment collection complete.
             pass
         finally:
-            self._sock.settimeout(None)
+            self._sock.settimeout(self.timeout)
 
         return "".join(fragments)
 
@@ -204,10 +203,15 @@ class RconClient:
     def _recv_exactly(self, num_bytes: int) -> bytes:
         """Read exactly num_bytes from the socket, blocking until available."""
         buf = b""
-        while len(buf) < num_bytes:
-            chunk = self._sock.recv(num_bytes - len(buf))
-            if not chunk:
-                raise RconError("Connection closed by server while reading packet.")
-            buf += chunk
+        try:
+            while len(buf) < num_bytes:
+                chunk = self._sock.recv(num_bytes - len(buf))
+                if not chunk:
+                    raise RconError("Connection closed by server while reading packet.")
+                buf += chunk
+        except socket.timeout:
+            raise RconError("RCON operation timed out.")
+        except OSError as e:
+            raise RconError(f"RCON socket error: {e}")
         return buf
 
