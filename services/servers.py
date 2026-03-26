@@ -92,7 +92,12 @@ def add_server():
 
 
 @servers_bp.route('/manage/<software>/getAvailableVersions', methods=['GET'])
-def get_available_software(software):
+@servers_bp.route('/manage//getAvailableVersions', methods=['GET'])
+@servers_bp.route('/manage/getAvailableVersions', methods=['GET'])
+def get_available_software(software=""):
+    if not software:
+        # Fallback to vanilla if software is not specified
+        software = "vanilla"
     result = manageLocalServers.getAvailableVersions(software.lower())
     if "error" in result:
         return jsonify(result), 400
