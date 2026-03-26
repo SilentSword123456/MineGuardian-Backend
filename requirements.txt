@@ -1,6 +1,6 @@
 Flask==3.0.0
 Flask-SocketIO==5.3.6
-simple-websocket
+eventlet>=0.34
 psutil==6.1.0
 questionary==2.1.1
 requests==2.31.0
