@@ -158,33 +158,6 @@ def remove_server(serverName):
 @servers_bp.output(GetServerStatsOutputSchema)
 def global_stats():
     try:
-        global_stats_payload = {
-            'cpu_usage_percent': 0.0,
-            'memory_usage_mb': 0.0,
-            'max_memory_mb': 0,
-            'online_players': {
-                'online': 0,
-                'max': 0,
-                'players': []
-            }
-        }
-
-        for serverInstance in list(serverSessionsManager.serverInstances.values()):
-            if not serverInstance.is_running():
-                continue
-
-            stats = utils.get_server_stats(serverInstance, force=True)
-            global_stats_payload['cpu_usage_percent'] += float(stats.get('cpu_usage_percent', 0.0))
-            global_stats_payload['memory_usage_mb'] += float(stats.get('memory_usage_mb', 0.0))
-            global_stats_payload['max_memory_mb'] += int(stats.get('max_memory_mb', 0))
-
-            online_players = stats.get('online_players', {})
-            players = online_players.get('players', [])
-
-            global_stats_payload['online_players']['max'] += int(online_players.get('max', 0))
-            global_stats_payload['online_players']['online'] += int(online_players.get('online', len(players)))
-            global_stats_payload['online_players']['players'].extend(players)
-
-        return global_stats_payload, 200
+        return utils.getGlobalStats(), 200
     except Exception as e:
         abort(500, message=f"Failed to retrieve global stats: {str(e)}")
