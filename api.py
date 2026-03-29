@@ -71,18 +71,18 @@ def handle_connect(auth=None):
 
         join_room(serverName)
         print(f'Client connected to server room: {serverName}')
-        emit('message', {'data': f"Connected to server {serverName}"})
+        emit('system', {'data': f"Connected to server {serverName}"})
 
         for line in serverInstance.log_history:
             emit('console', {'data': line})
 
-        emit('status', {'running': serverInstance.running})
+        live_running = serverInstance.running
+        emit('status', {'running': live_running})
 
-        #if serverInstance.is_running():
         stats = utils.get_server_stats(serverInstance)
         emit('resources', stats)
 
-        socketio.emit('status', {'running': serverInstance.running}, to=serverName, include_self=False)
+        socketio.emit('status', {'running': live_running}, to=serverName, include_self=False)
 
     except Exception as e:
         print(f"ERROR in handle_connect for '{serverName}': {e}")
@@ -102,11 +102,11 @@ def handle_disconnect():
     else:
         print('Client disconnected (no serverName)')
 
-@socketio.on('message')
-def handleMessage(data):
+@socketio.on('system')
+def handleSystemMessage(data):
     serverName = request.args.get('serverName')
     print(f'Message from server {serverName}: {data}')
-    emit('message', {'data': f"Server {serverName} received: {data['message']}"})
+    emit('system', {'data': f"Server {serverName} received: {data['message']}"})
 
 @socketio.on('console')
 def handleConsole(data):
