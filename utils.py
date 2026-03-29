@@ -83,11 +83,22 @@ def generateRconPassword():
 
     storeConfig(config)
     
-def getMaxPlayers(serverInstance) -> int:
-    if serverInstance is None or not getattr(serverInstance, 'working_dir', None):
+def getMaxPlayers(serverPath: str | None = None) -> int:
+    """Resolve max-players from <serverPath>/server.properties."""
+    if not serverPath:
         return 20
 
-    path = os.path.join(serverInstance.working_dir, "server.properties")
+    server_path_abs = os.path.abspath(serverPath)
+    for server in serverSessionsManager.serverInstances.values():
+        if (
+            getattr(server, 'working_dir', None)
+            and os.path.abspath(server.working_dir) == server_path_abs
+            and server.is_running()
+            and getattr(server, 'max_players', None) is not None
+        ):
+            return int(server.max_players)
+
+    path = os.path.join(serverPath, "server.properties")
     
     if not os.path.isfile(path):
         return 20  # Default Minecraft max players
@@ -109,13 +120,14 @@ def getPlayersOnline(serverInstance) -> dict[str, int | list[str]]:
     If the server is not running or RCON communication fails, returns ONLY 'max'
     to avoid reporting potentially inaccurate '0 players online' data.
     """
+    server_path = getattr(serverInstance, 'working_dir', None) if serverInstance is not None else None
     if serverInstance is None or not serverInstance.running:
-        return {"max": getMaxPlayers(serverInstance)}
+        return {"max": getMaxPlayers(server_path)}
 
     try:
         output = serverInstance.send_rcon_command("list")
         if output is None:
-            return {"max": getMaxPlayers(serverInstance)}
+            return {"max": getMaxPlayers(server_path)}
 
         # The output should be in a format of "There are X of a max of Y players online: player1, player2, ..."
         # Split on ": " to separate the counts sentence from the player names
@@ -123,10 +135,10 @@ def getPlayersOnline(serverInstance) -> dict[str, int | list[str]]:
         counts_part = parts[0]   # "There are X of a max of Y players online"
         names_part  = parts[1] if len(parts) > 1 else ""
 
-        # Extract X and Y from the counts sentence
+        # Extract online players from the counts sentence
         tokens = counts_part.split()
         online      = int(tokens[2])   # "There are X ..."
-        max_players = int(tokens[7])   # "... of a max of Y ..."
+        max_players = getMaxPlayers(server_path)
 
         # Parse player names, filtering empty strings when no players are online
         players = [name.strip() for name in names_part.split(",") if name.strip()]
@@ -138,7 +150,7 @@ def getPlayersOnline(serverInstance) -> dict[str, int | list[str]]:
         }
     except Exception:
         # If RCON connection, authentication, or parsing fails, return only max capacity
-        return {"max": getMaxPlayers(serverInstance)}
+        return {"max": getMaxPlayers(server_path)}
 
 def get_server_stats(serverInstance, force=False):
     """
@@ -165,7 +177,7 @@ def get_server_stats(serverInstance, force=False):
                 'cpu_usage_percent': 0.0,
                 'memory_usage_mb': 0.0,
                 'max_memory_mb': getMaxMemoryMB(getattr(serverInstance, 'working_dir', None)),
-                'online_players': {"max": getMaxPlayers(serverInstance)}
+                'online_players': {"max": getMaxPlayers(getattr(serverInstance, 'working_dir', None))}
             }
         
         try:
@@ -181,14 +193,17 @@ def get_server_stats(serverInstance, force=False):
                 'max_memory_mb': getMaxMemoryMB(getattr(serverInstance, 'working_dir', None)),
             }
 
+
             try:
                 stats['online_players'] = getPlayersOnline(serverInstance)
             except Exception:
-                stats['online_players'] = {"max": getMaxPlayers(serverInstance)}
+                stats['online_players'] = {"max": getMaxPlayers(getattr(serverInstance, 'working_dir', None))}
 
             # Update cache
             serverInstance.last_stats = stats
             serverInstance.last_stats_time = now
+            print("Collected new stats", stats)
+
             return stats
         finally:
             lock.release()
@@ -448,6 +463,16 @@ def getLocalServers():
 def getMaxMemoryMB(serverPath):
     if serverPath is None:
         return -1
+
+    server_path_abs = os.path.abspath(serverPath)
+    for server in serverSessionsManager.serverInstances.values():
+        if (
+            getattr(server, 'working_dir', None)
+            and os.path.abspath(server.working_dir) == server_path_abs
+            and server.is_running()
+            and getattr(server, 'max_memory_mb', None) is not None
+        ):
+            return int(server.max_memory_mb)
 
     try:
         launchCommand = getLaunchCommand(serverPath)
