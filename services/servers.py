@@ -43,11 +43,26 @@ def getGeneralServerInfo(serverName):
              abort(404, message='Server not found')
 
      serverInstance = serverSessionsManager.serverInstances.get(serverName)
-     if serverInstance and serverInstance.is_running():
-             return serverInstance.get_process_info()
+     if serverInstance:
+         info = serverInstance.get_process_info()
+     else:
+         info = {
+             'name': match['name'],
+             'is_running': False,
+             'pid': 0,
+             'uptime_seconds': 0.0,
+             'max_memory_mb': match['max_memory_mb'],
+             'max_players': match.get('online_players', {}).get('max', 20),
+         }
 
-     # Not running: return basic metadata
-     return match
+     return {
+         'name': info['name'],
+         'is_running': info.get('is_running', False),
+         'pid': info.get('pid', 0),
+         'uptime_seconds': info.get('uptime_seconds', 0.0),
+         'max_memory_mb': info.get('max_memory_mb', match['max_memory_mb']),
+         'online_players': {'max': info.get('max_players', match.get('online_players', {}).get('max', 20))},
+     }
 
 
 
