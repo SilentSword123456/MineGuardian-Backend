@@ -19,6 +19,11 @@ class GeneralServerInfoOutputSchema(Schema):
     pid = Integer(required=True)
     uptime_seconds = Float(required=True)
     max_memory_mb = Integer(required=True)
+    online_players = Nested(lambda: GeneralOnlinePlayersOutputSchema(), required=True)
+
+
+class GeneralOnlinePlayersOutputSchema(Schema):
+    max = Integer(required=True)
 
 
 class StartServerOutputSchema(Schema):
