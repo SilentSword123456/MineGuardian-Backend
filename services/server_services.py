@@ -13,7 +13,8 @@ def get_all_servers():
             'id': i,
             'isRunning': (
                 serverSessionsManager.serverInstances[name].is_running() if name in serverSessionsManager.serverInstances else False),
-            "max_memory_mb": utils.getMaxMemoryMB(os.path.join(DIR, "servers", name))
+            'max_memory_mb': utils.getMaxMemoryMB(os.path.join(DIR, "servers", name)),
+            'online_players': {'max': utils.getMaxPlayers(os.path.join(DIR, "servers", name))}
         })
         i += 1
     return servers
