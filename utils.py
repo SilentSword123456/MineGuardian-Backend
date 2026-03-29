@@ -217,6 +217,40 @@ def get_server_stats(serverInstance, force=False):
         }
         return stats
 
+
+def getGlobalStats(serverInstances=None):
+    if serverInstances is None:
+        serverInstances = serverSessionsManager.serverInstances.values()
+
+    global_stats = {
+        'cpu_usage_percent': 0.0,
+        'memory_usage_mb': 0.0,
+        'max_memory_mb': 0,
+        'online_players': {
+            'online': 0,
+            'max': 0,
+            'players': []
+        }
+    }
+
+    for serverInstance in list(serverInstances):
+        if not serverInstance.is_running():
+            continue
+
+        server_stats = get_server_stats(serverInstance, force=True)
+        global_stats['cpu_usage_percent'] += float(server_stats.get('cpu_usage_percent', 0.0))
+        global_stats['memory_usage_mb'] += float(server_stats.get('memory_usage_mb', 0.0))
+        global_stats['max_memory_mb'] += int(server_stats.get('max_memory_mb', 0))
+
+        online_players = server_stats.get('online_players', {})
+        players = online_players.get('players', [])
+
+        global_stats['online_players']['max'] += int(online_players.get('max', 0))
+        global_stats['online_players']['online'] += int(online_players.get('online', len(players)))
+        global_stats['online_players']['players'].extend(players)
+
+    return global_stats
+
 def getRconInfo(serverName):
     file = f"servers/{serverName}/rcon_info.json"
     if not os.path.isfile(file):
