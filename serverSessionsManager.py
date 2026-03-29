@@ -25,17 +25,24 @@ class ServerSession:
         self.max_history = 100
         self._running = False
         self.output_thread = None
+        self.monitor_thread = None
         self.port = utils.assignNewPort(self,utils.getNewPort(type="server"), type="server")
         self.rcon_port = utils.assignNewPort(self,utils.getNewPort(type="rcon"), type="rcon")
         self.last_stats = None
         self.last_stats_time = 0
+        self.started_at = 0.0
+        self.max_memory_mb = None
+        self.max_players = None
         self._rcon: RconClient | None = None
         self._rcon_lock = eventlet.semaphore.Semaphore()
         self._stats_lock = eventlet.semaphore.Semaphore()
 
     @property
     def running(self):
-        """Getter for the running state."""
+        """Return live running state and broadcast on real transitions."""
+        live = self.is_running()
+        if live != self._running:
+            self.running = live
         return self._running
 
     @running.setter
@@ -101,10 +108,17 @@ class ServerSession:
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
             )
 
+            # Latch effective runtime limits at process start to avoid drift
+            # if launch files are edited while the server is running.
+            self.started_at = time.time()
+            self.max_memory_mb = utils.getMaxMemoryMB(self.working_dir)
+            self.max_players = utils.getMaxPlayers(self.working_dir)
 
             self.running = True
 
             self.output_thread = eventlet.spawn(self._read_output)
+            # Watch process liveness independently from stdout to ensure stop/crash broadcasts.
+            self.monitor_thread = eventlet.spawn(self._monitor_process_exit, self.process)
 
             print(f"Server '{self.name}' started!")
             print(f"Process ID: {self.process.pid}")
@@ -127,7 +141,18 @@ class ServerSession:
         except Exception as e:
             self._broadcast(f"[ERROR: {e}]")
         finally:
-            if self.process and self.process.poll() is not None:
+            if self.process:
+                _ = self.running
+
+    def _monitor_process_exit(self, proc):
+        """Wait for process exit and sync/broadcast running=False immediately."""
+        try:
+            # wait() can block; run it in tpool so the eventlet hub stays responsive.
+            eventlet.tpool.execute(proc.wait)
+        except Exception as e:
+            print(f"Process monitor error for '{self.name}': {e}")
+        finally:
+            if self.process is proc:
                 self.running = False
 
     def _connect_rcon(self) -> bool:
@@ -204,6 +229,7 @@ class ServerSession:
             return True
         except Exception as e:
             print(f"Error sending command: {e}")
+            _ = self.running
             return False
 
     def attach(self):
@@ -253,7 +279,7 @@ class ServerSession:
 
     def stop(self, timeout=30):
 
-        if not self.is_running():
+        if not self.running:
             print(f"Server '{self.name}' is not running")
             return False
 
@@ -290,8 +316,6 @@ class ServerSession:
         if self.process:
             return self.process.poll() is None
         return False
-
-
 
     def _ensure_psutil_proc(self):
         if not self.is_running() or self.process is None:
@@ -372,24 +396,28 @@ class ServerSession:
             return 0.0
 
     def get_process_info(self):
-        if not self._ensure_psutil_proc():
-            return None
+        is_running = self.running
+        pid = self.process.pid if is_running and self.process else 0
+        uptime_seconds = 0.0
 
-        try:
-            p = self._psutil_proc
+        if is_running and self._ensure_psutil_proc():
             try:
-                create_time = p.create_time()
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                return None
+                create_time = self._psutil_proc.create_time()
+                uptime_seconds = round(max(0.0, time.time() - create_time), 2)
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                if self.started_at > 0:
+                    uptime_seconds = round(max(0.0, time.time() - self.started_at), 2)
+        elif is_running and self.started_at > 0:
+            uptime_seconds = round(max(0.0, time.time() - self.started_at), 2)
 
-            uptime = time.time() - create_time
+        max_memory_mb = self.max_memory_mb if is_running and self.max_memory_mb is not None else utils.getMaxMemoryMB(self.working_dir)
+        max_players = self.max_players if is_running and self.max_players is not None else utils.getMaxPlayers(self.working_dir)
 
-            return {
-                "name": self.name,
-                "is_running": True,
-                "pid": self.process.pid,
-                "uptime_seconds": round(uptime, 2),
-                "max_memory_mb": utils.getMaxMemoryMB(self.working_dir),
-            }
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            return None
+        return {
+            "name": self.name,
+            "is_running": is_running,
+            "pid": pid,
+            "uptime_seconds": uptime_seconds,
+            "max_memory_mb": max_memory_mb,
+            "max_players": max_players,
+        }
