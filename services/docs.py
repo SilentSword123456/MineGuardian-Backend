@@ -39,6 +39,14 @@ DOCS = {
             500: 'Stats retrieval failed.'
         }
     },
+    'get_global_stats': {
+        'summary': 'Get aggregated runtime stats for all running servers',
+        'description': 'Returns combined CPU, memory, capacity, and player metrics for all currently running server sessions.',
+        'responses': {
+            200: 'Global statistics returned successfully.',
+            500: 'Global stats retrieval failed.'
+        }
+    },
     'add_server': {
         'summary': 'Install and register a server',
         'description': 'Installs a server using the provided software and version settings.',
