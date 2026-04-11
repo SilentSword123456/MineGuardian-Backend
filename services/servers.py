@@ -34,7 +34,7 @@ def getGeneralServerInfo(serverName):
 
      match = None
      for s in servers:
-        if s['name'] == serverName:
+        if s['server_id'] == serverName:
             match = s
             break
 
@@ -47,7 +47,7 @@ def getGeneralServerInfo(serverName):
          info = serverInstance.get_process_info()
      else:
          info = {
-             'name': match['name'],
+             'server_id': match['server_id'],
              'is_running': False,
              'pid': 0,
              'uptime_seconds': 0.0,
@@ -56,7 +56,7 @@ def getGeneralServerInfo(serverName):
          }
 
      return {
-         'name': info['name'],
+         'server_id': info['server_id'],
          'is_running': info.get('is_running', False),
          'pid': info.get('pid', 0),
          'uptime_seconds': info.get('uptime_seconds', 0.0),
