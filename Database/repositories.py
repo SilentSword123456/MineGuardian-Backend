@@ -33,6 +33,15 @@ class FavoriteServersRepository():
         if servers is None:
             return False
         return servers
+    @staticmethod
+    def getFavoriteServerId(serverId, userId):
+        server = db.session.query(FavoriteServers).filter(
+            FavoriteServers.server_id == serverId,
+            FavoriteServers.user_id == userId
+        ).first()
+        if server is None:
+            return False
+        return server.id
 
 class PlayerRepository():
     @staticmethod
@@ -52,6 +61,12 @@ class PlayerRepository():
         if not players:
             return False
         return players
+    @staticmethod
+    def getPlayerId(userId, uuid):
+        player = db.session.query(Player).filter(Player.user_id == userId, Player.uuid == uuid).first()
+        if player is None:
+            return False
+        return player.id
 
 class PlayersPrivilegesRepository():
     @staticmethod
@@ -74,6 +89,15 @@ class PlayersPrivilegesRepository():
         if not privileges:
             return False
         return privileges
+    @staticmethod
+    def getPlayerPrivilegeId(playerId, privilegeId):
+        privilege = db.session.query(PlayersPrivileges).filter(
+            PlayersPrivileges.player_id == playerId,
+            PlayersPrivileges.privilege_id == privilegeId
+        ).first()
+        if privilege is None:
+            return False
+        return privilege.id
 
 class SettingsRepository():
     @staticmethod
@@ -99,5 +123,11 @@ class SettingsRepository():
         setting.approved=approved
         db.session.commit()
 
+    @staticmethod
+    def getSettingId(userId, rule):
+        setting = db.session.query(Settings).filter(Settings.user_id == userId, Settings.rule == rule).first()
+        if setting is None:
+            return False
+        return setting.id
 
-#TODO add a function at each class to get the id of specific records so that they can be deleted.
+
