@@ -8,11 +8,14 @@ import serverSessionsManager
 import utils
 from utils import getConfig
 from flask_socketio import SocketIO, emit, join_room, leave_room
+from services.servers import servers_bp
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = APIFlask(__name__)
 app.config.update(getConfig()['flaskConfig'])
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mineguardian.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 CORS(app)
 socketio = SocketIO(
     app,
@@ -20,7 +23,6 @@ socketio = SocketIO(
     async_mode="eventlet"
 )
 
-from services.servers import servers_bp
 app.register_blueprint(servers_bp)
 
 def register_socketio_listener(serverName, serverInstance):
