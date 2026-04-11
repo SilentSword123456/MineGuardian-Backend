@@ -414,7 +414,7 @@ class ServerSession:
         max_players = self.max_players if is_running and self.max_players is not None else utils.getMaxPlayers(self.working_dir)
 
         return {
-            "name": self.name,
+            "server_id": self.name,
             "is_running": is_running,
             "pid": pid,
             "uptime_seconds": uptime_seconds,
