@@ -9,7 +9,7 @@ def get_all_servers():
     i = 1
     for name in os.listdir(os.path.join(DIR, "servers")):
         servers.append({
-            'name': name,
+            'server_id': name,
             'id': i,
             'isRunning': (
                 serverSessionsManager.serverInstances[name].is_running() if name in serverSessionsManager.serverInstances else False),
