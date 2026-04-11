@@ -7,7 +7,7 @@ DOCS = {
         }
     },
     'get_general_server_info': {
-        'summary': 'Get server details by name',
+        'summary': 'Get server details by server_id',
         'description': 'Returns runtime process details if running, otherwise stored metadata.',
         'responses': {
             200: 'Server details returned successfully.',
@@ -19,15 +19,15 @@ DOCS = {
         'description': 'Starts a server process and registers its socket listener.',
         'responses': {
             200: 'Server started successfully.',
-            400: 'Missing or invalid server name.'
+            400: 'Missing or invalid server server_id.'
         }
     },
     'stop_server': {
         'summary': 'Stop a server',
-        'description': 'Stops a running server process for the given server name.',
+        'description': 'Stops a running server process for the given server server_id.',
         'responses': {
             200: 'Server stopped successfully.',
-            400: 'Missing or invalid server name.'
+            400: 'Missing or invalid server server_id.'
         }
     },
     'get_server_stats': {
@@ -68,7 +68,7 @@ DOCS = {
         'description': 'Uninstalls and removes the selected server from local storage.',
         'responses': {
             200: 'Server uninstall request completed.',
-            400: 'Missing server name.'
+            400: 'Missing server server_id.'
         }
     }
 }
