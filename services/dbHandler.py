@@ -1,10 +1,26 @@
 from apiflask import APIBlueprint
 from flask import request
 from Database.repositories import *
+from services.docs import DOCS
+from services.schemas import (
+    PlayerCreateRequestSchema,
+    PlayerPrivilegeRequestSchema,
+    PlayerPrivilegesRequestSchema,
+    FavoriteServersOutputSchema,
+    PlayerUuidRequestSchema,
+    SettingRequestSchema,
+    PlayerPrivilegesOutputSchema,
+    PlayerUUIDsOutputSchema,
+    UserIdRequestSchema,
+    UserIdServerIdRequestSchema,
+    StatusOutputSchema,
+)
 
 db_blueprint = APIBlueprint('database', __name__)
 
 @db_blueprint.route('/user', methods=['POST'])
+@db_blueprint.doc(**DOCS['create_user'])
+@db_blueprint.output(StatusOutputSchema, status_code=200)
 def createUser():
     request_data = request.get_json()
     if request_data is None:
@@ -13,8 +29,10 @@ def createUser():
     return {'status': UserRepository.createUser()}, 200
 
 @db_blueprint.route('/user', methods=['DELETE'])
-def removeUser():
-    request_data = request.get_json()
+@db_blueprint.doc(**DOCS['remove_user'])
+@db_blueprint.input(UserIdRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.output(StatusOutputSchema, status_code=200)
+def removeUser(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
@@ -25,8 +43,10 @@ def removeUser():
     return {'status': UserRepository.removeUser(user_id)}, 200
 
 @db_blueprint.route('/favoriteServers', methods=['POST'])
-def addFavoriteServer():
-    request_data = request.get_json()
+@db_blueprint.doc(**DOCS['add_favorite_server'])
+@db_blueprint.input(UserIdServerIdRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.output(StatusOutputSchema, status_code=200)
+def addFavoriteServer(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
     user_id = request_data.get('user_id')
@@ -43,8 +63,10 @@ def addFavoriteServer():
     return {'status': FavoriteServersRepository.addFavoriteServer(server_id, user_id)}, 200
 
 @db_blueprint.route('/favoriteServers', methods=['DELETE'])
-def removeFavoriteServer():
-    request_data = request.get_json()
+@db_blueprint.doc(**DOCS['remove_favorite_server'])
+@db_blueprint.input(UserIdServerIdRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.output(StatusOutputSchema, status_code=200)
+def removeFavoriteServer(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
     user_id = request_data.get('user_id')
@@ -60,8 +82,10 @@ def removeFavoriteServer():
     return {'status': FavoriteServersRepository.removeFavoriteServer(user_id, server_id)}, 200
 
 @db_blueprint.route('/favoriteServers', methods=['GET'])
-def getFavoriteServers():
-    request_data = request.get_json()
+@db_blueprint.doc(**DOCS['get_favorite_servers'])
+@db_blueprint.input(UserIdRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.output(FavoriteServersOutputSchema, status_code=200)
+def getFavoriteServers(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
     user_id = request_data.get('user_id')
@@ -71,8 +95,10 @@ def getFavoriteServers():
     return {'servers': FavoriteServersRepository.getFavoriteServers(user_id)}, 200
 
 @db_blueprint.route('/player', methods=['POST'])
-def addPlayer():
-    request_data = request.get_json()
+@db_blueprint.doc(**DOCS['add_player'])
+@db_blueprint.input(PlayerCreateRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.output(StatusOutputSchema, status_code=200)
+def addPlayer(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
@@ -90,8 +116,10 @@ def addPlayer():
     return {'status': PlayerRepository.createPlayer(user_id, name, uuid)}, 200
 
 @db_blueprint.route('/player', methods=['DELETE'])
-def removePlayer():
-    request_data = request.get_json()
+@db_blueprint.doc(**DOCS['remove_player'])
+@db_blueprint.input(PlayerUuidRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.output(StatusOutputSchema, status_code=200)
+def removePlayer(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
@@ -108,8 +136,10 @@ def removePlayer():
     return {'status': PlayerRepository.removePlayer(user_id, uuid)}, 200
 
 @db_blueprint.route('/player', methods=['GET'])
-def getAllPlayersUUIDs():
-    request_data = request.get_json()
+@db_blueprint.doc(**DOCS['get_all_players_uuids'])
+@db_blueprint.input(UserIdRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.output(PlayerUUIDsOutputSchema, status_code=200)
+def getAllPlayersUUIDs(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
@@ -125,8 +155,10 @@ def getAllPlayersUUIDs():
     return {'players': PlayerRepository.getAllPlayersUUIDs(user_id)}, 200
 
 @db_blueprint.route('/playerPrivilege', methods=['POST'])
-def addPlayerPrivilege():
-    request_data = request.get_json()
+@db_blueprint.doc(**DOCS['add_player_privilege'])
+@db_blueprint.input(PlayerPrivilegeRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.output(StatusOutputSchema, status_code=200)
+def addPlayerPrivilege(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
@@ -144,8 +176,10 @@ def addPlayerPrivilege():
     return {'status': PlayersPrivilegesRepository.addPlayerPrivilege(player_id, privilege_id)}, 200
 
 @db_blueprint.route('/playerPrivilege', methods=['DELETE'])
-def deletePlayerPrivilege():
-    request_data = request.get_json()
+@db_blueprint.doc(**DOCS['delete_player_privilege'])
+@db_blueprint.input(PlayerPrivilegeRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.output(StatusOutputSchema, status_code=200)
+def deletePlayerPrivilege(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
@@ -163,8 +197,10 @@ def deletePlayerPrivilege():
     return {'status': PlayersPrivilegesRepository.deletePlayerPrivilege(player_id, privilege_id)}, 200
 
 @db_blueprint.route('/playerPrivilege', methods=['GET'])
-def getPlayerPrivileges():
-    request_data = request.get_json()
+@db_blueprint.doc(**DOCS['get_player_privileges'])
+@db_blueprint.input(PlayerPrivilegesRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.output(PlayerPrivilegesOutputSchema, status_code=200)
+def getPlayerPrivileges(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
@@ -181,8 +217,10 @@ def getPlayerPrivileges():
     return {'privileges': PlayersPrivilegesRepository.getPlayerPrivileges(user_id, player_uuid)}, 200
 
 @db_blueprint.route('/setting', methods=['POST'])
-def addSetting():
-    request_data = request.get_json()
+@db_blueprint.doc(**DOCS['add_setting'])
+@db_blueprint.input(SettingRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.output(StatusOutputSchema, status_code=200)
+def addSetting(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
@@ -202,8 +240,10 @@ def addSetting():
     return {'status': SettingsRepository.addSetting(user_id, rule, approved)}, 200
 
 @db_blueprint.route('/setting', methods=['DELETE'])
-def removeSetting():
-    request_data = request.get_json()
+@db_blueprint.doc(**DOCS['remove_setting'])
+@db_blueprint.input(UserIdRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.output(StatusOutputSchema, status_code=200)
+def removeSetting(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
@@ -221,8 +261,10 @@ def removeSetting():
     return {'status': SettingsRepository.removeSetting(user_id, rule)}, 200
 
 @db_blueprint.route('/setting', methods=['PATCH'])
-def changeSetting():
-    request_data = request.get_json()
+@db_blueprint.doc(**DOCS['change_setting'])
+@db_blueprint.input(SettingRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.output(StatusOutputSchema, status_code=200)
+def changeSetting(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
