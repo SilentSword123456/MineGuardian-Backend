@@ -1,3 +1,5 @@
+from typing import List
+
 from Database.perms import SettingsPermissions, PlayersPermissions
 from Database.database import *
 
@@ -6,6 +8,7 @@ class UserRepository():
     def createUser():
         db.session.add(User())
         db.session.commit()
+        return True
     @staticmethod
     def removeUser(id):
         users = db.session.query(User).filter(User.id == id).first()
@@ -13,41 +16,58 @@ class UserRepository():
             return False
         db.session.delete(users)
         db.session.commit()
+        return True
+
+    @staticmethod
+    def checkUser(userId):
+        users = db.session.query(User).filter(User.id == userId).first()
+        if users is None:
+            return False
+        return True
 
 class FavoriteServersRepository():
     @staticmethod
-    def addFavoriteServer(serverId, userId):
+    def addFavoriteServer(serverId: int, userId: int ) -> bool:
+        if not UserRepository.checkUser(userId):
+            return False
+
+        print("serverId:" + str(serverId))
+        print("serversIds: " + str(FavoriteServersRepository.getFavoriteServers(userId)))
+        if serverId in FavoriteServersRepository.getFavoriteServers(userId):
+            return False
         db.session.add(FavoriteServers(user_id=userId, server_id=serverId))
         db.session.commit()
+        return True
     @staticmethod
-    def removeFavoriteServer(id):
-        servers = db.session.query(FavoriteServers).filter(FavoriteServers.id == id).first()
+    def removeFavoriteServer(serverId: int, userId:int) -> bool:
+        if not UserRepository.checkUser(userId):
+            return False
+        servers = db.session.query(FavoriteServers).filter(FavoriteServers.user_id == userId, FavoriteServers.server_id == serverId).first()
         if servers is None:
             return False
         db.session.delete(servers)
         db.session.commit()
+        return True
 
     @staticmethod
-    def getFavoriteServers(userId):
+    def getFavoriteServers(userId: int) -> List[int]:
+        if not UserRepository.checkUser(userId):
+            return False
         servers = db.session.query(FavoriteServers).filter(FavoriteServers.user_id == userId).all()
-        if servers is None:
-            return False
-        return servers
-    @staticmethod
-    def getFavoriteServerId(serverId, userId):
-        server = db.session.query(FavoriteServers).filter(
-            FavoriteServers.server_id == serverId,
-            FavoriteServers.user_id == userId
-        ).first()
-        if server is None:
-            return False
-        return server.id
+        if not servers:
+            return []
+
+        serversId = []
+        for server in servers:
+            serversId.append(server.server_id)
+        return serversId
 
 class PlayerRepository():
     @staticmethod
     def createPlayer(userId, name, uuid):
         db.session.add(Player(userId=userId, name=name, uuid=uuid))
         db.session.commit()
+        return True
     @staticmethod
     def removePlayer(id):
         players = db.session.query(Player).filter(Player.id == id).first()
@@ -55,6 +75,7 @@ class PlayerRepository():
             return False
         db.session.delete(players)
         db.session.commit()
+        return True
     @staticmethod
     def getAllPlayers(userId):
         players = db.session.query(Player).filter(Player.user_id == userId).all()
@@ -75,6 +96,7 @@ class PlayersPrivilegesRepository():
             return False
         db.session.add(PlayersPrivileges(playerId=playerId, privilege_id = privilegeId))
         db.session.commit()
+        return True
     @staticmethod
     def deletePlayerPrivilege(playerId, privilegeId):
         privileges = db.session.query(PlayersPrivileges).filter(PlayersPrivileges.player_id == playerId, PlayersPrivileges.privilege_id == privilegeId).all()
@@ -83,6 +105,7 @@ class PlayersPrivilegesRepository():
         for privilege in privileges:
             db.session.delete(privilege)
         db.session.commit()
+        return True
     @staticmethod
     def getPlayerPrivileges(playerId):
         privileges = db.session.query(PlayersPrivileges).filter(PlayersPrivileges.player_id == playerId).all()
@@ -108,6 +131,7 @@ class SettingsRepository():
             return False
         db.session.add(Settings(userId=userId, rule=rule, approved=approved))
         db.session.commit()
+        return True
     @staticmethod
     def removeSetting(userId, rule):
         setting = db.session.query(Settings).filter(Settings.user_id == userId, Settings.rule == rule).first()
@@ -115,6 +139,7 @@ class SettingsRepository():
             return False
         db.session.delete(setting)
         db.session.commit()
+        return True
     @staticmethod
     def changeSetting(userId, rule, approved=False):
         setting = db.session.query(Settings).filter(Settings.user_id == userId, Settings.rule == rule).first()
@@ -122,6 +147,7 @@ class SettingsRepository():
             return False
         setting.approved=approved
         db.session.commit()
+        return True
 
     @staticmethod
     def getSettingId(userId, rule):
