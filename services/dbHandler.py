@@ -95,7 +95,7 @@ def removeFavoriteServer(request_data=None):
 @db_blueprint.doc(**DOCS['get_favorite_servers'])
 @db_blueprint.input(UserIdRequestSchema, location='json', arg_name='request_data', validation=False)
 @db_blueprint.output(FavoriteServersOutputSchema, status_code=200)
-@get_jwt_identity()
+@jwt_required()
 def getFavoriteServers(request_data=None):
     username = get_jwt_identity()
     return {'servers': FavoriteServersRepository.getFavoriteServers(username)}, 200
