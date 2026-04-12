@@ -52,7 +52,7 @@ class FavoriteServersRepository():
     @staticmethod
     def getFavoriteServers(userId: int) -> List[int]:
         if not UserRepository.checkUser(userId):
-            return False
+            return []
         servers = db.session.query(FavoriteServers).filter(FavoriteServers.user_id == userId).all()
         if not servers:
             return []
