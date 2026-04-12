@@ -77,6 +77,7 @@ def firstLaunch():
 
     utils.generateRconPassword()
     utils.generateFlaskKey()
+    #TODO add a generate JWT token function in utils for the config file
 
 
 if __name__ == '__main__':
