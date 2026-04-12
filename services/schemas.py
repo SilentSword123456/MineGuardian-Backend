@@ -58,3 +58,66 @@ class GetAvailableVersionsOutputSchema(Schema):
 class RemoveServerOutputSchema(Schema):
     error = String(required=True)
 
+
+class StatusOutputSchema(Schema):
+    status = Boolean()
+    error = String()
+
+
+class FavoriteServersOutputSchema(Schema):
+    servers = List(Integer())
+    error = String()
+
+
+class PlayerUUIDsOutputSchema(Schema):
+    players = List(String())
+    error = String()
+
+
+class PlayerPrivilegeItemSchema(Schema):
+    id = Integer()
+    player_id = Integer()
+    privilege_id = Integer()
+
+
+class PlayerPrivilegesOutputSchema(Schema):
+    privileges = List(Nested(PlayerPrivilegeItemSchema))
+    error = String()
+
+
+class UserIdRequestSchema(Schema):
+    user_id = Integer(required=True)
+
+
+class UserIdServerIdRequestSchema(Schema):
+    user_id = Integer(required=True)
+    server_id = Integer(required=True)
+
+
+class PlayerCreateRequestSchema(Schema):
+    user_id = Integer(required=True)
+    name = String(required=True)
+    uuid = String(required=True)
+
+
+class PlayerUuidRequestSchema(Schema):
+    user_id = Integer(required=True)
+    uuid = String(required=True)
+
+
+class PlayerPrivilegeRequestSchema(Schema):
+    player_id = Integer(required=True)
+    privilege_id = Integer(required=True)
+
+
+class PlayerPrivilegesRequestSchema(Schema):
+    user_id = Integer(required=True)
+    player_uuid = String(required=True)
+
+
+class SettingRequestSchema(Schema):
+    user_id = Integer(required=True)
+    rule = Integer(required=True)
+    approved = Boolean(load_default=False)
+
+
