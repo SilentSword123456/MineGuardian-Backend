@@ -11,6 +11,7 @@ from services.dbHandler import db_blueprint
 from utils import getConfig
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from services.servers import servers_bp
+from services.auth import jwt, auth_blueprint
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -18,6 +19,7 @@ app = APIFlask(__name__)
 app.config.update(getConfig()['flaskConfig'])
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mineguardian.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config["JWT_SECRET_KEY"] = getConfig()['jwtSecretKey']
 CORS(app)
 socketio = SocketIO(
     app,
@@ -27,7 +29,9 @@ socketio = SocketIO(
 
 app.register_blueprint(servers_bp)
 app.register_blueprint(db_blueprint)
+app.register_blueprint(auth_blueprint)
 db.init_app(app)
+jwt.init_app(app)
 
 def register_socketio_listener(serverName, serverInstance):
     """Ensures a SocketIO broadcast listener is registered for the server instance."""
