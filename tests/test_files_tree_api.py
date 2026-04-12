@@ -1,0 +1,126 @@
+import unittest
+from unittest.mock import patch
+
+from api import app
+from services import servers as servers_module
+
+
+class DummyServerInstance:
+    def __init__(self, process_info=None, running=True):
+        self._process_info = process_info or {
+            'server_id': 'myCoolServer',
+            'is_running': True,
+            'pid': 1234,
+            'uptime_seconds': 12.5,
+            'max_memory_mb': 2048,
+            'max_players': 20,
+        }
+        self._running = running
+
+    def get_process_info(self):
+        return self._process_info
+
+    def is_running(self):
+        return self._running
+
+
+class ServerRoutesTests(unittest.TestCase):
+    def setUp(self):
+        self.client = app.test_client()
+
+    def test_health_endpoint(self):
+        response = self.client.get('/health')
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data['status'], 'ok')
+        self.assertIn('timestamp', data)
+
+    def test_list_servers(self):
+        servers = [{'name': 'myCoolServer', 'id': 1, 'isRunning': False, 'max_memory_mb': 2048}]
+        with patch.object(servers_module, 'get_all_servers', return_value=servers):
+            response = self.client.get('/servers')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {'servers': servers})
+
+    def test_general_server_info_when_server_is_not_running(self):
+        servers = [{'server_id': 'myCoolServer', 'max_memory_mb': 2048, 'online_players': {'max': 20}}]
+        with patch.object(servers_module, 'get_all_servers', return_value=servers), \
+                patch.object(servers_module.serverSessionsManager, 'serverInstances', {}):
+            response = self.client.get('/servers/myCoolServer')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {
+            'is_running': False,
+            'pid': 0,
+            'uptime_seconds': 0.0,
+            'max_memory_mb': 2048,
+            'online_players': {'max': 20},
+        })
+
+    def test_general_server_info_when_server_is_running(self):
+        servers = [{'server_id': 'myCoolServer', 'max_memory_mb': 4096, 'online_players': {'max': 10}}]
+        server_instance = DummyServerInstance(process_info={
+            'server_id': 'myCoolServer',
+            'is_running': True,
+            'pid': 4321,
+            'uptime_seconds': 99.9,
+            'max_memory_mb': 4096,
+            'max_players': 15,
+        })
+
+        with patch.object(servers_module, 'get_all_servers', return_value=servers), \
+                patch.object(servers_module.serverSessionsManager, 'serverInstances', {'myCoolServer': server_instance}):
+            response = self.client.get('/servers/myCoolServer')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {
+            'is_running': True,
+            'pid': 4321,
+            'uptime_seconds': 99.9,
+            'max_memory_mb': 4096,
+            'online_players': {'max': 15},
+        })
+
+    def test_server_not_found(self):
+        with patch.object(servers_module, 'get_all_servers', return_value=[]):
+            response = self.client.get('/servers/NotARealServer')
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.get_json(), {'detail': {}, 'message': 'Server not found'})
+
+    def test_server_stats_endpoint(self):
+        server_instance = DummyServerInstance(running=True)
+        stats = {
+            'cpu_usage_percent': 12.5,
+            'memory_usage_mb': 512.0,
+            'max_memory_mb': 2048,
+            'online_players': {'online': 1, 'max': 20, 'players': ['Steve']},
+        }
+
+        with patch.object(servers_module.serverSessionsManager, 'serverInstances', {'myCoolServer': server_instance}), \
+                patch.object(servers_module.utils, 'get_server_stats', return_value=stats):
+            response = self.client.get('/servers/myCoolServer/stats')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), stats)
+
+    def test_global_stats_endpoint(self):
+        stats = {
+            'cpu_usage_percent': 18.0,
+            'memory_usage_mb': 1024.0,
+            'max_memory_mb': 4096,
+            'online_players': {'online': 7, 'max': 40, 'players': ['Steve', 'Alex']},
+        }
+
+        with patch.object(servers_module.utils, 'getGlobalStats', return_value=stats):
+            response = self.client.get('/servers/globalStats')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), stats)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
