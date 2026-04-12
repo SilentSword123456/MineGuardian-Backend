@@ -86,37 +86,38 @@ class PlayerPrivilegesOutputSchema(Schema):
 
 
 class UserIdRequestSchema(Schema):
-    user_id = Integer(required=True)
+    username = String(required=True)
 
 
 class UserIdServerIdRequestSchema(Schema):
-    user_id = Integer(required=True)
+    username = String(required=True)
     server_id = Integer(required=True)
 
 
 class PlayerCreateRequestSchema(Schema):
-    user_id = Integer(required=True)
+    username = String(required=True)
     name = String(required=True)
     uuid = String(required=True)
 
 
 class PlayerUuidRequestSchema(Schema):
-    user_id = Integer(required=True)
+    username = String(required=True)
     uuid = String(required=True)
 
 
 class PlayerPrivilegeRequestSchema(Schema):
-    player_id = Integer(required=True)
+    username = String(required=True)
+    player_uuid = String(required=True)
     privilege_id = Integer(required=True)
 
 
 class PlayerPrivilegesRequestSchema(Schema):
-    user_id = Integer(required=True)
+    username = String(required=True)
     player_uuid = String(required=True)
 
 
 class SettingRequestSchema(Schema):
-    user_id = Integer(required=True)
+    username = String(required=True)
     rule = Integer(required=True)
     approved = Boolean(load_default=False)
 
