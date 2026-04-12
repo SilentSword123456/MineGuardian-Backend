@@ -69,11 +69,11 @@ class PlayerRepository():
         db.session.commit()
         return True
     @staticmethod
-    def removePlayer(id):
-        players = db.session.query(Player).filter(Player.id == id).first()
-        if players is None:
+    def removePlayer(userId, uuid):
+        player = db.session.query(Player).filter(Player.user_id == userId, Player.uuid == uuid).first()
+        if player is None:
             return False
-        db.session.delete(players)
+        db.session.delete(player)
         db.session.commit()
         return True
     @staticmethod
@@ -82,11 +82,12 @@ class PlayerRepository():
         if not players:
             return False
         return players
+
     @staticmethod
-    def getPlayerId(userId, uuid):
-        player = db.session.query(Player).filter(Player.user_id == userId, Player.uuid == uuid).first()
+    def getPlayerId(userId:int , playerUUID:str) -> int:
+        player = db.session.query(Player).filter(Player.user_id == userId, Player.uuid == playerUUID).first()
         if player is None:
-            return False
+            return 0
         return player.id
 
 class PlayersPrivilegesRepository():
@@ -107,13 +108,15 @@ class PlayersPrivilegesRepository():
         db.session.commit()
         return True
     @staticmethod
-    def getPlayerPrivileges(playerId):
+    def getPlayerPrivileges(userId, playerUUID):
+        playerId = PlayerRepository.getPlayerId(userId, playerUUID)
         privileges = db.session.query(PlayersPrivileges).filter(PlayersPrivileges.player_id == playerId).all()
         if not privileges:
             return False
         return privileges
     @staticmethod
-    def getPlayerPrivilegeId(playerId, privilegeId):
+    def getPlayerPrivilegeId(userId, playerUUID, privilegeId):
+        playerId = PlayerRepository.getPlayerId(userId, playerUUID)
         privilege = db.session.query(PlayersPrivileges).filter(
             PlayersPrivileges.player_id == playerId,
             PlayersPrivileges.privilege_id == privilegeId
@@ -148,12 +151,5 @@ class SettingsRepository():
         setting.approved=approved
         db.session.commit()
         return True
-
-    @staticmethod
-    def getSettingId(userId, rule):
-        setting = db.session.query(Settings).filter(Settings.user_id == userId, Settings.rule == rule).first()
-        if setting is None:
-            return False
-        return setting.id
 
 
