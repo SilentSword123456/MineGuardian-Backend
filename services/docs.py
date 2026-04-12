@@ -81,106 +81,146 @@ DOCS = {
     },
     'remove_user': {
         'summary': 'Remove a user',
-        'description': 'Removes a database user record by username.',
+        'description': 'Requires JWT Bearer token. Removes the authenticated user record. The request username must match the JWT identity.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'User removed successfully.',
-            400: 'Bad request.'
+            400: 'Bad request.',
+            401: 'Missing or invalid JWT token.',
+            422: 'JWT token is malformed or cannot be processed.',
+            403: 'Forbidden when JWT identity does not match the provided username.'
         }
     },
     'add_favorite_server': {
         'summary': 'Add a favorite server',
-        'description': 'Adds a server_id to the specified username favorites.',
+        'description': 'Requires JWT Bearer token. Adds a server_id to the authenticated user favorites.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Favorite server added successfully.',
-            400: 'Bad request.'
+            400: 'Bad request.',
+            401: 'Missing or invalid JWT token.',
+            422: 'JWT token is malformed or cannot be processed.'
         }
     },
     'remove_favorite_server': {
         'summary': 'Remove a favorite server',
-        'description': 'Removes a server_id from the specified username favorites.',
+        'description': 'Requires JWT Bearer token. Removes a server_id from the authenticated user favorites.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Favorite server removed successfully.',
-            400: 'Bad request.'
+            400: 'Bad request.',
+            401: 'Missing or invalid JWT token.',
+            422: 'JWT token is malformed or cannot be processed.'
         }
     },
     'get_favorite_servers': {
         'summary': 'List favorite servers',
-        'description': 'Returns the favorite server ids for a username.',
+        'description': 'Requires JWT Bearer token. Returns favorite server ids for the authenticated user.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Favorite servers returned successfully.',
-            400: 'Bad request.'
+            400: 'Bad request.',
+            401: 'Missing or invalid JWT token.',
+            422: 'JWT token is malformed or cannot be processed.'
         }
     },
     'add_player': {
         'summary': 'Add a player',
-        'description': 'Creates a player record for the specified username.',
+        'description': 'Requires JWT Bearer token. Creates a player record for the authenticated user.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Player created successfully.',
-            400: 'Bad request.'
+            400: 'Bad request.',
+            401: 'Missing or invalid JWT token.',
+            422: 'JWT token is malformed or cannot be processed.'
         }
     },
     'remove_player': {
         'summary': 'Remove a player',
-        'description': 'Removes a player record by username and uuid.',
+        'description': 'Requires JWT Bearer token. Removes a player record for the authenticated user by uuid.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Player removed successfully.',
-            400: 'Bad request.'
+            400: 'Bad request.',
+            401: 'Missing or invalid JWT token.',
+            422: 'JWT token is malformed or cannot be processed.'
         }
     },
     'get_all_players_uuids': {
         'summary': 'List player UUIDs',
-        'description': 'Returns the UUIDs for all players linked to a username.',
+        'description': 'Requires JWT Bearer token. Returns UUIDs for all players linked to the authenticated user.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Player UUIDs returned successfully.',
-            400: 'Bad request.'
+            400: 'Bad request.',
+            401: 'Missing or invalid JWT token.',
+            422: 'JWT token is malformed or cannot be processed.'
         }
     },
     'add_player_privilege': {
         'summary': 'Add a player privilege',
-        'description': 'Adds a privilege to a player specified by username and player_uuid.',
+        'description': 'Requires JWT Bearer token. Adds a privilege to a player_uuid owned by the authenticated user.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Player privilege added successfully.',
-            400: 'Bad request.'
+            400: 'Bad request.',
+            401: 'Missing or invalid JWT token.',
+            422: 'JWT token is malformed or cannot be processed.'
         }
     },
     'delete_player_privilege': {
         'summary': 'Delete a player privilege',
-        'description': 'Removes a privilege from a player specified by username and player_uuid.',
+        'description': 'Requires JWT Bearer token. Removes a privilege from a player_uuid owned by the authenticated user.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Player privilege removed successfully.',
-            400: 'Bad request.'
+            400: 'Bad request.',
+            401: 'Missing or invalid JWT token.',
+            422: 'JWT token is malformed or cannot be processed.'
         }
     },
     'get_player_privileges': {
         'summary': 'List player privileges',
-        'description': 'Returns the privileges assigned to a player specified by username and player_uuid.',
+        'description': 'Requires JWT Bearer token. Returns privileges for a player_uuid linked to the authenticated user.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Player privileges returned successfully.',
-            400: 'Bad request.'
+            400: 'Bad request.',
+            401: 'Missing or invalid JWT token.',
+            422: 'JWT token is malformed or cannot be processed.'
         }
     },
     'add_setting': {
         'summary': 'Add a setting',
-        'description': 'Creates a setting rule for a username.',
+        'description': 'Requires JWT Bearer token. Creates a setting rule for the authenticated user.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Setting created successfully.',
-            400: 'Bad request.'
+            400: 'Bad request.',
+            401: 'Missing or invalid JWT token.',
+            422: 'JWT token is malformed or cannot be processed.'
         }
     },
     'remove_setting': {
         'summary': 'Remove a setting',
-        'description': 'Removes a setting rule for a username.',
+        'description': 'Requires JWT Bearer token. Removes a setting rule for the authenticated user.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Setting removed successfully.',
-            400: 'Bad request.'
+            400: 'Bad request.',
+            401: 'Missing or invalid JWT token.',
+            422: 'JWT token is malformed or cannot be processed.'
         }
     },
     'change_setting': {
         'summary': 'Change a setting',
-        'description': 'Updates the approval state of a setting rule for a username.',
+        'description': 'Requires JWT Bearer token. Updates the approval state of a setting rule for the authenticated user.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Setting updated successfully.',
-            400: 'Bad request.'
+            400: 'Bad request.',
+            401: 'Missing or invalid JWT token.',
+            422: 'JWT token is malformed or cannot be processed.'
         }
     }
 }
