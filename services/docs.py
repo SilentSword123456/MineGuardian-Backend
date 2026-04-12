@@ -70,6 +70,118 @@ DOCS = {
             200: 'Server uninstall request completed.',
             400: 'Missing server server_id.'
         }
+    },
+    'create_user': {
+        'summary': 'Create a user',
+        'description': 'Creates a new database user record.',
+        'responses': {
+            200: 'User created successfully.',
+            400: 'Bad request.'
+        }
+    },
+    'remove_user': {
+        'summary': 'Remove a user',
+        'description': 'Removes a database user record by user_id.',
+        'responses': {
+            200: 'User removed successfully.',
+            400: 'Bad request.'
+        }
+    },
+    'add_favorite_server': {
+        'summary': 'Add a favorite server',
+        'description': 'Adds a server_id to the specified user favorites.',
+        'responses': {
+            200: 'Favorite server added successfully.',
+            400: 'Bad request.'
+        }
+    },
+    'remove_favorite_server': {
+        'summary': 'Remove a favorite server',
+        'description': 'Removes a server_id from the specified user favorites.',
+        'responses': {
+            200: 'Favorite server removed successfully.',
+            400: 'Bad request.'
+        }
+    },
+    'get_favorite_servers': {
+        'summary': 'List favorite servers',
+        'description': 'Returns the favorite server ids for a user.',
+        'responses': {
+            200: 'Favorite servers returned successfully.',
+            400: 'Bad request.'
+        }
+    },
+    'add_player': {
+        'summary': 'Add a player',
+        'description': 'Creates a player record for the specified user.',
+        'responses': {
+            200: 'Player created successfully.',
+            400: 'Bad request.'
+        }
+    },
+    'remove_player': {
+        'summary': 'Remove a player',
+        'description': 'Removes a player record by user_id and uuid.',
+        'responses': {
+            200: 'Player removed successfully.',
+            400: 'Bad request.'
+        }
+    },
+    'get_all_players_uuids': {
+        'summary': 'List player UUIDs',
+        'description': 'Returns the UUIDs for all players linked to a user.',
+        'responses': {
+            200: 'Player UUIDs returned successfully.',
+            400: 'Bad request.'
+        }
+    },
+    'add_player_privilege': {
+        'summary': 'Add a player privilege',
+        'description': 'Adds a privilege to a player.',
+        'responses': {
+            200: 'Player privilege added successfully.',
+            400: 'Bad request.'
+        }
+    },
+    'delete_player_privilege': {
+        'summary': 'Delete a player privilege',
+        'description': 'Removes a privilege from a player.',
+        'responses': {
+            200: 'Player privilege removed successfully.',
+            400: 'Bad request.'
+        }
+    },
+    'get_player_privileges': {
+        'summary': 'List player privileges',
+        'description': 'Returns the privileges assigned to a player.',
+        'responses': {
+            200: 'Player privileges returned successfully.',
+            400: 'Bad request.'
+        }
+    },
+    'add_setting': {
+        'summary': 'Add a setting',
+        'description': 'Creates a setting rule for a user.',
+        'responses': {
+            200: 'Setting created successfully.',
+            400: 'Bad request.'
+        }
+    },
+    'remove_setting': {
+        'summary': 'Remove a setting',
+        'description': 'Removes a setting rule for a user.',
+        'responses': {
+            200: 'Setting removed successfully.',
+            400: 'Bad request.'
+        }
+    },
+    'change_setting': {
+        'summary': 'Change a setting',
+        'description': 'Updates the approval state of a setting rule.',
+        'responses': {
+            200: 'Setting updated successfully.',
+            400: 'Bad request.'
+        }
     }
 }
 
