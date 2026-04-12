@@ -1,6 +1,5 @@
 from flask import Blueprint, request
-from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
-
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, create_access_token
 from Database import repositories
 
 jwt = JWTManager()
@@ -19,7 +18,7 @@ def login():
     if not authorized:
         return {'message': 'Invalid credentials'}, 401
 
-    access_token = jwt.create_access_token(identity=username)
+    access_token = create_access_token(identity=username)
     return {'access_token': access_token}, 200
 
 
