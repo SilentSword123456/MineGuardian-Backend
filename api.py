@@ -6,6 +6,8 @@ import eventlet
 from flask_cors import CORS
 import serverSessionsManager
 import utils
+from Database.database import db
+from services.dbHandler import db_blueprint
 from utils import getConfig
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from services.servers import servers_bp
@@ -24,6 +26,8 @@ socketio = SocketIO(
 )
 
 app.register_blueprint(servers_bp)
+app.register_blueprint(db_blueprint)
+db.init_app(app)
 
 def register_socketio_listener(serverName, serverInstance):
     """Ensures a SocketIO broadcast listener is registered for the server instance."""
