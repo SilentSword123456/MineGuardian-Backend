@@ -10,11 +10,12 @@ from services.schemas import (
     PlayerPrivilegesRequestSchema,
     FavoriteServersOutputSchema,
     PlayerUuidRequestSchema,
+    RuleRequestSchema,
+    ServerIdRequestSchema,
     SettingRequestSchema,
     PlayerPrivilegesOutputSchema,
     PlayerUUIDsOutputSchema,
-    UserIdRequestSchema,
-    UserIdServerIdRequestSchema,
+    UsernameRequestSchema,
     StatusOutputSchema,
 )
 
@@ -35,7 +36,7 @@ def createUser():
 
 @db_blueprint.route('/user', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['remove_user'])
-@db_blueprint.input(UserIdRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.input(UsernameRequestSchema, location='json', arg_name='request_data', validation=False)
 @db_blueprint.output(StatusOutputSchema, status_code=200)
 @jwt_required()
 def removeUser(request_data=None):
@@ -54,7 +55,7 @@ def removeUser(request_data=None):
 
 @db_blueprint.route('/favoriteServers', methods=['POST'])
 @db_blueprint.doc(**DOCS['add_favorite_server'])
-@db_blueprint.input(UserIdServerIdRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.input(ServerIdRequestSchema, location='json', arg_name='request_data', validation=False)
 @db_blueprint.output(StatusOutputSchema, status_code=200)
 @jwt_required()
 def addFavoriteServer(request_data=None):
@@ -74,7 +75,7 @@ def addFavoriteServer(request_data=None):
 
 @db_blueprint.route('/favoriteServers', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['remove_favorite_server'])
-@db_blueprint.input(UserIdServerIdRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.input(ServerIdRequestSchema, location='json', arg_name='request_data', validation=False)
 @db_blueprint.output(StatusOutputSchema, status_code=200)
 @jwt_required()
 def removeFavoriteServer(request_data=None):
@@ -93,10 +94,9 @@ def removeFavoriteServer(request_data=None):
 
 @db_blueprint.route('/favoriteServers', methods=['GET'])
 @db_blueprint.doc(**DOCS['get_favorite_servers'])
-@db_blueprint.input(UserIdRequestSchema, location='json', arg_name='request_data', validation=False)
 @db_blueprint.output(FavoriteServersOutputSchema, status_code=200)
 @jwt_required()
-def getFavoriteServers(request_data=None):
+def getFavoriteServers():
     username = get_jwt_identity()
     return {'servers': FavoriteServersRepository.getFavoriteServers(username)}, 200
 
@@ -135,10 +135,9 @@ def removePlayer(request_data=None):
 
 @db_blueprint.route('/player', methods=['GET'])
 @db_blueprint.doc(**DOCS['get_all_players_uuids'])
-@db_blueprint.input(UserIdRequestSchema, location='json', arg_name='request_data', validation=False)
 @db_blueprint.output(PlayerUUIDsOutputSchema, status_code=200)
 @jwt_required()
-def getAllPlayersUUIDs(request_data=None):
+def getAllPlayersUUIDs():
     username = get_jwt_identity()
     return {'players': PlayerRepository.getAllPlayersUUIDs(username)}, 200
 
@@ -227,7 +226,7 @@ def addSetting(request_data=None):
 
 @db_blueprint.route('/setting', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['remove_setting'])
-@db_blueprint.input(UserIdRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.input(RuleRequestSchema, location='json', arg_name='request_data', validation=False)
 @db_blueprint.output(StatusOutputSchema, status_code=200)
 @jwt_required()
 def removeSetting(request_data=None):
