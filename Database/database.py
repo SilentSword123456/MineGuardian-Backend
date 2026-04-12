@@ -29,3 +29,7 @@ class Settings(db.Model):
     user_id = db.Column(db.String, db.ForeignKey('user.id'))
     rule = db.Column(db.Integer)
     approved = db.Column(db.Boolean)
+
+def generateDB(app):
+    with app.app_context():
+        db.create_all()
