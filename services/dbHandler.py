@@ -26,7 +26,10 @@ def createUser():
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    return {'status': UserRepository.createUser()}, 200
+    username = request_data.get('username')
+    password = request_data.get('password')
+
+    return {'status': UserRepository.createUser(username, password)}, 200
 
 @db_blueprint.route('/user', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['remove_user'])
@@ -36,11 +39,11 @@ def removeUser(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    user_id = request_data.get('user_id')
-    if user_id is None:
+    username = request_data.get('username')
+    if username is None:
         return {'error': 'bad request'}, 400
 
-    return {'status': UserRepository.removeUser(user_id)}, 200
+    return {'status': UserRepository.removeUser(username)}, 200
 
 @db_blueprint.route('/favoriteServers', methods=['POST'])
 @db_blueprint.doc(**DOCS['add_favorite_server'])
@@ -49,18 +52,17 @@ def removeUser(request_data=None):
 def addFavoriteServer(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
-    user_id = request_data.get('user_id')
+    username = request_data.get('username')
     server_id = request_data.get('server_id')
-    if server_id is None or user_id is None:
+    if server_id is None or username is None:
         return {'error': 'bad request'}, 400
 
     try:
         server_id = int(server_id)
-        user_id = int(user_id)
     except (ValueError, TypeError):
         return {'error': 'bad request'}, 400
 
-    return {'status': FavoriteServersRepository.addFavoriteServer(server_id, user_id)}, 200
+    return {'status': FavoriteServersRepository.addFavoriteServer(server_id, username)}, 200
 
 @db_blueprint.route('/favoriteServers', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['remove_favorite_server'])
@@ -69,17 +71,16 @@ def addFavoriteServer(request_data=None):
 def removeFavoriteServer(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
-    user_id = request_data.get('user_id')
+    username = request_data.get('username')
     server_id = request_data.get('server_id')
-    if server_id is None or user_id is None:
+    if server_id is None or username is None:
         return {'error': 'bad request'}, 400
     try:
         server_id = int(server_id)
-        user_id = int(user_id)
     except (ValueError, TypeError):
         return {'error': 'bad request'}, 400
 
-    return {'status': FavoriteServersRepository.removeFavoriteServer(user_id, server_id)}, 200
+    return {'status': FavoriteServersRepository.removeFavoriteServer(username, server_id)}, 200
 
 @db_blueprint.route('/favoriteServers', methods=['GET'])
 @db_blueprint.doc(**DOCS['get_favorite_servers'])
@@ -88,11 +89,11 @@ def removeFavoriteServer(request_data=None):
 def getFavoriteServers(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
-    user_id = request_data.get('user_id')
-    if user_id is None:
+    username = request_data.get('username')
+    if username is None:
         return {'error': 'bad request'}, 400
 
-    return {'servers': FavoriteServersRepository.getFavoriteServers(user_id)}, 200
+    return {'servers': FavoriteServersRepository.getFavoriteServers(username)}, 200
 
 @db_blueprint.route('/player', methods=['POST'])
 @db_blueprint.doc(**DOCS['add_player'])
@@ -102,18 +103,13 @@ def addPlayer(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    user_id = request_data.get('user_id')
+    username = request_data.get('username')
     name = request_data.get('name')
     uuid = request_data.get('uuid')
-    if user_id is None or name is None or uuid is None:
+    if username is None or name is None or uuid is None:
         return {'error': 'bad request'}, 400
 
-    try:
-        user_id = int(user_id)
-    except (ValueError, TypeError):
-        return {'error': 'bad request'}, 400
-
-    return {'status': PlayerRepository.createPlayer(user_id, name, uuid)}, 200
+    return {'status': PlayerRepository.createPlayer(username, name, uuid)}, 200
 
 @db_blueprint.route('/player', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['remove_player'])
@@ -123,17 +119,12 @@ def removePlayer(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    user_id = request_data.get('user_id')
+    username = request_data.get('username')
     uuid = request_data.get('uuid')
-    if user_id is None or uuid is None:
+    if username is None or uuid is None:
         return {'error': 'bad request'}, 400
 
-    try:
-        user_id = int(user_id)
-    except (ValueError, TypeError):
-        return {'error': 'bad request'}, 400
-
-    return {'status': PlayerRepository.removePlayer(user_id, uuid)}, 200
+    return {'status': PlayerRepository.removePlayer(username, uuid)}, 200
 
 @db_blueprint.route('/player', methods=['GET'])
 @db_blueprint.doc(**DOCS['get_all_players_uuids'])
@@ -143,16 +134,11 @@ def getAllPlayersUUIDs(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    user_id = request_data.get('user_id')
-    if user_id is None:
+    username = request_data.get('username')
+    if username is None:
         return {'error': 'bad request'}, 400
 
-    try:
-        user_id = int(user_id)
-    except (ValueError, TypeError):
-        return {'error': 'bad request'}, 400
-
-    return {'players': PlayerRepository.getAllPlayersUUIDs(user_id)}, 200
+    return {'players': PlayerRepository.getAllPlayersUUIDs(username)}, 200
 
 @db_blueprint.route('/playerPrivilege', methods=['POST'])
 @db_blueprint.doc(**DOCS['add_player_privilege'])
@@ -162,18 +148,18 @@ def addPlayerPrivilege(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    player_id = request_data.get('player_id')
+    username = request_data.get('username')
+    player_uuid = request_data.get('player_uuid')
     privilege_id = request_data.get('privilege_id')
-    if player_id is None or privilege_id is None:
+    if username is None or player_uuid is None or privilege_id is None:
         return {'error': 'bad request'}, 400
 
     try:
-        player_id = int(player_id)
         privilege_id = int(privilege_id)
     except (ValueError, TypeError):
         return {'error': 'bad request'}, 400
 
-    return {'status': PlayersPrivilegesRepository.addPlayerPrivilege(player_id, privilege_id)}, 200
+    return {'status': PlayersPrivilegesRepository.addPlayerPrivilege(username, player_uuid, privilege_id)}, 200
 
 @db_blueprint.route('/playerPrivilege', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['delete_player_privilege'])
@@ -183,18 +169,18 @@ def deletePlayerPrivilege(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    player_id = request_data.get('player_id')
+    username = request_data.get('username')
+    player_uuid = request_data.get('player_uuid')
     privilege_id = request_data.get('privilege_id')
-    if player_id is None or privilege_id is None:
+    if username is None or player_uuid is None or privilege_id is None:
         return {'error': 'bad request'}, 400
 
     try:
-        player_id = int(player_id)
         privilege_id = int(privilege_id)
     except (ValueError, TypeError):
         return {'error': 'bad request'}, 400
 
-    return {'status': PlayersPrivilegesRepository.deletePlayerPrivilege(player_id, privilege_id)}, 200
+    return {'status': PlayersPrivilegesRepository.deletePlayerPrivilege(username, player_uuid, privilege_id)}, 200
 
 @db_blueprint.route('/playerPrivilege', methods=['GET'])
 @db_blueprint.doc(**DOCS['get_player_privileges'])
@@ -204,17 +190,12 @@ def getPlayerPrivileges(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    user_id = request_data.get('user_id')
+    username = request_data.get('username')
     player_uuid = request_data.get('player_uuid')
-    if user_id is None or player_uuid is None:
+    if username is None or player_uuid is None:
         return {'error': 'bad request'}, 400
 
-    try:
-        user_id = int(user_id)
-    except (ValueError, TypeError):
-        return {'error': 'bad request'}, 400
-
-    return {'privileges': PlayersPrivilegesRepository.getPlayerPrivileges(user_id, player_uuid)}, 200
+    return {'privileges': PlayersPrivilegesRepository.getPlayerPrivileges(username, player_uuid)}, 200
 
 @db_blueprint.route('/setting', methods=['POST'])
 @db_blueprint.doc(**DOCS['add_setting'])
@@ -224,20 +205,19 @@ def addSetting(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    user_id = request_data.get('user_id')
+    username = request_data.get('username')
     rule = request_data.get('rule')
     approved = request_data.get('approved', False)
-    if user_id is None or rule is None:
+    if username is None or rule is None:
         return {'error': 'bad request'}, 400
 
     try:
-        user_id = int(user_id)
         rule = int(rule)
         approved = bool(approved)
     except (ValueError, TypeError):
         return {'error': 'bad request'}, 400
 
-    return {'status': SettingsRepository.addSetting(user_id, rule, approved)}, 200
+    return {'status': SettingsRepository.addSetting(username, rule, approved)}, 200
 
 @db_blueprint.route('/setting', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['remove_setting'])
@@ -247,18 +227,17 @@ def removeSetting(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    user_id = request_data.get('user_id')
+    username = request_data.get('username')
     rule = request_data.get('rule')
-    if user_id is None or rule is None:
+    if username is None or rule is None:
         return {'error': 'bad request'}, 400
 
     try:
-        user_id = int(user_id)
         rule = int(rule)
     except (ValueError, TypeError):
         return {'error': 'bad request'}, 400
 
-    return {'status': SettingsRepository.removeSetting(user_id, rule)}, 200
+    return {'status': SettingsRepository.removeSetting(username, rule)}, 200
 
 @db_blueprint.route('/setting', methods=['PATCH'])
 @db_blueprint.doc(**DOCS['change_setting'])
@@ -268,17 +247,16 @@ def changeSetting(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    user_id = request_data.get('user_id')
+    username = request_data.get('username')
     rule = request_data.get('rule')
     approved = request_data.get('approved', False)
-    if user_id is None or rule is None:
+    if username is None or rule is None:
         return {'error': 'bad request'}, 400
 
     try:
-        user_id = int(user_id)
         rule = int(rule)
         approved = bool(approved)
     except (ValueError, TypeError):
         return {'error': 'bad request'}, 400
 
-    return {'status': SettingsRepository.changeSetting(user_id, rule, approved)}, 200
+    return {'status': SettingsRepository.changeSetting(username, rule, approved)}, 200
