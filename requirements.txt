@@ -1,6 +1,11 @@
 Flask==3.0.0
+APIFlask==3.1.0
+Flask-Cors==6.0.2
+Flask-JWT-Extended==4.7.1
+Flask-SQLAlchemy==3.1.1
 Flask-SocketIO==5.3.6
-eventlet>=0.34
+eventlet==0.40.4
+marshmallow==4.2.3
 psutil==6.1.0
 questionary==2.1.1
 requests==2.31.0
