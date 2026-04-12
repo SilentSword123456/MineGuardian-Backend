@@ -4,6 +4,21 @@ from api import app
 
 
 class EndpointMapApiTests(unittest.TestCase):
+	def test_openapi_documents_bearer_auth_for_protected_db_routes(self):
+		response = app.test_client().get('/openapi.json')
+		self.assertEqual(response.status_code, 200)
+
+		spec = response.get_json()
+		self.assertIn('securitySchemes', spec['components'])
+		self.assertIn('BearerAuth', spec['components']['securitySchemes'])
+
+		favorite_servers_get = spec['paths']['/favoriteServers']['get']
+		self.assertEqual(favorite_servers_get.get('security'), [{'BearerAuth': []}])
+		self.assertIn('Requires JWT Bearer token', favorite_servers_get.get('description', ''))
+
+		create_user_post = spec['paths']['/user']['post']
+		self.assertNotIn('security', create_user_post)
+
 	def test_current_routes_are_registered(self):
 		routes = {}
 		for rule in app.url_map.iter_rules():
