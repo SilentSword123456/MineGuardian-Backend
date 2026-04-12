@@ -20,6 +20,13 @@ app.config.update(getConfig()['flaskConfig'])
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mineguardian.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config["JWT_SECRET_KEY"] = getConfig()['jwtSecretKey']
+app.security_schemes = {
+    'BearerAuth': {
+        'type': 'http',
+        'scheme': 'bearer',
+        'bearerFormat': 'JWT',
+    }
+}
 CORS(app)
 socketio = SocketIO(
     app,
