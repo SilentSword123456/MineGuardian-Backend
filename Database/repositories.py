@@ -39,13 +39,13 @@ class FavoriteServersRepository():
         db.session.commit()
         return True
     @staticmethod
-    def removeFavoriteServer(serverId: int, userId:int) -> bool:
+    def removeFavoriteServer(userId: int, serverId:int) -> bool:
         if not UserRepository.checkUser(userId):
             return False
-        servers = db.session.query(FavoriteServers).filter(FavoriteServers.user_id == userId, FavoriteServers.server_id == serverId).first()
-        if servers is None:
+        server = db.session.query(FavoriteServers).filter(FavoriteServers.user_id == userId, FavoriteServers.server_id == serverId).first()
+        if server is None:
             return False
-        db.session.delete(servers)
+        db.session.delete(server)
         db.session.commit()
         return True
 
