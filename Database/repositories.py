@@ -8,7 +8,7 @@ class UserRepository():
     def createUser(username: str, password: str) -> bool:
         if UserRepository.doseUserExist(username):
             return False
-        hashPassword = hashlib.sha256(password.encode('utf-8'))
+        hashPassword = hashlib.sha256(password.encode('utf-8')).hexdigest()
         db.session.add(User(username=username, password=hashPassword))
         db.session.commit()
         return True
@@ -25,7 +25,7 @@ class UserRepository():
     def verify(username: str, password: str) -> bool:
         if not UserRepository.doseUserExist(username):
             return False
-        hashPassword = hashlib.sha256(password.encode('utf-8'))
+        hashPassword = hashlib.sha256(password.encode('utf-8')).hexdigest()
         user = db.session.query(User).filter(User.username == username, User.password == hashPassword).first()
         if user is None:
             return False
