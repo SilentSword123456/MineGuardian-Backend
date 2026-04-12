@@ -81,7 +81,7 @@ DOCS = {
     },
     'remove_user': {
         'summary': 'Remove a user',
-        'description': 'Removes a database user record by user_id.',
+        'description': 'Removes a database user record by username.',
         'responses': {
             200: 'User removed successfully.',
             400: 'Bad request.'
@@ -89,7 +89,7 @@ DOCS = {
     },
     'add_favorite_server': {
         'summary': 'Add a favorite server',
-        'description': 'Adds a server_id to the specified user favorites.',
+        'description': 'Adds a server_id to the specified username favorites.',
         'responses': {
             200: 'Favorite server added successfully.',
             400: 'Bad request.'
@@ -97,7 +97,7 @@ DOCS = {
     },
     'remove_favorite_server': {
         'summary': 'Remove a favorite server',
-        'description': 'Removes a server_id from the specified user favorites.',
+        'description': 'Removes a server_id from the specified username favorites.',
         'responses': {
             200: 'Favorite server removed successfully.',
             400: 'Bad request.'
@@ -105,7 +105,7 @@ DOCS = {
     },
     'get_favorite_servers': {
         'summary': 'List favorite servers',
-        'description': 'Returns the favorite server ids for a user.',
+        'description': 'Returns the favorite server ids for a username.',
         'responses': {
             200: 'Favorite servers returned successfully.',
             400: 'Bad request.'
@@ -113,7 +113,7 @@ DOCS = {
     },
     'add_player': {
         'summary': 'Add a player',
-        'description': 'Creates a player record for the specified user.',
+        'description': 'Creates a player record for the specified username.',
         'responses': {
             200: 'Player created successfully.',
             400: 'Bad request.'
@@ -121,7 +121,7 @@ DOCS = {
     },
     'remove_player': {
         'summary': 'Remove a player',
-        'description': 'Removes a player record by user_id and uuid.',
+        'description': 'Removes a player record by username and uuid.',
         'responses': {
             200: 'Player removed successfully.',
             400: 'Bad request.'
@@ -129,7 +129,7 @@ DOCS = {
     },
     'get_all_players_uuids': {
         'summary': 'List player UUIDs',
-        'description': 'Returns the UUIDs for all players linked to a user.',
+        'description': 'Returns the UUIDs for all players linked to a username.',
         'responses': {
             200: 'Player UUIDs returned successfully.',
             400: 'Bad request.'
@@ -137,7 +137,7 @@ DOCS = {
     },
     'add_player_privilege': {
         'summary': 'Add a player privilege',
-        'description': 'Adds a privilege to a player.',
+        'description': 'Adds a privilege to a player specified by username and player_uuid.',
         'responses': {
             200: 'Player privilege added successfully.',
             400: 'Bad request.'
@@ -145,7 +145,7 @@ DOCS = {
     },
     'delete_player_privilege': {
         'summary': 'Delete a player privilege',
-        'description': 'Removes a privilege from a player.',
+        'description': 'Removes a privilege from a player specified by username and player_uuid.',
         'responses': {
             200: 'Player privilege removed successfully.',
             400: 'Bad request.'
@@ -153,7 +153,7 @@ DOCS = {
     },
     'get_player_privileges': {
         'summary': 'List player privileges',
-        'description': 'Returns the privileges assigned to a player.',
+        'description': 'Returns the privileges assigned to a player specified by username and player_uuid.',
         'responses': {
             200: 'Player privileges returned successfully.',
             400: 'Bad request.'
@@ -161,7 +161,7 @@ DOCS = {
     },
     'add_setting': {
         'summary': 'Add a setting',
-        'description': 'Creates a setting rule for a user.',
+        'description': 'Creates a setting rule for a username.',
         'responses': {
             200: 'Setting created successfully.',
             400: 'Bad request.'
@@ -169,7 +169,7 @@ DOCS = {
     },
     'remove_setting': {
         'summary': 'Remove a setting',
-        'description': 'Removes a setting rule for a user.',
+        'description': 'Removes a setting rule for a username.',
         'responses': {
             200: 'Setting removed successfully.',
             400: 'Bad request.'
@@ -177,7 +177,7 @@ DOCS = {
     },
     'change_setting': {
         'summary': 'Change a setting',
-        'description': 'Updates the approval state of a setting rule.',
+        'description': 'Updates the approval state of a setting rule for a username.',
         'responses': {
             200: 'Setting updated successfully.',
             400: 'Bad request.'
