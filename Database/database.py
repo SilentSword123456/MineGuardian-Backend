@@ -11,7 +11,7 @@ class User(db.Model):
 class FavoriteServers(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    server_id = db.Column(db.Integer)
+    server_id = db.Column(db.Integer, db.ForeginKey('servers.id'))
 
 class Player(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -29,6 +29,18 @@ class Settings(db.Model):
     user_id = db.Column(db.String, db.ForeignKey('user.id'))
     rule = db.Column(db.Integer)
     approved = db.Column(db.Boolean)
+
+class Servers(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    owner_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    name = db.Column(db.String)
+
+class ServersUsersPerms(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    server_id = db.Column(db.Integer, db.ForeignKey('servers.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    owner_id = db.Column(db.Integer, db.ForeginKey('user.id'))
+    privilege_id = db.Column(db.Integer)
 
 def generateDB(app):
     with app.app_context():
