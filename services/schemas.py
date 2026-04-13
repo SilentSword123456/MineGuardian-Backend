@@ -48,7 +48,8 @@ class GetServerStatsOutputSchema(Schema):
 
 
 class AddServerOutputSchema(Schema):
-    warning = String(required=True)
+    status = Boolean(required=True)
+    message = String(required=True)
 
 
 class GetAvailableVersionsOutputSchema(Schema):
@@ -56,7 +57,8 @@ class GetAvailableVersionsOutputSchema(Schema):
 
 
 class RemoveServerOutputSchema(Schema):
-    error = String(required=True)
+    status = Boolean(required=True)
+    message = String(required=True)
 
 
 class StatusOutputSchema(Schema):
