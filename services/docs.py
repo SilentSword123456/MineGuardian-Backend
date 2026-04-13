@@ -49,10 +49,14 @@ DOCS = {
     },
     'add_server': {
         'summary': 'Install and register a server',
-        'description': 'Installs a server using the provided software and version settings.',
+        'description': 'Requires JWT Bearer token. Installs a server using the provided software and version settings, then registers it in the database for the authenticated user.',
+        'security': [{'BearerAuth': []}],
         'responses': {
-            200: 'Server installation request completed.',
-            400: 'Required fields are missing.'
+            200: 'Server installed and registered successfully.',
+            400: 'Required fields are missing or installation failed.',
+            401: 'Missing or invalid JWT token.',
+            422: 'JWT token is malformed or cannot be processed.',
+            500: 'Server was installed but database registration failed.'
         }
     },
     'get_available_versions': {
@@ -65,10 +69,14 @@ DOCS = {
     },
     'remove_server': {
         'summary': 'Uninstall a server',
-        'description': 'Uninstalls and removes the selected server from local storage.',
+        'description': 'Requires JWT Bearer token. Uninstalls and removes the selected server from local storage and unregisters it for the authenticated user.',
+        'security': [{'BearerAuth': []}],
         'responses': {
-            200: 'Server uninstall request completed.',
-            400: 'Missing server server_id.'
+            200: 'Server uninstalled and removed successfully.',
+            400: 'Missing server server_id or uninstall failed.',
+            401: 'Missing or invalid JWT token.',
+            422: 'JWT token is malformed or cannot be processed.',
+            404: 'Server uninstall succeeded but database record could not be removed.'
         }
     },
     'create_user': {
