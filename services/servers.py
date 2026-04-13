@@ -1,6 +1,8 @@
 from flask import request
 from apiflask import APIBlueprint, abort
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
+import Database.repositories
 import manageLocalServers
 import serverSessionsManager
 import utils
@@ -24,7 +26,7 @@ servers_bp = APIBlueprint('servers', __name__)
 @servers_bp.doc(**DOCS['list_servers'])
 @servers_bp.output(ListServersOutputSchema)
 def list_servers():
-    return {'servers': get_all_servers()}
+    return {'servers': get_all_servers()}, 200
 
 @servers_bp.route('/servers/<serverName>', methods=['GET'])
 @servers_bp.doc(**DOCS['get_general_server_info'])
@@ -62,7 +64,7 @@ def getGeneralServerInfo(serverName):
          'uptime_seconds': info.get('uptime_seconds', 0.0),
          'max_memory_mb': info.get('max_memory_mb', match['max_memory_mb']),
          'online_players': {'max': info.get('max_players', match.get('online_players', {}).get('max', 20))},
-     }
+     }, 200
 
 
 
@@ -109,7 +111,7 @@ def get_server_stats_endpoint(serverName):
 
     try:
         # Use the centralized function (it handles caching internally)
-        stats = utils.get_server_stats(serverInstance)
+        stats = utils.getServerStats(serverInstance)
         return stats, 200
     except Exception as e:
         abort(500, message=f"Failed to retrieve stats: {str(e)}")
@@ -117,7 +119,9 @@ def get_server_stats_endpoint(serverName):
 @servers_bp.route('/manage/addServer', methods=['POST'])
 @servers_bp.doc(**DOCS['add_server'])
 @servers_bp.output(AddServerOutputSchema)
+@jwt_required()
 def add_server():
+    userId = get_jwt_identity()
     args = request.get_json()
     if not args or 'serverName' not in args or 'serverSoftware' not in args or 'serverVersion' not in args:
         abort(400, message='Missing required parameters: serverName, serverSoftware, serverVersion')
@@ -127,8 +131,37 @@ def add_server():
     serverVersion = args['serverVersion']
     acceptEula = args.get('acceptEula', False)
 
-    return manageLocalServers.installMinecraftServer(serverSoftware, serverVersion, serverName, acceptEula)
+    status = manageLocalServers.installMinecraftServer(serverSoftware, serverVersion, serverName, acceptEula)
+    if isinstance(status, dict) and 'error' in status:
+        abort(400, message=status['error'])
 
+    databaseStatus = Database.repositories.ServersRepository.addServer(userId, serverName)
+
+    if not databaseStatus:
+        abort(500, message='Failed to register server in database')
+
+    if isinstance(status, dict) and 'warning' in status:
+        return {'status': True, 'message': status['warning']}, 200
+
+    return {'status': True, 'message': f"Server '{serverName}' installed and registered successfully"}, 200
+
+@servers_bp.route('/servers/<serverName>/uninstall', methods=['DELETE'])
+@servers_bp.doc(**DOCS['remove_server'])
+@servers_bp.output(RemoveServerOutputSchema)
+@jwt_required()
+def remove_server(serverName):
+    userId = get_jwt_identity()
+    if not serverName:
+        abort(400, message='No serverName provided')
+
+    status = manageLocalServers.uninstallMinecraftServer(serverName)
+    if isinstance(status, dict) and 'error' in status:
+        abort(400, message=status['error'])
+
+    databaseStatus = Database.repositories.ServersRepository.removeServer(userId, serverName)
+    if not databaseStatus:
+        abort(404, message='Failed to remove server from database')
+    return {'status': True, 'message': f"Server '{serverName}' uninstalled and removed successfully"}, 200
 
 @servers_bp.route('/manage/<software>/getAvailableVersions', methods=['GET'])
 @servers_bp.doc(**DOCS['get_available_versions'])
@@ -141,17 +174,6 @@ def get_available_software(software=""):
     if "error" in result:
         abort(400, message=result.get('error', 'Failed to get available versions'))
     return result, 200
-
-
-
-@servers_bp.route('/servers/<serverName>/uninstall', methods=['DELETE'])
-@servers_bp.doc(**DOCS['remove_server'])
-@servers_bp.output(RemoveServerOutputSchema)
-def remove_server(serverName):
-    if not serverName:
-        abort(400, message='No serverName provided')
-
-    return manageLocalServers.uninstallMinecraftServer(serverName)
 
 @servers_bp.route('/servers/globalStats', methods=['GET'])
 @servers_bp.doc(**DOCS['get_global_stats'])
