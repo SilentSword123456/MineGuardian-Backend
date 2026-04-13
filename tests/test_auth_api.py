@@ -23,7 +23,8 @@ class AuthApiTests(unittest.TestCase):
 
     def test_login_with_valid_credentials(self):
         """Test successful login returns access token"""
-        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True) as verify_mock:
+        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True) as verify_mock, \
+             patch.object(auth.repositories.UserRepository, 'getUserId', return_value='user-1') as get_user_id_mock:
             response = self.request_json('POST', '/login', {
                 'user_id': 'testuser',
                 'password': 'testpass'
@@ -34,10 +35,12 @@ class AuthApiTests(unittest.TestCase):
         self.assertIn('access_token', response_data)
         self.assertIsNotNone(response_data['access_token'])
         verify_mock.assert_called_once_with('testuser', 'testpass')
+        get_user_id_mock.assert_called_once_with('testuser')
 
     def test_login_with_invalid_credentials(self):
         """Test login with invalid credentials returns 401"""
-        with patch.object(auth.repositories.UserRepository, 'verify', return_value=False) as verify_mock:
+        with patch.object(auth.repositories.UserRepository, 'verify', return_value=False) as verify_mock, \
+             patch.object(auth.repositories.UserRepository, 'getUserId') as get_user_id_mock:
             response = self.request_json('POST', '/login', {
                 'user_id': 'testuser',
                 'password': 'wrongpass'
@@ -46,6 +49,7 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.get_json(), {'message': 'Invalid credentials'})
         verify_mock.assert_called_once_with('testuser', 'wrongpass')
+        get_user_id_mock.assert_not_called()
 
     def test_login_missing_username(self):
         """Test login without user_id returns 400"""
@@ -120,7 +124,8 @@ class AuthApiTests(unittest.TestCase):
 
     def test_login_with_empty_string_password(self):
         """Test login with empty string password"""
-        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True):
+        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
+             patch.object(auth.repositories.UserRepository, 'getUserId', return_value='empty-pwd-user'):
             response = self.request_json('POST', '/login', {
                 'user_id': 'testuser',
                 'password': ''
@@ -130,7 +135,8 @@ class AuthApiTests(unittest.TestCase):
 
     def test_login_with_special_characters_in_username(self):
         """Test login with special characters in user_id"""
-        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True) as verify_mock:
+        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True) as verify_mock, \
+             patch.object(auth.repositories.UserRepository, 'getUserId', return_value='special-user-id') as get_user_id_mock:
             response = self.request_json('POST', '/login', {
                 'user_id': 'test@user.com',
                 'password': 'testpass'
@@ -138,6 +144,7 @@ class AuthApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         verify_mock.assert_called_once_with('test@user.com', 'testpass')
+        get_user_id_mock.assert_called_once_with('test@user.com')
 
     def test_multiple_login_attempts_with_different_users(self):
         """Test multiple successful logins issue different tokens."""
