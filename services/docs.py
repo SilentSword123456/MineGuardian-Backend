@@ -73,7 +73,7 @@ DOCS = {
     },
     'create_user': {
         'summary': 'Create a user',
-        'description': 'Creates a new database user record.',
+        'description': 'Creates a new database user record from a `username` and password payload.',
         'responses': {
             200: 'User created successfully.',
             400: 'Bad request.'
@@ -81,14 +81,23 @@ DOCS = {
     },
     'remove_user': {
         'summary': 'Remove a user',
-        'description': 'Requires JWT Bearer token. Removes the authenticated user record. The request username must match the JWT identity.',
+        'description': 'Requires JWT Bearer token. Removes the authenticated user record. The request `username` must match the authenticated account username.',
         'security': [{'BearerAuth': []}],
         'responses': {
             200: 'User removed successfully.',
             400: 'Bad request.',
             401: 'Missing or invalid JWT token.',
             422: 'JWT token is malformed or cannot be processed.',
-            403: 'Forbidden when JWT identity does not match the provided username.'
+            403: 'Forbidden when the authenticated account does not match the provided `username`.'
+        }
+    },
+    'login': {
+        'summary': 'Authenticate a user',
+        'description': 'Validates a `user_id` and password pair and returns a JWT access token on success.',
+        'responses': {
+            200: 'Access token returned successfully.',
+            400: 'Missing `user_id` or password.',
+            401: 'Invalid credentials.'
         }
     },
     'add_favorite_server': {
