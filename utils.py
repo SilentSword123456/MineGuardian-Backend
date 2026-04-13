@@ -47,15 +47,6 @@ def storeConfig(config):
     except Exception as e:
         questionary.print(f"Error saving configuration file: {e}", style="fg:red")
 
-def runCommand(command, cwd=None):
-    if cwd:
-        original_dir = os.getcwd()
-        os.chdir(cwd)
-        os.system(command)
-        os.chdir(original_dir)
-    else:
-        os.system(command)
-
 def generateFlaskKey():
     config = getConfig()
     if config is None:
@@ -68,6 +59,16 @@ def generateFlaskKey():
     config['flaskConfig']['SECRET_KEY'] = secretKey
 
     storeConfig(config)
+def generateJWTSecretKey():
+    config = getConfig()
+    if config is None:
+        return
+    if config.get('jwtSecretKey'):
+        return
+
+    jwtSecretKey = secrets.token_urlsafe(64)
+    config['jwtSecretKey'] = jwtSecretKey
+    storeConfig(config)
 
 def generateRconPassword():
     """Generate a random RCON password and store it in config.json (once)."""
@@ -78,7 +79,7 @@ def generateRconPassword():
     if config.get('rconPassword'):
         return
 
-    rconPassword = secrets.token_urlsafe(16)
+    rconPassword = secrets.token_urlsafe(24)
     config['rconPassword'] = rconPassword
 
     storeConfig(config)
@@ -113,13 +114,7 @@ def getMaxPlayers(serverPath: str | None = None) -> int:
 
     return 20  # Default if not found in file
 
-def getPlayersOnline(serverInstance) -> dict[str, int | list[str]]:
-    """
-    Send the 'list' command to a running server via RCON and return the response.
-    Returns a dictionary with 'online', 'max', and 'players' if successful.
-    If the server is not running or RCON communication fails, returns ONLY 'max'
-    to avoid reporting potentially inaccurate '0 players online' data.
-    """
+def getOnlinePlayers(serverInstance) -> dict[str, int | list[str]]:
     server_path = getattr(serverInstance, 'working_dir', None) if serverInstance is not None else None
     if serverInstance is None or not serverInstance.running:
         return {"max": getMaxPlayers(server_path)}
@@ -149,15 +144,9 @@ def getPlayersOnline(serverInstance) -> dict[str, int | list[str]]:
             "players": players
         }
     except Exception:
-        # If RCON connection, authentication, or parsing fails, return only max capacity
         return {"max": getMaxPlayers(server_path)}
 
-def get_server_stats(serverInstance, force=False):
-    """
-    Collects stats for a server instance. Uses cached data if it's recent (e.g., < 5s)
-    unless 'force' is True.
-    """
-    # Quick check without lock
+def getServerStats(serverInstance, force=False):
     now = time.time()
     last_stats = getattr(serverInstance, 'last_stats', None)
     last_time = getattr(serverInstance, 'last_stats_time', 0)
@@ -165,14 +154,11 @@ def get_server_stats(serverInstance, force=False):
     if not force and last_stats and (now - last_time < 5):
         return last_stats
 
-    # Ensure only one collection runs at a time for this instance
     lock = getattr(serverInstance, '_stats_lock', None)
     if lock:
-        # Using a timeout on the lock to avoid forever-hanging in the background task
-        # if something goes terribly wrong, though eventlet locks are usually safe.
         acquired = lock.acquire(timeout=10)
         if not acquired:
-            # If we can't get the lock in 10s, just return cached stats (even if old)
+            # If we can't get the lock in 10s, just return cached stats
             return last_stats if last_stats else {
                 'cpu_usage_percent': 0.0,
                 'memory_usage_mb': 0.0,
@@ -186,7 +172,6 @@ def get_server_stats(serverInstance, force=False):
             if not force and serverInstance.last_stats and (now - serverInstance.last_stats_time < 5):
                 return serverInstance.last_stats
 
-            # Collect new stats
             stats = {
                 'cpu_usage_percent': serverInstance.get_cpu_usage_percent(),
                 'memory_usage_mb': serverInstance.get_memory_usage_mb(),
@@ -195,11 +180,10 @@ def get_server_stats(serverInstance, force=False):
 
 
             try:
-                stats['online_players'] = getPlayersOnline(serverInstance)
+                stats['online_players'] = getOnlinePlayers(serverInstance)
             except Exception:
                 stats['online_players'] = {"max": getMaxPlayers(getattr(serverInstance, 'working_dir', None))}
 
-            # Update cache
             serverInstance.last_stats = stats
             serverInstance.last_stats_time = now
             print("Collected new stats", stats)
@@ -213,7 +197,7 @@ def get_server_stats(serverInstance, force=False):
             'cpu_usage_percent': serverInstance.get_cpu_usage_percent(),
             'memory_usage_mb': serverInstance.get_memory_usage_mb(),
             'max_memory_mb': getMaxMemoryMB(getattr(serverInstance, 'working_dir', None)),
-            'online_players': getPlayersOnline(serverInstance)
+            'online_players': getOnlinePlayers(serverInstance)
         }
         return stats
 
@@ -237,7 +221,7 @@ def getGlobalStats(serverInstances=None):
         if not serverInstance.is_running():
             continue
 
-        server_stats = get_server_stats(serverInstance, force=True)
+        server_stats = getServerStats(serverInstance, force=True)
         global_stats['cpu_usage_percent'] += float(server_stats.get('cpu_usage_percent', 0.0))
         global_stats['memory_usage_mb'] += float(server_stats.get('memory_usage_mb', 0.0))
         global_stats['max_memory_mb'] += int(server_stats.get('max_memory_mb', 0))
@@ -250,24 +234,6 @@ def getGlobalStats(serverInstances=None):
         global_stats['online_players']['players'].extend(players)
 
     return global_stats
-
-def getRconInfo(serverName):
-    file = f"servers/{serverName}/rcon_info.json"
-    if not os.path.isfile(file):
-        return None
-
-    try:
-        content = None
-        with open(file, "r") as f:
-            content = json.load(f)
-        return {
-            "enable-rcon": content.get("enable-rcon", "false"),
-            "rcon.port": int(content.get("rcon.port", "25575"))
-        }
-    except Exception as e:
-        questionary.print(f"Error reading RCON info for server '{serverName}': {e}", style="fg:red")
-        return None
-
 
 def createRunScript(path) -> str | None:
     config = getConfig()
@@ -322,11 +288,7 @@ def runMinecraftServer(serverName = None, path = "servers"):
         return None
 
 
-def _patch_server_properties(path: str, overrides: dict):
-    """
-    Read server.properties from `path`, apply key=value `overrides`, and write it back.
-    Creates the file if it doesn't exist yet (Minecraft will merge on first boot).
-    """
+def patchServerProperties(path: str, overrides: dict):
     if not path:
         raise ValueError("_patch_server_properties: path must not be empty or None")
 
@@ -336,12 +298,12 @@ def _patch_server_properties(path: str, overrides: dict):
     # Ensure the target directory is inside the servers/ folder, never the project root or above
     if not abs_path.startswith(servers_dir + os.sep):
         raise ValueError(
-            f"_patch_server_properties: refusing to write to '{abs_path}' — "
+            f"patchServerProperties: refusing to write to '{abs_path}' — "
             f"path must be inside the servers/ directory ('{servers_dir}')"
         )
 
     if not os.path.isdir(abs_path):
-        raise ValueError(f"_patch_server_properties: server directory does not exist: '{abs_path}'")
+        raise ValueError(f"patchServerProperties: server directory does not exist: '{abs_path}'")
 
     props_path = os.path.join(abs_path, "server.properties")
     lines = []
@@ -475,7 +437,7 @@ def assignNewPort(serverInstance: serverSessionsManager.ServerSession, port: int
 
 def updateServerSettings(path, port: int = 25565):
     # Inject server port settings so the server is ready to run on the assigned port
-    _patch_server_properties(path, {
+    patchServerProperties(path, {
         "server-port": port,
         "query.port": port,
     })
@@ -485,7 +447,7 @@ def updateRconSettings(path, port: int = 25575):
     # Inject RCON settings so the server is ready to accept RCON connections
     rcon_password = getConfig().get("rconPassword", "")
     if rcon_password:
-        _patch_server_properties(path, {
+        patchServerProperties(path, {
             "enable-rcon": "true",
             "rcon.port": port,
             "rcon.password": rcon_password,
