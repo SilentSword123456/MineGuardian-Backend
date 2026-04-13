@@ -1,12 +1,11 @@
 import hashlib
-from typing import List
 from Database.perms import SettingsPermissions, PlayersPermissions, ServersPermissions
 from Database.database import *
 
 class UserRepository():
     @staticmethod
     def createUser(username: str, password: str) -> bool:
-        if UserRepository.doseUserExist(username):
+        if db.session.query(User).filter(User.username == username).first() is not None:
             return False
         hashPassword = hashlib.sha256(password.encode('utf-8')).hexdigest()
         db.session.add(User(username=username, password=hashPassword))
@@ -23,8 +22,6 @@ class UserRepository():
 
     @staticmethod
     def verify(username: str, password: str) -> bool:
-        if not UserRepository.doseUserExist(username):
-            return False
         hashPassword = hashlib.sha256(password.encode('utf-8')).hexdigest()
         user = db.session.query(User).filter(User.username == username, User.password == hashPassword).first()
         if user is None:
@@ -32,8 +29,6 @@ class UserRepository():
         return True
 
     def getUserId(username: str) -> int:
-        if not UserRepository.doseUserExist(username):
-            return 0
         user = db.session.query(User).filter(User.username == username).first()
         if user is None:
             return 0
@@ -78,7 +73,7 @@ class FavoriteServersRepository():
         return True
 
     @staticmethod
-    def getFavoriteServers(userId: int) -> List[int]:
+    def getFavoriteServers(userId: int) -> list[int]:
         if not UserRepository.doseUserExist(userId):
             return []
         servers = db.session.query(FavoriteServers).filter(FavoriteServers.user_id == userId).all()
@@ -109,12 +104,12 @@ class PlayerRepository():
         db.session.commit()
         return True
     @staticmethod
-    def getAllPlayersUUIDs(userId: int):
+    def getAllPlayersUUIDs(userId: int) -> list[str]:
         if not UserRepository.doseUserExist(userId):
-            return False
+            return []
         players = db.session.query(Player).filter(Player.user_id == userId).all()
         if not players:
-            return False
+            return []
 
         playersUUIDs = []
         for player in players:
@@ -125,25 +120,27 @@ class PlayerRepository():
     def getPlayerId(userId: int, playerUUID:str) -> int:
         if not UserRepository.doseUserExist(userId):
             return 0
-        player = db.session.query(Player).filter(Player.userId == userId, Player.uuid == playerUUID).first()
+        player = db.session.query(Player).filter(Player.user_id == userId, Player.uuid == playerUUID).first()
         if player is None:
             return 0
         return player.id
 
 class PlayersPrivilegesRepository():
     @staticmethod
-    def addPlayerPrivilege(userId: int, playerUUID: str, privilegeId: int) -> bool:
+    def addPrivilege(userId: int, playerUUID: str, privilegeId: int) -> bool:
         if privilegeId not in PlayersPermissions:
             return False
         if not UserRepository.doseUserExist(userId):
             return False
 
         playerId = PlayerRepository.getPlayerId(userId, playerUUID)
-        db.session.add(PlayersPrivileges(playerId=playerId, privilege_id = privilegeId))
+        if playerId == 0:
+            return False
+        db.session.add(PlayersPrivileges(player_id=playerId, privilege_id = privilegeId))
         db.session.commit()
         return True
     @staticmethod
-    def deletePlayerPrivilege(userId: int, playerUUID: str, privilegeId: int) -> bool:
+    def deletePrivilege(userId: int, playerUUID: str, privilegeId: int) -> bool:
         if not UserRepository.doseUserExist(userId):
             return False
 
@@ -159,7 +156,7 @@ class PlayersPrivilegesRepository():
         db.session.commit()
         return True
     @staticmethod
-    def getPlayerPrivileges(userId: int, playerUUID:str) -> List[PlayersPrivileges]:
+    def getPlayerPrivileges(userId: int, playerUUID:str) -> list[PlayersPrivileges]:
         playerId = PlayerRepository.getPlayerId(userId, playerUUID)
         if playerId == 0:
             return []
@@ -275,7 +272,7 @@ class ServersUsersPermsRepository():
         return True
 
     @staticmethod
-    def getPerms(userId: int, serverId: int) -> List[int]:
+    def getPerms(userId: int, serverId: int) -> list[int]:
         if not UserRepository.doseUserExist(userId):
             return []
         if not ServersRepository.doseServerExist(serverId):
