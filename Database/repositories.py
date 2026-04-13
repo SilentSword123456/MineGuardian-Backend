@@ -1,6 +1,6 @@
 import hashlib
 from typing import List
-from Database.perms import SettingsPermissions, PlayersPermissions
+from Database.perms import SettingsPermissions, PlayersPermissions, ServersPermissions
 from Database.database import *
 
 class UserRepository():
@@ -202,3 +202,94 @@ class SettingsRepository():
         return True
 
 
+class ServersRepository():
+    @staticmethod
+    def addServer(userId: int, serverName: str) -> bool:
+        if not UserRepository.doseUserExist(userId):
+            return False
+
+        db.session.add(Servers(owner_id=userId, name=serverName))
+        ServersUsersPermsRepository.addPerm(userId, )
+        db.session.commit()
+        return True
+
+    @staticmethod
+    def removeServer(userId: int, serverName: str) -> bool:
+        if not UserRepository.doseUserExist(userId):
+            return False
+        db.session.delete(Servers(owner_id=userId, name=serverName))
+        db.session.commit()
+        return True
+    @staticmethod
+    def changeServerName(userId: int, serverName: str) -> bool:
+        if not UserRepository.doseUserExist(userId):
+            return False
+        server = db.session.query(Servers).filter(Servers.owner_id==userId, Servers.name==serverName).first()
+        if server is None:
+            return False
+        server.name = serverName
+        db.session.commit()
+        return True
+
+    @staticmethod
+    def doseServerExist(serverId: int) -> bool:
+        server = db.session.query(Servers).filter(Servers.id == serverId).first()
+        if server is None:
+            return False
+        return True
+
+    @staticmethod
+    def getServerOwner(serverId: int) -> int:
+        server = db.session.query(Servers).filter(Servers.id == serverId).first()
+        if server is None:
+            return 0
+        return server.owner_id
+
+class ServersUsersPermsRepository():
+    @staticmethod
+    def addPerm(userId: int, serverId: int, targetUserId: int, permId: int) -> bool:
+        if not UserRepository.doseUserExist(userId) or not UserRepository.doseUserExist(targetUserId):
+            return False
+        if not ServersRepository.doseServerExist(serverId):
+            return False
+        if ServersPermissions.AddPermissionToServer not in ServersUsersPermsRepository.getPerms(userId, targetUserId, serverId):
+            return False
+
+        if permId not in ServersPermissions:
+            return False
+
+        db.session.add(ServersUsersPerms(owner_id=userId, user_id=targetUserId, server_id=serverId, perm_id=permId))
+        db.session.commit()
+        return True
+
+    @staticmethod
+    def getPerms(userId: int, targetUserId: int, serverId: int) -> List[int]:
+        if not UserRepository.doseUserExist(userId) or not UserRepository.doseUserExist(targetUserId):
+            return []
+        if not ServersRepository.doseServerExist(serverId):
+            return []
+        perms = db.session.query(ServersUsersPerms).filter(ServersUsersPerms.owner_id == userId, ServersUsersPerms.user_id == targetUserId, ServersUsersPerms.server_id == serverId).all()
+        if not perms:
+            return []
+
+        permsPermsId = []
+        for perm in perms:
+            permsPermsId.append(perm.perm_id)
+
+        return permsPermsId
+
+    @staticmethod
+    def removePerm(userId: int, serverId: int, targetUserId: int, permId: int) -> bool:
+        if not UserRepository.doseUserExist(userId) or not UserRepository.doseUserExist(targetUserId):
+            return False
+        if not ServersRepository.doseServerExist(serverId):
+            return False
+        if ServersPermissions.RemovePermissionFromServer not in ServersUsersPermsRepository.getPerms(userId, targetUserId, serverId):
+            return False
+
+        perm = db.session.query(ServersUsersPerms).filter(ServersUsersPerms.owner_id == userId, ServersUsersPerms.user_id == targetUserId, ServersUsersPerms.server_id == serverId, ServersUsersPerms.perm_id == permId).first()
+        if perm is None:
+            return False
+        db.session.delete(perm)
+        db.session.commit()
+        return True
