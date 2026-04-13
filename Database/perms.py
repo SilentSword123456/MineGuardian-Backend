@@ -6,3 +6,7 @@ class PlayersPermissions(Enum):
 
 class SettingsPermissions(Enum):
     NotBlank = 0
+
+class ServersPermissions(Enum):
+    AddPermissionToServer = 1
+    RemovePermissionFromServer = 2
