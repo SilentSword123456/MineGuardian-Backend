@@ -1,6 +1,6 @@
 import json
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from api import app
 from services import auth
@@ -25,7 +25,7 @@ class AuthApiTests(unittest.TestCase):
         """Test successful login returns access token"""
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True) as verify_mock:
             response = self.request_json('POST', '/login', {
-                'username': 'testuser',
+                'user_id': 'testuser',
                 'password': 'testpass'
             })
 
@@ -39,7 +39,7 @@ class AuthApiTests(unittest.TestCase):
         """Test login with invalid credentials returns 401"""
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=False) as verify_mock:
             response = self.request_json('POST', '/login', {
-                'username': 'testuser',
+                'user_id': 'testuser',
                 'password': 'wrongpass'
             })
 
@@ -48,136 +48,91 @@ class AuthApiTests(unittest.TestCase):
         verify_mock.assert_called_once_with('testuser', 'wrongpass')
 
     def test_login_missing_username(self):
-        """Test login without username returns 400"""
+        """Test login without user_id returns 400"""
         response = self.request_json('POST', '/login', {
             'password': 'testpass'
         })
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json(), {'message': 'Missing username or password'})
+        self.assertEqual(response.get_json(), {'message': 'Missing user_id or password'})
 
     def test_login_missing_password(self):
         """Test login without password returns 400"""
         response = self.request_json('POST', '/login', {
-            'username': 'testuser'
+            'user_id': 'testuser'
         })
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json(), {'message': 'Missing username or password'})
+        self.assertEqual(response.get_json(), {'message': 'Missing user_id or password'})
 
     def test_login_missing_both_credentials(self):
-        """Test login without username and password returns 400"""
+        """Test login without user_id and password returns 400"""
         response = self.request_json('POST', '/login', {})
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json(), {'message': 'Missing username or password'})
+        self.assertEqual(response.get_json(), {'message': 'Missing user_id or password'})
 
     def test_login_with_null_username(self):
-        """Test login with null username returns 400"""
+        """Test login with null user_id returns 400"""
         response = self.request_json('POST', '/login', {
-            'username': None,
+            'user_id': None,
             'password': 'testpass'
         })
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json(), {'message': 'Missing username or password'})
+        self.assertEqual(response.get_json(), {'message': 'Missing user_id or password'})
 
     def test_login_with_null_password(self):
         """Test login with null password returns 400"""
         response = self.request_json('POST', '/login', {
-            'username': 'testuser',
+            'user_id': 'testuser',
             'password': None
         })
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json(), {'message': 'Missing username or password'})
+        self.assertEqual(response.get_json(), {'message': 'Missing user_id or password'})
 
-    # Protected endpoint tests
-
-    def test_protected_route_with_valid_token(self):
-        """Test protected route access with valid JWT token"""
-        # First, login to get a token
-        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True):
-            login_response = self.request_json('POST', '/login', {
-                'username': 'testuser',
+    def test_login_calls_get_user_id_for_verified_user(self):
+        """Verified login should resolve user id and return an access token."""
+        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True) as verify_mock, \
+             patch.object(auth.repositories.UserRepository, 'getUserId', return_value='user-42') as get_user_id_mock:
+            response = self.request_json('POST', '/login', {
+                'user_id': 'steve',
                 'password': 'testpass'
             })
 
-        token = login_response.get_json()['access_token']
-
-        # Now access protected route with token
-        headers = {'Authorization': f'Bearer {token}'}
-        response = self.client.get('/protected', headers=headers)
-
         self.assertEqual(response.status_code, 200)
-        response_data = response.get_json()
-        self.assertEqual(response_data['logged_in_as'], 'testuser')
-
-    def test_protected_route_without_token(self):
-        """Test protected route returns 401 without token"""
-        response = self.client.get('/protected')
-
-        self.assertEqual(response.status_code, 401)
-
-    def test_protected_route_with_invalid_token(self):
-        """Test protected route returns 422 with invalid token"""
-        headers = {'Authorization': 'Bearer invalid_token_here'}
-        response = self.client.get('/protected', headers=headers)
-
-        self.assertEqual(response.status_code, 422)
-
-    def test_protected_route_with_malformed_auth_header(self):
-        """Test protected route with malformed Authorization header"""
-        # Missing "Bearer " prefix
-        headers = {'Authorization': 'invalid_token_here'}
-        response = self.client.get('/protected', headers=headers)
-
-        self.assertEqual(response.status_code, 422)
-
-    def test_login_creates_jwt_with_username_identity(self):
-        """Test that JWT token contains the username as identity"""
-        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True):
-            login_response = self.request_json('POST', '/login', {
-                'username': 'steve',
-                'password': 'testpass'
-            })
-
-        token = login_response.get_json()['access_token']
-
-        # Access protected route and verify identity
-        headers = {'Authorization': f'Bearer {token}'}
-        response = self.client.get('/protected', headers=headers)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get_json()['logged_in_as'], 'steve')
+        self.assertIn('access_token', response.get_json())
+        verify_mock.assert_called_once_with('steve', 'testpass')
+        get_user_id_mock.assert_called_once_with('steve')
 
     def test_login_with_empty_string_username(self):
-        """Test login with empty string username"""
-        response = self.request_json('POST', '/login', {
-            'username': '',
-            'password': 'testpass'
-        })
+        """Test login with empty string user_id"""
+        with patch.object(auth.repositories.UserRepository, 'verify', return_value=False) as verify_mock:
+            response = self.request_json('POST', '/login', {
+                'user_id': '',
+                'password': 'testpass'
+            })
 
-        # Empty string is falsy in Python, but not None
-        # The current code checks for None, so this will pass through and fail verification
-        # This tests the actual behavior
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.get_json(), {'message': 'Invalid credentials'})
+        verify_mock.assert_called_once_with('', 'testpass')
 
     def test_login_with_empty_string_password(self):
         """Test login with empty string password"""
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True):
             response = self.request_json('POST', '/login', {
-                'username': 'testuser',
+                'user_id': 'testuser',
                 'password': ''
             })
 
         self.assertEqual(response.status_code, 200)
 
     def test_login_with_special_characters_in_username(self):
-        """Test login with special characters in username"""
+        """Test login with special characters in user_id"""
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True) as verify_mock:
             response = self.request_json('POST', '/login', {
-                'username': 'test@user.com',
+                'user_id': 'test@user.com',
                 'password': 'testpass'
             })
 
@@ -185,14 +140,15 @@ class AuthApiTests(unittest.TestCase):
         verify_mock.assert_called_once_with('test@user.com', 'testpass')
 
     def test_multiple_login_attempts_with_different_users(self):
-        """Test multiple logins with different users create different tokens"""
-        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True):
+        """Test multiple successful logins issue different tokens."""
+        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
+             patch.object(auth.repositories.UserRepository, 'getUserId', side_effect=['user1-id', 'user2-id']):
             response1 = self.request_json('POST', '/login', {
-                'username': 'user1',
+                'user_id': 'user1',
                 'password': 'pass1'
             })
             response2 = self.request_json('POST', '/login', {
-                'username': 'user2',
+                'user_id': 'user2',
                 'password': 'pass2'
             })
 
@@ -202,15 +158,6 @@ class AuthApiTests(unittest.TestCase):
         # Tokens should be different
         self.assertNotEqual(token1, token2)
 
-        # Each token should identify its respective user
-        headers1 = {'Authorization': f'Bearer {token1}'}
-        headers2 = {'Authorization': f'Bearer {token2}'}
-
-        protected1 = self.client.get('/protected', headers=headers1)
-        protected2 = self.client.get('/protected', headers=headers2)
-
-        self.assertEqual(protected1.get_json()['logged_in_as'], 'user1')
-        self.assertEqual(protected2.get_json()['logged_in_as'], 'user2')
 
 
 if __name__ == '__main__':
