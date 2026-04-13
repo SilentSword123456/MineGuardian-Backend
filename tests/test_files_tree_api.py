@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from api import app
 from services import servers as servers_module
@@ -105,6 +105,36 @@ class ServerRoutesTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), stats)
+
+    def test_server_stats_endpoint_returns_404_when_server_not_running(self):
+        server_instance = DummyServerInstance(running=False)
+
+        with patch.object(servers_module.serverSessionsManager, 'serverInstances', {'myCoolServer': server_instance}):
+            response = self.client.get('/servers/myCoolServer/stats')
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.get_json(), {'detail': {}, 'message': "Server 'myCoolServer' is not running"})
+
+    def test_start_server_endpoint_starts_instance_and_registers_listener(self):
+        server_instance = Mock()
+
+        with patch.object(servers_module, 'get_server_instance', return_value=server_instance) as get_server_instance, \
+                patch.object(servers_module.api, 'register_socketio_listener') as register_listener:
+            response = self.client.post('/servers/myCoolServer/start')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {'message': "Server 'myCoolServer' started successfully"})
+        get_server_instance.assert_called_once_with('myCoolServer')
+        register_listener.assert_called_once_with('myCoolServer', server_instance)
+        server_instance.start.assert_called_once_with()
+
+    def test_stop_server_endpoint_calls_stop_service(self):
+        with patch.object(servers_module, 'stop_server') as stop_server:
+            response = self.client.post('/servers/myCoolServer/stop')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {'message': "Server 'myCoolServer' stopped successfully"})
+        stop_server.assert_called_once_with('myCoolServer')
 
     def test_global_stats_endpoint(self):
         stats = {
