@@ -28,8 +28,6 @@ def main_menu():
         ).ask()
 
         if choice == "Start API Server":
-            utils.generateFlaskKey()
-            utils.generateRconPassword()
             start_server()
         elif choice == "Run Minecraft Server":
             utils.runMinecraftServer()
@@ -77,7 +75,7 @@ def firstLaunch():
 
     utils.generateRconPassword()
     utils.generateFlaskKey()
-    #TODO add a generate JWT token function in utils for the config file
+    utils.generateJWTSecretKey()
 
 
 if __name__ == '__main__':
