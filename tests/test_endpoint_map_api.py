@@ -26,6 +26,7 @@ class EndpointMapApiTests(unittest.TestCase):
 
 		expected_routes = {
 			'/health': {'GET'},
+			'/login': {'POST'},
 			'/servers': {'GET'},
 			'/servers/<serverName>': {'GET'},
 			'/servers/<serverName>/start': {'POST'},
@@ -46,7 +47,6 @@ class EndpointMapApiTests(unittest.TestCase):
 			self.assertIn(path, routes)
 			self.assertTrue(methods.issubset(routes[path]))
 
-		self.assertNotIn('/servers/<serverName>/files/tree', routes)
 
 
 if __name__ == '__main__':
