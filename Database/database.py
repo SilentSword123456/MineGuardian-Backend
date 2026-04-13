@@ -10,12 +10,12 @@ class User(db.Model):
 
 class FavoriteServers(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String, db.ForeignKey('user.username'))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     server_id = db.Column(db.Integer)
 
 class Player(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String, db.ForeignKey('user.username'))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     name = db.Column(db.String)
     uuid = db.Column(db.String)
 
