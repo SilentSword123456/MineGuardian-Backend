@@ -163,7 +163,7 @@ def addPlayerPrivilege(request_data=None):
     except (ValueError, TypeError):
         return {'error': 'bad request'}, 400
 
-    return {'status': PlayersPrivilegesRepository.addPlayerPrivilege(userId, player_uuid, privilege_id)}, 200
+    return {'status': PlayersPrivilegesRepository.addPrivilege(userId, player_uuid, privilege_id)}, 200
 
 @db_blueprint.route('/playerPrivilege', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['delete_player_privilege'])
@@ -185,7 +185,7 @@ def deletePlayerPrivilege(request_data=None):
     except (ValueError, TypeError):
         return {'error': 'bad request'}, 400
 
-    return {'status': PlayersPrivilegesRepository.deletePlayerPrivilege(userId, player_uuid, privilege_id)}, 200
+    return {'status': PlayersPrivilegesRepository.deletePrivilege(userId, player_uuid, privilege_id)}, 200
 
 @db_blueprint.route('/playerPrivilege', methods=['GET'])
 @db_blueprint.doc(**DOCS['get_player_privileges'])
