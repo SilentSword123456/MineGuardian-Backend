@@ -1,5 +1,4 @@
 from apiflask import APIBlueprint
-from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from Database.repositories import *
@@ -15,7 +14,8 @@ from services.schemas import (
     SettingRequestSchema,
     PlayerPrivilegesOutputSchema,
     PlayerUUIDsOutputSchema,
-    UsernameRequestSchema,
+    UserCreateRequestSchema,
+    UserIdRequestSchema,
     StatusOutputSchema,
 )
 
@@ -23,9 +23,9 @@ db_blueprint = APIBlueprint('database', __name__)
 
 @db_blueprint.route('/user', methods=['POST'])
 @db_blueprint.doc(**DOCS['create_user'])
+@db_blueprint.input(UserCreateRequestSchema, location='json', arg_name='request_data', validation=False)
 @db_blueprint.output(StatusOutputSchema, status_code=200)
-def createUser():
-    request_data = request.get_json()
+def createUser(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
@@ -36,17 +36,19 @@ def createUser():
 
 @db_blueprint.route('/user', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['remove_user'])
-@db_blueprint.input(UsernameRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.input(UserIdRequestSchema, location='json', arg_name='request_data', validation=False)
 @db_blueprint.output(StatusOutputSchema, status_code=200)
 @jwt_required()
 def removeUser(request_data=None):
-    username = get_jwt_identity()
+    userId = get_jwt_identity()
     if request_data is None:
         return {'error': 'bad request'}, 400
 
     targetUsername = request_data.get('username')
     if targetUsername is None:
         return {'error': 'bad request'}, 400
+
+    username = UserRepository.getUsername(userId)
 
     if username != targetUsername:
         return {'error': 'forbidden'}, 403
@@ -61,9 +63,9 @@ def removeUser(request_data=None):
 def addFavoriteServer(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
-    username = get_jwt_identity()
+    userId = get_jwt_identity()
     server_id = request_data.get('server_id')
-    if server_id is None or username is None:
+    if server_id is None or userId is None:
         return {'error': 'bad request'}, 400
 
     try:
@@ -71,7 +73,7 @@ def addFavoriteServer(request_data=None):
     except (ValueError, TypeError):
         return {'error': 'bad request'}, 400
 
-    return {'status': FavoriteServersRepository.addFavoriteServer(server_id, username)}, 200
+    return {'status': FavoriteServersRepository.addFavoriteServer(server_id, userId)}, 200
 
 @db_blueprint.route('/favoriteServers', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['remove_favorite_server'])
@@ -81,24 +83,24 @@ def addFavoriteServer(request_data=None):
 def removeFavoriteServer(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
-    username = get_jwt_identity()
+    userId = get_jwt_identity()
     server_id = request_data.get('server_id')
-    if server_id is None or username is None:
+    if server_id is None or userId is None:
         return {'error': 'bad request'}, 400
     try:
         server_id = int(server_id)
     except (ValueError, TypeError):
         return {'error': 'bad request'}, 400
 
-    return {'status': FavoriteServersRepository.removeFavoriteServer(username, server_id)}, 200
+    return {'status': FavoriteServersRepository.removeFavoriteServer(userId, server_id)}, 200
 
 @db_blueprint.route('/favoriteServers', methods=['GET'])
 @db_blueprint.doc(**DOCS['get_favorite_servers'])
 @db_blueprint.output(FavoriteServersOutputSchema, status_code=200)
 @jwt_required()
 def getFavoriteServers():
-    username = get_jwt_identity()
-    return {'servers': FavoriteServersRepository.getFavoriteServers(username)}, 200
+    userId = get_jwt_identity()
+    return {'servers': FavoriteServersRepository.getFavoriteServers(userId)}, 200
 
 @db_blueprint.route('/player', methods=['POST'])
 @db_blueprint.doc(**DOCS['add_player'])
@@ -109,13 +111,13 @@ def addPlayer(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    username = get_jwt_identity()
+    userId = get_jwt_identity()
     name = request_data.get('name')
     uuid = request_data.get('uuid')
-    if username is None or name is None or uuid is None:
+    if userId is None or name is None or uuid is None:
         return {'error': 'bad request'}, 400
 
-    return {'status': PlayerRepository.createPlayer(username, name, uuid)}, 200
+    return {'status': PlayerRepository.createPlayer(userId, name, uuid)}, 200
 
 @db_blueprint.route('/player', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['remove_player'])
@@ -126,20 +128,20 @@ def removePlayer(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    username = get_jwt_identity()
+    userId = get_jwt_identity()
     uuid = request_data.get('uuid')
-    if username is None or uuid is None:
+    if userId is None or uuid is None:
         return {'error': 'bad request'}, 400
 
-    return {'status': PlayerRepository.removePlayer(username, uuid)}, 200
+    return {'status': PlayerRepository.removePlayer(userId, uuid)}, 200
 
 @db_blueprint.route('/player', methods=['GET'])
 @db_blueprint.doc(**DOCS['get_all_players_uuids'])
 @db_blueprint.output(PlayerUUIDsOutputSchema, status_code=200)
 @jwt_required()
 def getAllPlayersUUIDs():
-    username = get_jwt_identity()
-    return {'players': PlayerRepository.getAllPlayersUUIDs(username)}, 200
+    userId = get_jwt_identity()
+    return {'players': PlayerRepository.getAllPlayersUUIDs(userId)}, 200
 
 @db_blueprint.route('/playerPrivilege', methods=['POST'])
 @db_blueprint.doc(**DOCS['add_player_privilege'])
@@ -150,10 +152,10 @@ def addPlayerPrivilege(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    username = get_jwt_identity()
+    userId = get_jwt_identity()
     player_uuid = request_data.get('player_uuid')
     privilege_id = request_data.get('privilege_id')
-    if username is None or player_uuid is None or privilege_id is None:
+    if userId is None or player_uuid is None or privilege_id is None:
         return {'error': 'bad request'}, 400
 
     try:
@@ -161,7 +163,7 @@ def addPlayerPrivilege(request_data=None):
     except (ValueError, TypeError):
         return {'error': 'bad request'}, 400
 
-    return {'status': PlayersPrivilegesRepository.addPlayerPrivilege(username, player_uuid, privilege_id)}, 200
+    return {'status': PlayersPrivilegesRepository.addPlayerPrivilege(userId, player_uuid, privilege_id)}, 200
 
 @db_blueprint.route('/playerPrivilege', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['delete_player_privilege'])
@@ -172,10 +174,10 @@ def deletePlayerPrivilege(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    username = get_jwt_identity()
+    userId = get_jwt_identity()
     player_uuid = request_data.get('player_uuid')
     privilege_id = request_data.get('privilege_id')
-    if username is None or player_uuid is None or privilege_id is None:
+    if userId is None or player_uuid is None or privilege_id is None:
         return {'error': 'bad request'}, 400
 
     try:
@@ -183,7 +185,7 @@ def deletePlayerPrivilege(request_data=None):
     except (ValueError, TypeError):
         return {'error': 'bad request'}, 400
 
-    return {'status': PlayersPrivilegesRepository.deletePlayerPrivilege(username, player_uuid, privilege_id)}, 200
+    return {'status': PlayersPrivilegesRepository.deletePlayerPrivilege(userId, player_uuid, privilege_id)}, 200
 
 @db_blueprint.route('/playerPrivilege', methods=['GET'])
 @db_blueprint.doc(**DOCS['get_player_privileges'])
@@ -194,12 +196,12 @@ def getPlayerPrivileges(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    username = get_jwt_identity()
+    userId = get_jwt_identity()
     player_uuid = request_data.get('player_uuid')
-    if username is None or player_uuid is None:
+    if userId is None or player_uuid is None:
         return {'error': 'bad request'}, 400
 
-    return {'privileges': PlayersPrivilegesRepository.getPlayerPrivileges(username, player_uuid)}, 200
+    return {'privileges': PlayersPrivilegesRepository.getPlayerPrivileges(userId, player_uuid)}, 200
 
 @db_blueprint.route('/setting', methods=['POST'])
 @db_blueprint.doc(**DOCS['add_setting'])
@@ -210,10 +212,10 @@ def addSetting(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    username = get_jwt_identity()
+    userId = get_jwt_identity()
     rule = request_data.get('rule')
     approved = request_data.get('approved', False)
-    if username is None or rule is None:
+    if userId is None or rule is None:
         return {'error': 'bad request'}, 400
 
     try:
@@ -222,7 +224,7 @@ def addSetting(request_data=None):
     except (ValueError, TypeError):
         return {'error': 'bad request'}, 400
 
-    return {'status': SettingsRepository.addSetting(username, rule, approved)}, 200
+    return {'status': SettingsRepository.addSetting(userId, rule, approved)}, 200
 
 @db_blueprint.route('/setting', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['remove_setting'])
@@ -233,9 +235,9 @@ def removeSetting(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    username = get_jwt_identity()
+    userId = get_jwt_identity()
     rule = request_data.get('rule')
-    if username is None or rule is None:
+    if userId is None or rule is None:
         return {'error': 'bad request'}, 400
 
     try:
@@ -243,7 +245,7 @@ def removeSetting(request_data=None):
     except (ValueError, TypeError):
         return {'error': 'bad request'}, 400
 
-    return {'status': SettingsRepository.removeSetting(username, rule)}, 200
+    return {'status': SettingsRepository.removeSetting(userId, rule)}, 200
 
 @db_blueprint.route('/setting', methods=['PATCH'])
 @db_blueprint.doc(**DOCS['change_setting'])
@@ -254,10 +256,10 @@ def changeSetting(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    username = get_jwt_identity()
+    userId = get_jwt_identity()
     rule = request_data.get('rule')
     approved = request_data.get('approved', False)
-    if username is None or rule is None:
+    if userId is None or rule is None:
         return {'error': 'bad request'}, 400
 
     try:
@@ -266,4 +268,4 @@ def changeSetting(request_data=None):
     except (ValueError, TypeError):
         return {'error': 'bad request'}, 400
 
-    return {'status': SettingsRepository.changeSetting(username, rule, approved)}, 200
+    return {'status': SettingsRepository.changeSetting(userId, rule, approved)}, 200
