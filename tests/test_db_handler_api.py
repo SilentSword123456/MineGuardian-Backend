@@ -97,7 +97,7 @@ class DbHandlerApiTests(unittest.TestCase):
         remove_player.assert_called_once_with('test', 'uuid-1')
 
     def test_get_all_players_uuids(self):
-        with patch.object(db_handler.PlayerRepository, 'getAllPlayersUUIDs', return_value=['uuid-1', 'uuid-2'], create=True) as get_all_players_uuids:
+        with patch.object(db_handler.PlayerRepository, 'getAllPlayersUUIDs', return_value=['uuid-1', 'uuid-2']) as get_all_players_uuids:
             response = self.request_json('GET', '/player')
 
         self.assertEqual(response.status_code, 200)
@@ -105,7 +105,7 @@ class DbHandlerApiTests(unittest.TestCase):
         get_all_players_uuids.assert_called_once_with('test')
 
     def test_add_player_privilege(self):
-        with patch.object(db_handler.PlayersPrivilegesRepository, 'addPlayerPrivilege', return_value=True) as add_player_privilege:
+        with patch.object(db_handler.PlayersPrivilegesRepository, 'addPrivilege', return_value=True) as add_player_privilege:
             response = self.request_json('POST', '/playerPrivilege', {'player_uuid': 'uuid-1', 'privilege_id': 1})
 
         self.assertEqual(response.status_code, 200)
@@ -113,12 +113,20 @@ class DbHandlerApiTests(unittest.TestCase):
         add_player_privilege.assert_called_once_with('test', 'uuid-1', 1)
 
     def test_delete_player_privilege(self):
-        with patch.object(db_handler.PlayersPrivilegesRepository, 'deletePlayerPrivilege', return_value=True) as delete_player_privilege:
+        with patch.object(db_handler.PlayersPrivilegesRepository, 'deletePrivilege', return_value=True) as delete_player_privilege:
             response = self.request_json('DELETE', '/playerPrivilege', {'player_uuid': 'uuid-1', 'privilege_id': 1})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'status': True})
         delete_player_privilege.assert_called_once_with('test', 'uuid-1', 1)
+
+    def test_add_player_privilege_invalid_integer_payload_is_rejected(self):
+        response = self.request_json('POST', '/playerPrivilege', {'player_uuid': 'uuid-1', 'privilege_id': 'abc'})
+        self.assert_bad_request(response)
+
+    def test_delete_player_privilege_invalid_integer_payload_is_rejected(self):
+        response = self.request_json('DELETE', '/playerPrivilege', {'player_uuid': 'uuid-1', 'privilege_id': 'abc'})
+        self.assert_bad_request(response)
 
     def test_get_player_privileges(self):
         expected_privileges = [{'id': 1, 'privilege_id': 0}]
