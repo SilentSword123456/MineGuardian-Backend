@@ -98,7 +98,7 @@ def handle_connect(auth=None):
         live_running = serverInstance.running
         emit('status', {'running': live_running})
 
-        stats = utils.get_server_stats(serverInstance)
+        stats = utils.getServerStats(serverInstance)
         emit('resources', stats)
 
         socketio.emit('status', {'running': live_running}, to=serverName, include_self=False)
@@ -161,7 +161,7 @@ def _emit_server_stats(serverName, serverInstance):
     try:
         # Collect stats using the centralized function (force=True to get fresh data for broadcast)
         # get_server_stats now handles its own per-server locking
-        stats = utils.get_server_stats(serverInstance, force=True)
+        stats = utils.getServerStats(serverInstance, force=True)
 
         # Emit to specific room for this server
         socketio.emit('resources', stats, to=serverName)
