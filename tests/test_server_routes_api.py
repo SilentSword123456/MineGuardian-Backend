@@ -28,6 +28,15 @@ class ServerRoutesTests(unittest.TestCase):
     def setUp(self):
         self.client = app.test_client()
 
+    def _get_auth_headers(self):
+        with patch('services.auth.repositories.UserRepository.verify', return_value=True), \
+                patch('services.auth.repositories.UserRepository.getUserId', return_value='test-user'):
+            response = self.client.post('/login', json={'user_id': 'test-user', 'password': 'test'})
+
+        self.assertEqual(response.status_code, 200)
+        token = response.get_json()['access_token']
+        return {'Authorization': f'Bearer {token}'}
+
     def test_health_endpoint(self):
         response = self.client.get('/health')
 
@@ -52,6 +61,7 @@ class ServerRoutesTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {
+            'name': 'myCoolServer',
             'is_running': False,
             'pid': 0,
             'uptime_seconds': 0.0,
@@ -76,6 +86,7 @@ class ServerRoutesTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {
+            'name': 'myCoolServer',
             'is_running': True,
             'pid': 4321,
             'uptime_seconds': 99.9,
@@ -100,7 +111,7 @@ class ServerRoutesTests(unittest.TestCase):
         }
 
         with patch.object(servers_module.serverSessionsManager, 'serverInstances', {'myCoolServer': server_instance}), \
-                patch.object(servers_module.utils, 'get_server_stats', return_value=stats):
+                patch.object(servers_module.utils, 'getServerStats', return_value=stats):
             response = self.client.get('/servers/myCoolServer/stats')
 
         self.assertEqual(response.status_code, 200)
@@ -135,6 +146,48 @@ class ServerRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'message': "Server 'myCoolServer' stopped successfully"})
         stop_server.assert_called_once_with('myCoolServer')
+
+    def test_manage_add_server_requires_jwt(self):
+        response = self.client.post('/manage/addServer', json={
+            'serverName': 'jwt-server',
+            'serverSoftware': 'vanilla',
+            'serverVersion': 'latest',
+        })
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_manage_add_server_success(self):
+        headers = self._get_auth_headers()
+
+        with patch.object(servers_module.manageLocalServers, 'installMinecraftServer', return_value=True) as install_server, \
+                patch.object(servers_module.Database.repositories.ServersRepository, 'addServer', return_value=True) as add_server:
+            response = self.client.post(
+                '/manage/addServer',
+                json={'serverName': 'myCoolServer', 'serverSoftware': 'vanilla', 'serverVersion': 'latest'},
+                headers=headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {'status': True, 'message': "Server 'myCoolServer' installed and registered successfully"})
+        install_server.assert_called_once_with('vanilla', 'latest', 'myCoolServer', False)
+        add_server.assert_called_once_with('test-user', 'myCoolServer')
+
+    def test_manage_remove_server_requires_jwt(self):
+        response = self.client.delete('/servers/myCoolServer/uninstall')
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_manage_remove_server_success(self):
+        headers = self._get_auth_headers()
+
+        with patch.object(servers_module.manageLocalServers, 'uninstallMinecraftServer', return_value=True) as uninstall_server, \
+                patch.object(servers_module.Database.repositories.ServersRepository, 'removeServer', return_value=True) as remove_server:
+            response = self.client.delete('/servers/myCoolServer/uninstall', headers=headers)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {'status': True, 'message': "Server 'myCoolServer' uninstalled and removed successfully"})
+        uninstall_server.assert_called_once_with('myCoolServer')
+        remove_server.assert_called_once_with('test-user', 'myCoolServer')
 
     def test_global_stats_endpoint(self):
         stats = {
