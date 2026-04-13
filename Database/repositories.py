@@ -209,7 +209,6 @@ class ServersRepository():
             return False
 
         db.session.add(Servers(owner_id=userId, name=serverName))
-        ServersUsersPermsRepository.addPerm(userId, )
         db.session.commit()
         return True
 
@@ -217,17 +216,21 @@ class ServersRepository():
     def removeServer(userId: int, serverName: str) -> bool:
         if not UserRepository.doseUserExist(userId):
             return False
-        db.session.delete(Servers(owner_id=userId, name=serverName))
-        db.session.commit()
-        return True
-    @staticmethod
-    def changeServerName(userId: int, serverName: str) -> bool:
-        if not UserRepository.doseUserExist(userId):
-            return False
+
         server = db.session.query(Servers).filter(Servers.owner_id==userId, Servers.name==serverName).first()
         if server is None:
             return False
-        server.name = serverName
+        db.session.delete(server)
+        db.session.commit()
+        return True
+    @staticmethod
+    def changeServerName(userId: int, currentServerName: str, newServerName: str) -> bool:
+        if not UserRepository.doseUserExist(userId):
+            return False
+        server = db.session.query(Servers).filter(Servers.owner_id==userId, Servers.name==currentServerName).first()
+        if server is None:
+            return False
+        server.name = newServerName
         db.session.commit()
         return True
 
@@ -245,6 +248,16 @@ class ServersRepository():
             return 0
         return server.owner_id
 
+    @staticmethod
+    def getServerId(userId: int, serverName: str) -> int:
+        if not UserRepository.doseUserExist(userId):
+            return 0
+        server = db.session.query(Servers).filter(Servers.owner_id == userId, Servers.name == serverName).first()
+        if server is None:
+            return 0
+        return server.id
+
+
 class ServersUsersPermsRepository():
     @staticmethod
     def addPerm(userId: int, serverId: int, targetUserId: int, permId: int) -> bool:
@@ -252,23 +265,22 @@ class ServersUsersPermsRepository():
             return False
         if not ServersRepository.doseServerExist(serverId):
             return False
-        if ServersPermissions.AddPermissionToServer not in ServersUsersPermsRepository.getPerms(userId, targetUserId, serverId):
+        if ServersRepository.getServerOwner(serverId) != userId or ServersPermissions.AddPermissionToServer.value not in ServersUsersPermsRepository.getPerms(userId, serverId):
             return False
-
         if permId not in ServersPermissions:
             return False
 
-        db.session.add(ServersUsersPerms(owner_id=userId, user_id=targetUserId, server_id=serverId, perm_id=permId))
+        db.session.add(ServersUsersPerms(user_id=targetUserId, server_id=serverId, perm_id=permId))
         db.session.commit()
         return True
 
     @staticmethod
-    def getPerms(userId: int, targetUserId: int, serverId: int) -> List[int]:
-        if not UserRepository.doseUserExist(userId) or not UserRepository.doseUserExist(targetUserId):
+    def getPerms(userId: int, serverId: int) -> List[int]:
+        if not UserRepository.doseUserExist(userId):
             return []
         if not ServersRepository.doseServerExist(serverId):
             return []
-        perms = db.session.query(ServersUsersPerms).filter(ServersUsersPerms.owner_id == userId, ServersUsersPerms.user_id == targetUserId, ServersUsersPerms.server_id == serverId).all()
+        perms = db.session.query(ServersUsersPerms).filter(ServersUsersPerms.user_id == userId, ServersUsersPerms.server_id == serverId).all()
         if not perms:
             return []
 
@@ -284,10 +296,10 @@ class ServersUsersPermsRepository():
             return False
         if not ServersRepository.doseServerExist(serverId):
             return False
-        if ServersPermissions.RemovePermissionFromServer not in ServersUsersPermsRepository.getPerms(userId, targetUserId, serverId):
+        if ServersRepository.getServerOwner(serverId) != userId or ServersPermissions.RemovePermissionFromServer.value not in ServersUsersPermsRepository.getPerms(userId, serverId):
             return False
 
-        perm = db.session.query(ServersUsersPerms).filter(ServersUsersPerms.owner_id == userId, ServersUsersPerms.user_id == targetUserId, ServersUsersPerms.server_id == serverId, ServersUsersPerms.perm_id == permId).first()
+        perm = db.session.query(ServersUsersPerms).filter(ServersUsersPerms.user_id == targetUserId, ServersUsersPerms.server_id == serverId, ServersUsersPerms.perm_id == permId).first()
         if perm is None:
             return False
         db.session.delete(perm)
