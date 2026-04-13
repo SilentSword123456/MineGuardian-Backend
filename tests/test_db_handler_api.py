@@ -9,11 +9,12 @@ from services import dbHandler as db_handler
 class DbHandlerApiTests(unittest.TestCase):
     def setUp(self):
         self.client = app.test_client()
-        with patch.object(db_handler.UserRepository, 'verify', return_value=True):
+        with patch.object(db_handler.UserRepository, 'verify', return_value=True), \
+             patch.object(db_handler.UserRepository, 'getUserId', return_value='test'):
             login_response = self.request_json(
                 'POST',
                 '/login',
-                {'username': 'test', 'password': 'test'},
+                {'user_id': 'test', 'password': 'test'},
                 use_auth=False,
             )
 
@@ -39,12 +40,21 @@ class DbHandlerApiTests(unittest.TestCase):
         create_user.assert_called_once_with('test', 'test')
 
     def test_remove_user(self):
-        with patch.object(db_handler.UserRepository, 'removeUser', return_value=True) as remove_user:
+        with patch.object(db_handler.UserRepository, 'getUsername', return_value='test') as get_username, \
+             patch.object(db_handler.UserRepository, 'removeUser', return_value=True) as remove_user:
             response = self.request_json('DELETE', '/user', {'username': 'test'})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'status': True})
+        get_username.assert_called_once_with('test')
         remove_user.assert_called_once_with('test')
+
+    def test_remove_user_forbidden_on_username_mismatch(self):
+        with patch.object(db_handler.UserRepository, 'getUsername', return_value='other-user'):
+            response = self.request_json('DELETE', '/user', {'username': 'test'})
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.get_json(), {'error': 'forbidden'})
 
     def test_add_favorite_server(self):
         with patch.object(db_handler.FavoriteServersRepository, 'addFavoriteServer', return_value=True) as add_favorite_server:
