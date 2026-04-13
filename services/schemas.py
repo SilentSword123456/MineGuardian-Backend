@@ -85,8 +85,23 @@ class PlayerPrivilegesOutputSchema(Schema):
     error = String()
 
 
-class UsernameRequestSchema(Schema):
+class UserCreateRequestSchema(Schema):
     username = String(required=True)
+    password = String(required=True)
+
+
+class UserIdRequestSchema(Schema):
+    username = String(required=True)
+
+
+class LoginRequestSchema(Schema):
+    user_id = String(required=True)
+    password = String(required=True)
+
+
+class LoginOutputSchema(Schema):
+    access_token = String()
+    message = String()
 
 
 class ServerIdRequestSchema(Schema):
