@@ -370,21 +370,11 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
         )
         self.assertEqual(ServersUsersPermsRepository.getPerms(owner_id, 999999), [])
 
-    def test_add_perm_requires_owner_add_grant_and_creates_target_permission(self):
+    def test_add_perm_allows_owner_without_add_grant_and_creates_target_permission(self):
         owner_id = self._seed_user('perms-add-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
         target_user_id = self._seed_user('perms-target', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
         server_id = self._seed_server(owner_id, 'perm-add-server')
 
-        self.assertFalse(
-            ServersUsersPermsRepository.addPerm(
-                owner_id,
-                server_id,
-                target_user_id,
-                ServersPermissions.RemovePermissionFromServer.value,
-            )
-        )
-
-        self._grant_owner_server_permissions(server_id, owner_id)
         self.assertTrue(
             ServersUsersPermsRepository.addPerm(
                 owner_id,
@@ -402,22 +392,12 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
         self.assertIsNotNone(perm)
         self.created_server_perm_ids.add(perm.id)
 
-    def test_remove_perm_requires_owner_remove_grant_and_deletes_target_permission(self):
+    def test_remove_perm_allows_owner_without_remove_grant_and_deletes_target_permission(self):
         owner_id = self._seed_user('perms-remove-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
         target_user_id = self._seed_user('perms-remove-target', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
         server_id = self._seed_server(owner_id, 'perm-remove-server')
         target_perm_id = self._seed_server_perm(server_id, target_user_id, ServersPermissions.AddPermissionToServer.value)
 
-        self.assertFalse(
-            ServersUsersPermsRepository.removePerm(
-                owner_id,
-                server_id,
-                target_user_id,
-                ServersPermissions.AddPermissionToServer.value,
-            )
-        )
-
-        self._grant_owner_server_permissions(server_id, owner_id)
         self.assertTrue(
             ServersUsersPermsRepository.removePerm(
                 owner_id,
@@ -436,7 +416,52 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
 
         self.assertFalse(ServersUsersPermsRepository.addPerm(owner_id, server_id, target_user_id, 999))
 
+    def test_dose_user_have_perm_returns_true_when_user_has_permission(self):
+        owner_id = self._seed_user('perm-check-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        target_user_id = self._seed_user('perm-check-target', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_id = self._seed_server(owner_id, 'perm-check-server')
+        self._grant_owner_server_permissions(server_id, owner_id)
 
-if __name__ == '__main__':
-    unittest.main()
+        self._seed_server_perm(server_id, target_user_id, ServersPermissions.RemovePermissionFromServer.value)
+
+        self.assertTrue(ServersUsersPermsRepository.doseUserHavePerm(target_user_id, server_id, ServersPermissions.RemovePermissionFromServer.value))
+
+    def test_dose_user_have_perm_returns_false_when_user_does_not_have_permission(self):
+        owner_id = self._seed_user('perm-no-check-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        target_user_id = self._seed_user('perm-no-check-target', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_id = self._seed_server(owner_id, 'perm-no-check-server')
+
+        self.assertFalse(ServersUsersPermsRepository.doseUserHavePerm(target_user_id, server_id, ServersPermissions.RemovePermissionFromServer.value))
+
+    def test_dose_user_have_perm_returns_false_for_missing_user(self):
+        owner_id = self._seed_user('perm-missing-user-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_id = self._seed_server(owner_id, 'perm-missing-user-server')
+
+        self.assertFalse(ServersUsersPermsRepository.doseUserHavePerm(999999, server_id, ServersPermissions.RemovePermissionFromServer.value))
+
+    def test_dose_user_have_perm_returns_false_for_missing_server(self):
+        user_id = self._seed_user('perm-missing-server-user', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+
+        self.assertFalse(ServersUsersPermsRepository.doseUserHavePerm(user_id, 999999, ServersPermissions.RemovePermissionFromServer.value))
+
+    def test_dose_user_have_perm_returns_false_when_user_has_different_permission(self):
+        owner_id = self._seed_user('perm-different-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        target_user_id = self._seed_user('perm-different-target', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_id = self._seed_server(owner_id, 'perm-different-server')
+
+        self._seed_server_perm(server_id, target_user_id, ServersPermissions.AddPermissionToServer.value)
+
+        self.assertFalse(ServersUsersPermsRepository.doseUserHavePerm(target_user_id, server_id, ServersPermissions.RemovePermissionFromServer.value))
+        self.assertTrue(ServersUsersPermsRepository.doseUserHavePerm(target_user_id, server_id, ServersPermissions.AddPermissionToServer.value))
+
+    def test_dose_user_have_perm_with_multiple_permissions(self):
+        owner_id = self._seed_user('perm-multi-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        target_user_id = self._seed_user('perm-multi-target', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_id = self._seed_server(owner_id, 'perm-multi-server')
+
+        self._seed_server_perm(server_id, target_user_id, ServersPermissions.AddPermissionToServer.value)
+        self._seed_server_perm(server_id, target_user_id, ServersPermissions.RemovePermissionFromServer.value)
+
+        self.assertTrue(ServersUsersPermsRepository.doseUserHavePerm(target_user_id, server_id, ServersPermissions.AddPermissionToServer.value))
+        self.assertTrue(ServersUsersPermsRepository.doseUserHavePerm(target_user_id, server_id, ServersPermissions.RemovePermissionFromServer.value))
 

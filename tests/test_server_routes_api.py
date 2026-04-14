@@ -1,5 +1,11 @@
+import shutil
 import unittest
+import uuid
+from pathlib import Path
 from unittest.mock import Mock, patch
+
+from Database.perms import ServersPermissions
+from Database.repositories import ServersRepository, ServersUsersPermsRepository, UserRepository
 
 from api import app
 from services import servers as servers_module
@@ -27,15 +33,49 @@ class DummyServerInstance:
 class ServerRoutesTests(unittest.TestCase):
     def setUp(self):
         self.client = app.test_client()
+        self._workflow_username = None
+        self._workflow_password = None
+        self._workflow_server_name = None
+        self._workflow_headers = None
+
+    def tearDown(self):
+        self._cleanup_workflow_artifacts()
 
     def _get_auth_headers(self):
         with patch('services.auth.repositories.UserRepository.verify', return_value=True), \
-                patch('services.auth.repositories.UserRepository.getUserId', return_value='test-user'):
+                patch('services.auth.repositories.UserRepository.getUserId', return_value=7):
             response = self.client.post('/login', json={'user_id': 'test-user', 'password': 'test'})
 
         self.assertEqual(response.status_code, 200)
         token = response.get_json()['access_token']
         return {'Authorization': f'Bearer {token}'}
+
+    def _workflow_server_root(self):
+        return Path(__file__).resolve().parent.parent / 'servers' / self._workflow_server_name
+
+    def _create_workflow_server_folder(self):
+        server_root = self._workflow_server_root()
+        server_root.mkdir(parents=True, exist_ok=True)
+
+        with (server_root / 'launch.bat').open('w', encoding='utf-8') as handle:
+            handle.write('java -Xmx2048M -jar server.jar nogui')
+
+        with (server_root / 'server.properties').open('w', encoding='utf-8') as handle:
+            handle.write('max-players=20\n')
+
+    def _cleanup_workflow_artifacts(self):
+        if self._workflow_server_name:
+            shutil.rmtree(self._workflow_server_root(), ignore_errors=True)
+            with app.app_context():
+                workflow_user_id = UserRepository.getUserId(self._workflow_username) if self._workflow_username else 0
+                if workflow_user_id:
+                    ServersRepository.removeServer(workflow_user_id, self._workflow_server_name)
+
+        if self._workflow_username:
+            with app.app_context():
+                workflow_user_id = UserRepository.getUserId(self._workflow_username)
+                if workflow_user_id:
+                    UserRepository.removeUser(self._workflow_username)
 
     def test_health_endpoint(self):
         response = self.client.get('/health')
@@ -170,7 +210,7 @@ class ServerRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'status': True, 'message': "Server 'myCoolServer' installed and registered successfully"})
         install_server.assert_called_once_with('vanilla', 'latest', 'myCoolServer', False)
-        add_server.assert_called_once_with('test-user', 'myCoolServer')
+        add_server.assert_called_once_with(7, 'myCoolServer')
 
     def test_manage_remove_server_requires_jwt(self):
         response = self.client.delete('/servers/myCoolServer/uninstall')
@@ -178,16 +218,71 @@ class ServerRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_manage_remove_server_success(self):
-        headers = self._get_auth_headers()
+        self._workflow_username = f'workflow-user-{uuid.uuid4().hex[:8]}'
+        self._workflow_password = f'workflow-pass-{uuid.uuid4().hex[:8]}'
+        self._workflow_server_name = f'workflow-server-{uuid.uuid4().hex[:8]}'
 
-        with patch.object(servers_module.manageLocalServers, 'uninstallMinecraftServer', return_value=True) as uninstall_server, \
-                patch.object(servers_module.Database.repositories.ServersRepository, 'removeServer', return_value=True) as remove_server:
-            response = self.client.delete('/servers/myCoolServer/uninstall', headers=headers)
+        try:
+            create_response = self.client.post('/user', json={
+                'username': self._workflow_username,
+                'password': self._workflow_password,
+            })
+            self.assertEqual(create_response.status_code, 200)
+            self.assertTrue(create_response.get_json()['status'])
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get_json(), {'status': True, 'message': "Server 'myCoolServer' uninstalled and removed successfully"})
-        uninstall_server.assert_called_once_with('myCoolServer')
-        remove_server.assert_called_once_with('test-user', 'myCoolServer')
+            login_response = self.client.post('/login', json={
+                'user_id': self._workflow_username,
+                'password': self._workflow_password,
+            })
+            self.assertEqual(login_response.status_code, 200)
+            token = login_response.get_json()['access_token']
+            headers = {'Authorization': f'Bearer {token}'}
+            self._workflow_headers = headers
+
+            with patch.object(servers_module.manageLocalServers, 'installMinecraftServer', side_effect=lambda *args, **kwargs: self._create_workflow_server_folder() or True) as install_server:
+                add_response = self.client.post(
+                    '/manage/addServer',
+                    json={
+                        'serverName': self._workflow_server_name,
+                        'serverSoftware': 'vanilla',
+                        'serverVersion': 'latest',
+                    },
+                    headers=headers,
+                )
+
+            self.assertEqual(add_response.status_code, 200)
+            self.assertEqual(add_response.get_json(), {'status': True, 'message': f"Server '{self._workflow_server_name}' installed and registered successfully"})
+            install_server.assert_called_once_with('vanilla', 'latest', self._workflow_server_name, False)
+
+            with app.app_context():
+                workflow_user_id = UserRepository.getUserId(self._workflow_username)
+                workflow_server_id = ServersRepository.getServerId(workflow_user_id, self._workflow_server_name)
+                self.assertTrue(
+                    ServersUsersPermsRepository.addPerm(
+                        workflow_user_id,
+                        workflow_server_id,
+                        workflow_user_id,
+                        ServersPermissions.RemovePermissionFromServer.value,
+                    )
+                )
+
+            info_response = self.client.get(f'/servers/{self._workflow_server_name}')
+            self.assertEqual(info_response.status_code, 200)
+            self.assertEqual(info_response.get_json()['name'], self._workflow_server_name)
+
+            with patch.object(servers_module.manageLocalServers, 'uninstallMinecraftServer', side_effect=lambda server_name: shutil.rmtree(Path(__file__).resolve().parent.parent / 'servers' / server_name, ignore_errors=True) or True) as uninstall_server:
+                remove_response = self.client.delete(f'/servers/{self._workflow_server_name}/uninstall', headers=headers)
+
+            self.assertEqual(remove_response.status_code, 200)
+            self.assertEqual(remove_response.get_json(), {'status': True, 'message': f"Server '{self._workflow_server_name}' uninstalled and removed successfully"})
+            uninstall_server.assert_called_once_with(self._workflow_server_name)
+
+            with app.app_context():
+                workflow_user_id = UserRepository.getUserId(self._workflow_username)
+                self.assertNotEqual(workflow_user_id, 0)
+                self.assertEqual(ServersRepository.getServerId(workflow_user_id, self._workflow_server_name), 0)
+        finally:
+            self._cleanup_workflow_artifacts()
 
     def test_global_stats_endpoint(self):
         stats = {
@@ -202,6 +297,89 @@ class ServerRoutesTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), stats)
+
+    def test_get_available_versions_success(self):
+        versions = {'versions': ['latest', '1.21.1', '1.20.4']}
+        with patch.object(servers_module.manageLocalServers, 'getAvailableVersions', return_value=versions):
+            response = self.client.get('/manage/vanilla/getAvailableVersions')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), versions)
+
+    def test_get_available_versions_returns_400_on_error(self):
+        with patch.object(servers_module.manageLocalServers, 'getAvailableVersions', return_value={'error': 'Not supported'}):
+            response = self.client.get('/manage/spigot/getAvailableVersions')
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_start_server_returns_400_when_service_raises_value_error(self):
+        with patch.object(servers_module, 'get_server_instance', side_effect=ValueError("already running")):
+            response = self.client.post('/servers/running-server/start')
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_stop_server_returns_400_when_service_raises_value_error(self):
+        with patch.object(servers_module, 'stop_server', side_effect=ValueError("no instance found")):
+            response = self.client.post('/servers/ghost-server/stop')
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_add_server_returns_400_when_params_missing(self):
+        headers = self._get_auth_headers()
+        response = self.client.post('/manage/addServer', json={'serverName': 'test'}, headers=headers)
+        self.assertEqual(response.status_code, 400)
+
+    def test_add_server_returns_400_when_install_returns_error(self):
+        headers = self._get_auth_headers()
+        with patch.object(servers_module.manageLocalServers, 'installMinecraftServer',
+                          return_value={'error': 'Server already exists'}):
+            response = self.client.post(
+                '/manage/addServer',
+                json={'serverName': 'myserver', 'serverSoftware': 'vanilla', 'serverVersion': '1.21'},
+                headers=headers,
+            )
+        self.assertEqual(response.status_code, 400)
+
+    def test_add_server_returns_200_with_warning_when_eula_not_accepted(self):
+        headers = self._get_auth_headers()
+        warning_msg = "EULA not accepted, server installed but not runnable until eula.txt is updated with 'eula=true'"
+        with patch.object(servers_module.manageLocalServers, 'installMinecraftServer',
+                          return_value={'warning': warning_msg}), \
+             patch.object(servers_module.Database.repositories.ServersRepository, 'addServer', return_value=True):
+            response = self.client.post(
+                '/manage/addServer',
+                json={'serverName': 'no-eula-server', 'serverSoftware': 'vanilla', 'serverVersion': '1.21'},
+                headers=headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()['message'], warning_msg)
+
+    def test_server_stats_endpoint_returns_500_on_exception(self):
+        server_instance = DummyServerInstance(running=True)
+        with patch.object(servers_module.serverSessionsManager, 'serverInstances', {'myCoolServer': server_instance}), \
+             patch.object(servers_module.utils, 'getServerStats', side_effect=Exception("stats failed")):
+            response = self.client.get('/servers/myCoolServer/stats')
+
+        self.assertEqual(response.status_code, 500)
+
+    def test_server_stats_endpoint_returns_404_for_unknown_server(self):
+        with patch.object(servers_module.serverSessionsManager, 'serverInstances', {}):
+            response = self.client.get('/servers/unknown-server/stats')
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_general_server_info_returns_403_when_user_lacks_permission(self):
+        servers = [{'server_id': 'private-server', 'max_memory_mb': 1024, 'online_players': {'max': 20}}]
+        headers = self._get_auth_headers()
+
+        with patch.object(servers_module, 'get_all_servers', return_value=servers), \
+             patch.object(servers_module.ServersRepository, 'getServerId', return_value=99), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=False), \
+             patch.object(servers_module.serverSessionsManager, 'serverInstances', {}):
+            response = self.client.get('/servers/private-server', headers=headers)
+
+        self.assertEqual(response.status_code, 403)
 
 
 if __name__ == "__main__":

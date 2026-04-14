@@ -1,7 +1,9 @@
 {
   "startMinecraftServerCommand": "java -Xmx1024M -Xms1024M -jar server.jar nogui",
+  "rconPassword": "CHANGE_ME_IN_PRODUCTION",
+  "jwtSecretKey": "CHANGE_ME_IN_PRODUCTION",
   "flaskConfig": {
-    "SECRET_KEY": "",
+    "SECRET_KEY": "CHANGE_ME_IN_PRODUCTION",
     "SOCKETIO_CORS_ALLOWED_ORIGINS": "*"
   }
 }

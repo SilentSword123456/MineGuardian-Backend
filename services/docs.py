@@ -7,7 +7,7 @@ DOCS = {
         }
     },
     'get_general_server_info': {
-        'summary': 'Get server details by server_id',
+        'summary': 'Get server details by server name',
         'description': 'Returns runtime process details if running, otherwise stored metadata.',
         'responses': {
             200: 'Server details returned successfully.',
@@ -73,7 +73,7 @@ DOCS = {
         'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Server uninstalled and removed successfully.',
-            400: 'Missing server server_id or uninstall failed.',
+            400: 'Missing server server name or uninstall failed.',
             401: 'Missing or invalid JWT token.',
             422: 'JWT token is malformed or cannot be processed.',
             404: 'Server uninstall succeeded but database record could not be removed.'

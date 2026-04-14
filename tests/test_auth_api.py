@@ -24,7 +24,7 @@ class AuthApiTests(unittest.TestCase):
     def test_login_with_valid_credentials(self):
         """Test successful login returns access token"""
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True) as verify_mock, \
-             patch.object(auth.repositories.UserRepository, 'getUserId', return_value='user-1') as get_user_id_mock:
+             patch.object(auth.repositories.UserRepository, 'getUserId', return_value=1) as get_user_id_mock:
             response = self.request_json('POST', '/login', {
                 'user_id': 'testuser',
                 'password': 'testpass'
@@ -99,7 +99,7 @@ class AuthApiTests(unittest.TestCase):
     def test_login_calls_get_user_id_for_verified_user(self):
         """Verified login should resolve user id and return an access token."""
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True) as verify_mock, \
-             patch.object(auth.repositories.UserRepository, 'getUserId', return_value='user-42') as get_user_id_mock:
+             patch.object(auth.repositories.UserRepository, 'getUserId', return_value=42) as get_user_id_mock:
             response = self.request_json('POST', '/login', {
                 'user_id': 'steve',
                 'password': 'testpass'
@@ -125,7 +125,7 @@ class AuthApiTests(unittest.TestCase):
     def test_login_with_empty_string_password(self):
         """Test login with empty string password"""
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
-             patch.object(auth.repositories.UserRepository, 'getUserId', return_value='empty-pwd-user'):
+             patch.object(auth.repositories.UserRepository, 'getUserId', return_value=2):
             response = self.request_json('POST', '/login', {
                 'user_id': 'testuser',
                 'password': ''
@@ -136,7 +136,7 @@ class AuthApiTests(unittest.TestCase):
     def test_login_with_special_characters_in_username(self):
         """Test login with special characters in user_id"""
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True) as verify_mock, \
-             patch.object(auth.repositories.UserRepository, 'getUserId', return_value='special-user-id') as get_user_id_mock:
+             patch.object(auth.repositories.UserRepository, 'getUserId', return_value=3) as get_user_id_mock:
             response = self.request_json('POST', '/login', {
                 'user_id': 'test@user.com',
                 'password': 'testpass'
@@ -149,7 +149,7 @@ class AuthApiTests(unittest.TestCase):
     def test_multiple_login_attempts_with_different_users(self):
         """Test multiple successful logins issue different tokens."""
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
-             patch.object(auth.repositories.UserRepository, 'getUserId', side_effect=['user1-id', 'user2-id']):
+             patch.object(auth.repositories.UserRepository, 'getUserId', side_effect=[11, 12]):
             response1 = self.request_json('POST', '/login', {
                 'user_id': 'user1',
                 'password': 'pass1'

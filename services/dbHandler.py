@@ -40,7 +40,7 @@ def createUser(request_data=None):
 @db_blueprint.output(StatusOutputSchema, status_code=200)
 @jwt_required()
 def removeUser(request_data=None):
-    userId = get_jwt_identity()
+    userId = int(get_jwt_identity())
     if request_data is None:
         return {'error': 'bad request'}, 400
 
@@ -63,7 +63,7 @@ def removeUser(request_data=None):
 def addFavoriteServer(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
-    userId = get_jwt_identity()
+    userId = int(get_jwt_identity())
     server_id = request_data.get('server_id')
     if server_id is None or userId is None:
         return {'error': 'bad request'}, 400
@@ -83,7 +83,7 @@ def addFavoriteServer(request_data=None):
 def removeFavoriteServer(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
-    userId = get_jwt_identity()
+    userId = int(get_jwt_identity())
     server_id = request_data.get('server_id')
     if server_id is None or userId is None:
         return {'error': 'bad request'}, 400
@@ -99,7 +99,7 @@ def removeFavoriteServer(request_data=None):
 @db_blueprint.output(FavoriteServersOutputSchema, status_code=200)
 @jwt_required()
 def getFavoriteServers():
-    userId = get_jwt_identity()
+    userId = int(get_jwt_identity())
     return {'servers': FavoriteServersRepository.getFavoriteServers(userId)}, 200
 
 @db_blueprint.route('/player', methods=['POST'])
@@ -111,7 +111,7 @@ def addPlayer(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    userId = get_jwt_identity()
+    userId = int(get_jwt_identity())
     name = request_data.get('name')
     uuid = request_data.get('uuid')
     if userId is None or name is None or uuid is None:
@@ -128,7 +128,7 @@ def removePlayer(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    userId = get_jwt_identity()
+    userId = int(get_jwt_identity())
     uuid = request_data.get('uuid')
     if userId is None or uuid is None:
         return {'error': 'bad request'}, 400
@@ -140,7 +140,7 @@ def removePlayer(request_data=None):
 @db_blueprint.output(PlayerUUIDsOutputSchema, status_code=200)
 @jwt_required()
 def getAllPlayersUUIDs():
-    userId = get_jwt_identity()
+    userId = int(get_jwt_identity())
     return {'players': PlayerRepository.getAllPlayersUUIDs(userId)}, 200
 
 @db_blueprint.route('/playerPrivilege', methods=['POST'])
@@ -152,7 +152,7 @@ def addPlayerPrivilege(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    userId = get_jwt_identity()
+    userId = int(get_jwt_identity())
     player_uuid = request_data.get('player_uuid')
     privilege_id = request_data.get('privilege_id')
     if userId is None or player_uuid is None or privilege_id is None:
@@ -174,7 +174,7 @@ def deletePlayerPrivilege(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    userId = get_jwt_identity()
+    userId = int(get_jwt_identity())
     player_uuid = request_data.get('player_uuid')
     privilege_id = request_data.get('privilege_id')
     if userId is None or player_uuid is None or privilege_id is None:
@@ -196,7 +196,7 @@ def getPlayerPrivileges(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    userId = get_jwt_identity()
+    userId = int(get_jwt_identity())
     player_uuid = request_data.get('player_uuid')
     if userId is None or player_uuid is None:
         return {'error': 'bad request'}, 400
@@ -212,7 +212,7 @@ def addSetting(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    userId = get_jwt_identity()
+    userId = int(get_jwt_identity())
     rule = request_data.get('rule')
     approved = request_data.get('approved', False)
     if userId is None or rule is None:
@@ -235,7 +235,7 @@ def removeSetting(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    userId = get_jwt_identity()
+    userId = int(get_jwt_identity())
     rule = request_data.get('rule')
     if userId is None or rule is None:
         return {'error': 'bad request'}, 400
@@ -256,7 +256,7 @@ def changeSetting(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
-    userId = get_jwt_identity()
+    userId = int(get_jwt_identity())
     rule = request_data.get('rule')
     approved = request_data.get('approved', False)
     if userId is None or rule is None:
