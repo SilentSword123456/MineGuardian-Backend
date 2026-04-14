@@ -4,6 +4,7 @@ import tempfile
 import unittest
 
 from flask import Flask
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from Database.database import (
     FavoriteServers,
@@ -137,13 +138,12 @@ class UserRepositoryTests(RepositoryTestCase):
     def test_create_user_hashes_password_and_rejects_duplicate_username(self):
         username = 'alice'
         password = 'secret-password'
-        expected_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
 
         self.assertTrue(UserRepository.createUser(username, password))
         users = db.session.query(User).filter(User.username == username).all()
         self._track_ids(self.created_user_ids, users)
         self.assertEqual(len(users), 1)
-        self.assertEqual(users[0].password, expected_hash)
+        self.assertTrue(check_password_hash(users[0].password, password))
 
         self.assertFalse(UserRepository.createUser(username, password))
         users = db.session.query(User).filter(User.username == username).all()
@@ -153,33 +153,33 @@ class UserRepositoryTests(RepositoryTestCase):
     def test_verify_accepts_correct_password_and_rejects_wrong_password(self):
         username = 'bob'
         password = 'hunter2'
-        self._seed_user(username, hashlib.sha256(password.encode('utf-8')).hexdigest())
+        self._seed_user(username, generate_password_hash(password))
 
         self.assertTrue(UserRepository.verify(username, password))
         self.assertFalse(UserRepository.verify(username, 'wrong-password'))
 
     def test_get_user_id_returns_id_for_existing_username(self):
         username = 'charlie'
-        user_id = self._seed_user(username, hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        user_id = self._seed_user(username, generate_password_hash('pw'))
 
         self.assertEqual(UserRepository.getUserId(username), user_id)
         self.assertEqual(UserRepository.getUserId('missing-user'), 0)
 
     def test_get_username_returns_username_for_existing_id(self):
-        user_id = self._seed_user('dora', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        user_id = self._seed_user('dora', generate_password_hash('pw'))
 
         self.assertEqual(UserRepository.getUsername(user_id), 'dora')
         self.assertEqual(UserRepository.getUsername(999999), '')
 
     def test_remove_user_deletes_existing_user_and_returns_false_when_missing(self):
-        self._seed_user('eve', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        self._seed_user('eve', generate_password_hash('pw'))
 
         self.assertTrue(UserRepository.removeUser('eve'))
         self.assertEqual(db.session.query(User).filter(User.username == 'eve').count(), 0)
         self.assertFalse(UserRepository.removeUser('eve'))
 
     def test_dose_user_exist_uses_numeric_id(self):
-        user_id = self._seed_user('frank', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        user_id = self._seed_user('frank', generate_password_hash('pw'))
 
         self.assertTrue(UserRepository.doseUserExist(user_id))
         self.assertFalse(UserRepository.doseUserExist(999999))
