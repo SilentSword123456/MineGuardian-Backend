@@ -341,13 +341,18 @@ def getLaunchCommand(path):
     if not path:
         return None
 
+    # Reject relative paths and any traversal attempts (e.g. ../../etc)
+    normalized = os.path.normpath(path)
+    if not os.path.isabs(normalized):
+        return None
+
     fileName = ""
     if(os.name == "nt"):  # Windows
         fileName = "launch.bat"
     else:
         fileName = "launch.sh"
 
-    filePath = os.path.join(path, fileName)
+    filePath = os.path.join(normalized, fileName)
     if os.path.isfile(filePath):
         try:
             with open(filePath, "r") as f:
