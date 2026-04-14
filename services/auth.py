@@ -27,5 +27,5 @@ def login(request_data=None):
         return {'message': 'Invalid credentials'}, 401
 
     userId = repositories.UserRepository.getUserId(username)
-    access_token = create_access_token(identity=userId)
+    access_token = create_access_token(identity=str(userId))
     return {'access_token': access_token}, 200
