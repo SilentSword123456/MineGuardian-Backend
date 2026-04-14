@@ -154,6 +154,7 @@ def remove_server(serverName):
     if not serverName:
         abort(400, message='No serverName provided')
 
+
     status = manageLocalServers.uninstallMinecraftServer(serverName)
     if isinstance(status, dict) and 'error' in status:
         abort(400, message=status['error'])
