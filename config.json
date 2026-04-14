@@ -1,7 +1,9 @@
 {
   "startMinecraftServerCommand": "java -Xmx1024M -Xms1024M -jar server.jar nogui",
+  "rconPassword": "test-rcon-password",
+  "jwtSecretKey": "test-jwt-secret-key-for-testing-only",
   "flaskConfig": {
-    "SECRET_KEY": "",
+    "SECRET_KEY": "test-flask-secret-key",
     "SOCKETIO_CORS_ALLOWED_ORIGINS": "*"
   }
 }
