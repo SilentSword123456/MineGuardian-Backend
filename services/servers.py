@@ -1,7 +1,6 @@
 from flask import request
 from apiflask import APIBlueprint, abort
 from flask_jwt_extended import jwt_required, get_jwt_identity
-
 import Database.repositories
 import manageLocalServers
 import serverSessionsManager
@@ -19,6 +18,8 @@ from services.schemas import (
     StartServerOutputSchema,
     StopServerOutputSchema,
 )
+from Database.repositories import *
+from Database.perms import ServersPermissions
 
 servers_bp = APIBlueprint('servers', __name__)
 
@@ -154,12 +155,14 @@ def remove_server(serverName):
     if not serverName:
         abort(400, message='No serverName provided')
 
-
+    serverId = ServersRepository.getServerId(userId, serverName)
+    if not ServersUsersPermsRepository.doseUserHavePerm(userId,serverId, ServersPermissions.RemovePermissionFromServer.value):
+        return False
     status = manageLocalServers.uninstallMinecraftServer(serverName)
     if isinstance(status, dict) and 'error' in status:
         abort(400, message=status['error'])
 
-    databaseStatus = Database.repositories.ServersRepository.removeServer(userId, serverName)
+    databaseStatus = ServersRepository.removeServer(userId, serverName)
     if not databaseStatus:
         abort(404, message='Failed to remove server from database')
     return {'status': True, 'message': f"Server '{serverName}' uninstalled and removed successfully"}, 200
