@@ -10,3 +10,6 @@ class SettingsPermissions(Enum):
 class ServersPermissions(Enum):
     AddPermissionToServer = 1
     RemovePermissionFromServer = 2
+    GetServerInfo = 3
+    StartServer = 4
+    StopServer = 5
