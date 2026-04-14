@@ -298,6 +298,89 @@ class ServerRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), stats)
 
+    def test_get_available_versions_success(self):
+        versions = {'versions': ['latest', '1.21.1', '1.20.4']}
+        with patch.object(servers_module.manageLocalServers, 'getAvailableVersions', return_value=versions):
+            response = self.client.get('/manage/vanilla/getAvailableVersions')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), versions)
+
+    def test_get_available_versions_returns_400_on_error(self):
+        with patch.object(servers_module.manageLocalServers, 'getAvailableVersions', return_value={'error': 'Not supported'}):
+            response = self.client.get('/manage/spigot/getAvailableVersions')
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_start_server_returns_400_when_service_raises_value_error(self):
+        with patch.object(servers_module, 'get_server_instance', side_effect=ValueError("already running")):
+            response = self.client.post('/servers/running-server/start')
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_stop_server_returns_400_when_service_raises_value_error(self):
+        with patch.object(servers_module, 'stop_server', side_effect=ValueError("no instance found")):
+            response = self.client.post('/servers/ghost-server/stop')
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_add_server_returns_400_when_params_missing(self):
+        headers = self._get_auth_headers()
+        response = self.client.post('/manage/addServer', json={'serverName': 'test'}, headers=headers)
+        self.assertEqual(response.status_code, 400)
+
+    def test_add_server_returns_400_when_install_returns_error(self):
+        headers = self._get_auth_headers()
+        with patch.object(servers_module.manageLocalServers, 'installMinecraftServer',
+                          return_value={'error': 'Server already exists'}):
+            response = self.client.post(
+                '/manage/addServer',
+                json={'serverName': 'myserver', 'serverSoftware': 'vanilla', 'serverVersion': '1.21'},
+                headers=headers,
+            )
+        self.assertEqual(response.status_code, 400)
+
+    def test_add_server_returns_200_with_warning_when_eula_not_accepted(self):
+        headers = self._get_auth_headers()
+        warning_msg = "EULA not accepted, server installed but not runnable until eula.txt is updated with 'eula=true'"
+        with patch.object(servers_module.manageLocalServers, 'installMinecraftServer',
+                          return_value={'warning': warning_msg}), \
+             patch.object(servers_module.Database.repositories.ServersRepository, 'addServer', return_value=True):
+            response = self.client.post(
+                '/manage/addServer',
+                json={'serverName': 'no-eula-server', 'serverSoftware': 'vanilla', 'serverVersion': '1.21'},
+                headers=headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()['message'], warning_msg)
+
+    def test_server_stats_endpoint_returns_500_on_exception(self):
+        server_instance = DummyServerInstance(running=True)
+        with patch.object(servers_module.serverSessionsManager, 'serverInstances', {'myCoolServer': server_instance}), \
+             patch.object(servers_module.utils, 'getServerStats', side_effect=Exception("stats failed")):
+            response = self.client.get('/servers/myCoolServer/stats')
+
+        self.assertEqual(response.status_code, 500)
+
+    def test_server_stats_endpoint_returns_404_for_unknown_server(self):
+        with patch.object(servers_module.serverSessionsManager, 'serverInstances', {}):
+            response = self.client.get('/servers/unknown-server/stats')
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_general_server_info_returns_403_when_user_lacks_permission(self):
+        servers = [{'server_id': 'private-server', 'max_memory_mb': 1024, 'online_players': {'max': 20}}]
+        headers = self._get_auth_headers()
+
+        with patch.object(servers_module, 'get_all_servers', return_value=servers), \
+             patch.object(servers_module.ServersRepository, 'getServerId', return_value=99), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=False), \
+             patch.object(servers_module.serverSessionsManager, 'serverInstances', {}):
+            response = self.client.get('/servers/private-server', headers=headers)
+
+        self.assertEqual(response.status_code, 403)
+
 
 if __name__ == "__main__":
     unittest.main()
