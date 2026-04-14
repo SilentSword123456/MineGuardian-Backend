@@ -9,9 +9,10 @@ import serverSessionsManager
 
 
 def displayTitle():
-    questionary.print("\n" + "="*50, style="bold")
-    questionary.print("MineGuardian Backend CLI", style="bold fg:cyan")
-    questionary.print("="*50 + "\n", style="bold")
+
+    print("\n" + "="*50)
+    print("MineGuardian Backend CLI")
+    print("="*50 + "\n")
 
 
 def downloadFile(url, dest):
@@ -24,20 +25,20 @@ def downloadFile(url, dest):
         with open(dest, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
-        #questionary.print(f"Downloaded file to {dest}", style="fg:green")
+        # print(f"Downloaded file to {dest}")
     except requests.exceptions.RequestException as e:
-        questionary.print(f"Error downloading file from {url}: {e}", style="fg:red")
+        print(f"Error downloading file from {url}: {e}")
 
 def getConfig():
     if(not os.path.isfile("config.json")):
-        questionary.print("Configuration file not found.", style="fg:red")
+        print("Configuration file not found.")
         return None
     try:
         with open("config.json", "r") as f:
             config = json.load(f)
             return config
     except json.JSONDecodeError as e:
-        questionary.print(f"Error reading configuration file: {e}", style="fg:red")
+        print(f"Error reading configuration file: {e}")
         return None
 
 def storeConfig(config):
@@ -45,7 +46,7 @@ def storeConfig(config):
         with open("config.json", "w") as f:
             json.dump(config, f, indent=4)
     except Exception as e:
-        questionary.print(f"Error saving configuration file: {e}", style="fg:red")
+        print(f"Error saving configuration file: {e}")
 
 def generateFlaskKey():
     config = getConfig()
@@ -110,7 +111,7 @@ def getMaxPlayers(serverPath: str | None = None) -> int:
                 if line.startswith("max-players="):
                     return int(line.split("=", 1)[1].strip())
     except Exception as e:
-        questionary.print(f"Error reading max players from server.properties: {e}", style="fg:red")
+        print(f"Error reading max players from server.properties: {e}")
 
     return 20  # Default if not found in file
 
@@ -241,7 +242,7 @@ def createRunScript(path) -> str | None:
         return None
     command = config.get("startMinecraftServerCommand")
     if not command:
-        questionary.print("'startMinecraftServerCommand' not set in config.", style="fg:red")
+        print("'startMinecraftServerCommand' not set in config.")
         return None
 
     fileName = ""
@@ -253,7 +254,7 @@ def createRunScript(path) -> str | None:
     filePath = os.path.join(path, fileName)
 
     if os.path.exists(filePath):
-        questionary.print(f"Overwriting launch script.", style="fg:yellow")
+        print(f"Overwriting launch script.")
 
     with open(filePath, "w") as f:
         f.write(command)
@@ -276,14 +277,14 @@ def runMinecraftServer(serverName = None, path = "servers"):
     if(serverName in serverSessionsManager.serverInstances):
         server = serverSessionsManager.serverInstances[serverName]
         if not server.running:
-            questionary.print(f"\nStarting Minecraft server '{serverName}' in background...", style="fg:green")
+            print(f"\nStarting Minecraft server '{serverName}' in background...")
             server.start()
             input("\nPress Enter to return to menu...")
         else:
-            questionary.print(f"\nServer '{serverName}' is already running.", style="fg:yellow")
+            print(f"\nServer '{serverName}' is already running.")
             input("\nPress Enter to return to menu...")
     else:
-        questionary.print(f"Server '{serverName}' not found.", style="fg:red")
+        print(f"Server '{serverName}' not found.")
         input("\nPress Enter to continue...")
         return None
 
@@ -357,7 +358,7 @@ def getLaunchCommand(path):
 def setupServerInstance(path, serverName):
     launchCommand = getLaunchCommand(path) or createRunScript(path)
     if launchCommand is None:
-        questionary.print(f"Failed to get/create launch script for server '{serverName}'.", style="fg:red")
+        print(f"Failed to get/create launch script for server '{serverName}'.")
         return None
 
     server = serverSessionsManager.ServerSession(serverName, launchCommand, os.path.abspath(path))
@@ -367,24 +368,24 @@ def setupServerInstance(path, serverName):
 
 def attachToServer():
     if not serverSessionsManager.serverInstances:
-        questionary.print("No running servers to attach to.", style="fg:red")
+        print("No running servers to attach to.")
         return
 
-    questionary.print(f"RunningServers: {serverSessionsManager.serverInstances}", style="fg:green")
+    print(f"RunningServers: {serverSessionsManager.serverInstances}")
 
     serverName = questionary.select("Select a server to attach to:", choices=list(serverSessionsManager.serverInstances.keys())).ask()
     if serverName in serverSessionsManager.serverInstances:
         server = serverSessionsManager.serverInstances[serverName]
         server.attach()
     else:
-        questionary.print(f"Server '{serverName}' not found.", style="fg:red")
+        print(f"Server '{serverName}' not found.")
     return
 
 
 def closeAllServers():
     for serverName, server in serverSessionsManager.serverInstances.items():
         if server.running:
-            questionary.print(f"\nStopping server '{serverName}'...", style="fg:yellow")
+            print(f"\nStopping server '{serverName}'...")
             server.stop()
     return
 
@@ -486,6 +487,6 @@ def getMaxMemoryMB(serverPath):
                 else:
                     return int(mem_str) // (1024 * 1024)  # Assume bytes if no unit
     except Exception as e:
-        questionary.print(f"Error reading max memory from server.properties: {e}", style="fg:red")
+        print(f"Error reading max memory from server.properties: {e}")
 
     return 1024  # Default if not found in file
