@@ -127,7 +127,9 @@ class PlayerRepository():
 class PlayersPrivilegesRepository():
     @staticmethod
     def addPrivilege(userId: int, playerUUID: str, privilegeId: int) -> bool:
-        if privilegeId not in PlayersPermissions:
+        try:
+            PlayersPermissions(privilegeId)
+        except ValueError:
             return False
         if not UserRepository.doseUserExist(userId):
             return False
@@ -172,7 +174,9 @@ class SettingsRepository():
     def addSetting(userId: int, rule, approved=False):
         if not UserRepository.doseUserExist(userId):
             return False
-        if rule not in SettingsPermissions:
+        try:
+            SettingsPermissions(rule)
+        except ValueError:
             return False
         if db.session.query(Settings).filter(Settings.user_id == userId, Settings.rule == rule).first() is not None:
             return False
@@ -271,7 +275,9 @@ class ServersUsersPermsRepository():
             return False
         if ServersRepository.getServerOwner(serverId) != userId and not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.AddPermissionToServer.value):
             return False
-        if permId not in ServersPermissions:
+        try:
+            ServersPermissions(permId)
+        except ValueError:
             return False
 
         db.session.add(ServersUsersPerms(user_id=targetUserId, server_id=serverId, perm_id=permId))
