@@ -341,9 +341,9 @@ def getLaunchCommand(path):
     if not path:
         return None
 
-    abs_path = os.path.abspath(path)
-    servers_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "servers"))
-    if os.path.commonpath([servers_dir, abs_path]) != servers_dir:
+    # Reject relative paths and any traversal attempts (e.g. ../../etc)
+    normalized = os.path.normpath(path)
+    if not os.path.isabs(normalized):
         return None
 
     fileName = ""
@@ -352,7 +352,7 @@ def getLaunchCommand(path):
     else:
         fileName = "launch.sh"
 
-    filePath = os.path.join(abs_path, fileName)
+    filePath = os.path.join(normalized, fileName)
     if os.path.isfile(filePath):
         try:
             with open(filePath, "r") as f:

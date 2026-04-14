@@ -1,4 +1,4 @@
-import hashlib
+from werkzeug.security import generate_password_hash, check_password_hash
 from Database.perms import SettingsPermissions, PlayersPermissions, ServersPermissions
 from Database.database import *
 
@@ -7,7 +7,7 @@ class UserRepository():
     def createUser(username: str, password: str) -> bool:
         if db.session.query(User).filter(User.username == username).first() is not None:
             return False
-        hashPassword = hashlib.sha256(password.encode('utf-8')).hexdigest()
+        hashPassword = generate_password_hash(password)
         db.session.add(User(username=username, password=hashPassword))
         db.session.commit()
         return True
@@ -22,11 +22,10 @@ class UserRepository():
 
     @staticmethod
     def verify(username: str, password: str) -> bool:
-        hashPassword = hashlib.sha256(password.encode('utf-8')).hexdigest()
-        user = db.session.query(User).filter(User.username == username, User.password == hashPassword).first()
+        user = db.session.query(User).filter(User.username == username).first()
         if user is None:
             return False
-        return True
+        return check_password_hash(user.password, password)
 
     def getUserId(username: str) -> int:
         user = db.session.query(User).filter(User.username == username).first()
