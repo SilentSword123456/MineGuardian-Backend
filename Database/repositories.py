@@ -136,6 +136,9 @@ class PlayersPrivilegesRepository():
         playerId = PlayerRepository.getPlayerId(userId, playerUUID)
         if playerId == 0:
             return False
+        if db.session.query(PlayersPrivileges).filter(PlayersPrivileges.player_id == playerId,PlayersPrivileges.privilege_id == privilegeId).first() is not None:
+            return False
+        
         db.session.add(PlayersPrivileges(player_id=playerId, privilege_id = privilegeId))
         db.session.commit()
         return True
@@ -204,6 +207,8 @@ class ServersRepository():
     def addServer(userId: int, serverName: str) -> bool:
         if not UserRepository.doseUserExist(userId):
             return False
+        if db.session.query(Servers).filter(Servers.owner_id == userId,Servers.name == serverName).first() is not None:
+            return False
 
         db.session.add(Servers(owner_id=userId, name=serverName))
         db.session.commit()
@@ -227,6 +232,9 @@ class ServersRepository():
         server = db.session.query(Servers).filter(Servers.owner_id==userId, Servers.name==currentServerName).first()
         if server is None:
             return False
+        if db.session.query(Servers).filter(Servers.owner_id == userId,Servers.name == newServerName).first() is not None:
+            return False
+        
         server.name = newServerName
         db.session.commit()
         return True
