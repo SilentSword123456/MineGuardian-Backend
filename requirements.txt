@@ -8,4 +8,4 @@ eventlet==0.40.4
 marshmallow==4.2.3
 psutil==6.1.0
 questionary==2.1.1
-requests==2.31.0
+requests==2.33.0
