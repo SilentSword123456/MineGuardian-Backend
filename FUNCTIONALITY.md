@@ -166,6 +166,7 @@ They are pure database operations with no side effects outside the database.
   - `privilegeId` is not a valid `PlayersPermissions` value.
   - The user does not exist.
   - The player UUID does not exist under the user (i.e. `getPlayerId` returns `0`).
+  - The player already had the privilege.
 
 #### `deletePrivilege(userId: int, playerUUID: str, privilegeId: int) -> bool`
 - **Purpose:** Remove a privilege from a player.
@@ -214,7 +215,7 @@ They are pure database operations with no side effects outside the database.
 #### `addServer(userId: int, serverName: str) -> bool`
 - **Purpose:** Register a server in the database under a user.
 - **Input:** `userId` (int) — the owner's ID; `serverName` (str).
-- **Output:** `True` if created; `False` if the user does not exist.
+- **Output:** `True` if created; `False` if the user does not exist or there is already a server with the same name.
 
 #### `removeServer(userId: int, serverName: str) -> bool`
 - **Purpose:** Remove a server record.
@@ -229,6 +230,7 @@ They are pure database operations with no side effects outside the database.
 - **Output:** `True` if renamed; `False` if:
   - The user does not exist.
   - No server with `currentServerName` owned by the user exists.
+  - A server with `newServerName` already exists under the same user.
 
 #### `doseServerExist(serverId: int) -> bool`
 - **Purpose:** Check whether a server with the given primary-key ID exists.
