@@ -338,13 +338,21 @@ def patchServerProperties(path: str, overrides: dict):
 
 
 def getLaunchCommand(path):
+    if not path:
+        return None
+
+    abs_path = os.path.abspath(path)
+    servers_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "servers"))
+    if os.path.commonpath([servers_dir, abs_path]) != servers_dir:
+        return None
+
     fileName = ""
     if(os.name == "nt"):  # Windows
         fileName = "launch.bat"
     else:
         fileName = "launch.sh"
 
-    filePath = os.path.join(path, fileName)
+    filePath = os.path.join(abs_path, fileName)
     if os.path.isfile(filePath):
         try:
             with open(filePath, "r") as f:
