@@ -32,7 +32,9 @@ def list_servers():
 @servers_bp.route('/servers/<serverName>', methods=['GET'])
 @servers_bp.doc(**DOCS['get_general_server_info'])
 @servers_bp.output(GeneralServerInfoOutputSchema)
+@jwt_required(optional=True)
 def getGeneralServerInfo(serverName):
+     userId = get_jwt_identity()
      servers = get_all_servers()
 
      match = None
@@ -44,6 +46,12 @@ def getGeneralServerInfo(serverName):
 
      if not match:
              abort(404, message='Server not found')
+
+     if userId is not None:
+         userId = int(userId)
+         serverId = ServersRepository.getServerId(userId, serverName)
+         if serverId and not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.GetServerInfo.value):
+             abort(403, message='You dont have the permission to do this!')
 
      serverInstance = serverSessionsManager.serverInstances.get(serverName)
      if serverInstance:
@@ -59,7 +67,7 @@ def getGeneralServerInfo(serverName):
          }
 
      return {
-         'server_id': info['server_id'],
+         'name': info.get('server_id', match['server_id']),
          'is_running': info.get('is_running', False),
          'pid': info.get('pid', 0),
          'uptime_seconds': info.get('uptime_seconds', 0.0),
@@ -122,7 +130,7 @@ def get_server_stats_endpoint(serverName):
 @servers_bp.output(AddServerOutputSchema)
 @jwt_required()
 def add_server():
-    userId = get_jwt_identity()
+    userId = int(get_jwt_identity())
     args = request.get_json()
     if not args or 'serverName' not in args or 'serverSoftware' not in args or 'serverVersion' not in args:
         abort(400, message='Missing required parameters: serverName, serverSoftware, serverVersion')
@@ -151,7 +159,7 @@ def add_server():
 @servers_bp.output(RemoveServerOutputSchema)
 @jwt_required()
 def remove_server(serverName):
-    userId = get_jwt_identity()
+    userId = int(get_jwt_identity())
     if not serverName:
         abort(400, message='No serverName provided')
 
