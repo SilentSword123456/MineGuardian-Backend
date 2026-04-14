@@ -10,7 +10,7 @@ class DbHandlerApiTests(unittest.TestCase):
     def setUp(self):
         self.client = app.test_client()
         with patch.object(db_handler.UserRepository, 'verify', return_value=True), \
-             patch.object(db_handler.UserRepository, 'getUserId', return_value='test'):
+             patch.object(db_handler.UserRepository, 'getUserId', return_value=1):
             login_response = self.request_json(
                 'POST',
                 '/login',
@@ -46,7 +46,7 @@ class DbHandlerApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'status': True})
-        get_username.assert_called_once_with('test')
+        get_username.assert_called_once_with(1)
         remove_user.assert_called_once_with('test')
 
     def test_remove_user_forbidden_on_username_mismatch(self):
@@ -62,7 +62,7 @@ class DbHandlerApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'status': True})
-        add_favorite_server.assert_called_once_with(99, 'test')
+        add_favorite_server.assert_called_once_with(99, 1)
 
     def test_remove_favorite_server(self):
         with patch.object(db_handler.FavoriteServersRepository, 'removeFavoriteServer', return_value=True) as remove_favorite_server:
@@ -70,7 +70,7 @@ class DbHandlerApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'status': True})
-        remove_favorite_server.assert_called_once_with('test', 99)
+        remove_favorite_server.assert_called_once_with(1, 99)
 
     def test_get_favorite_servers(self):
         with patch.object(db_handler.FavoriteServersRepository, 'getFavoriteServers', return_value=[99, 100]) as get_favorite_servers:
@@ -78,7 +78,7 @@ class DbHandlerApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'servers': [99, 100]})
-        get_favorite_servers.assert_called_once_with('test')
+        get_favorite_servers.assert_called_once_with(1)
 
     def test_add_player(self):
         with patch.object(db_handler.PlayerRepository, 'createPlayer', return_value=True) as create_player:
@@ -86,7 +86,7 @@ class DbHandlerApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'status': True})
-        create_player.assert_called_once_with('test', 'Steve', 'uuid-1')
+        create_player.assert_called_once_with(1, 'Steve', 'uuid-1')
 
     def test_remove_player(self):
         with patch.object(db_handler.PlayerRepository, 'removePlayer', return_value=True) as remove_player:
@@ -94,7 +94,7 @@ class DbHandlerApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'status': True})
-        remove_player.assert_called_once_with('test', 'uuid-1')
+        remove_player.assert_called_once_with(1, 'uuid-1')
 
     def test_get_all_players_uuids(self):
         with patch.object(db_handler.PlayerRepository, 'getAllPlayersUUIDs', return_value=['uuid-1', 'uuid-2']) as get_all_players_uuids:
@@ -102,7 +102,7 @@ class DbHandlerApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'players': ['uuid-1', 'uuid-2']})
-        get_all_players_uuids.assert_called_once_with('test')
+        get_all_players_uuids.assert_called_once_with(1)
 
     def test_add_player_privilege(self):
         with patch.object(db_handler.PlayersPrivilegesRepository, 'addPrivilege', return_value=True) as add_player_privilege:
@@ -110,7 +110,7 @@ class DbHandlerApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'status': True})
-        add_player_privilege.assert_called_once_with('test', 'uuid-1', 1)
+        add_player_privilege.assert_called_once_with(1, 'uuid-1', 1)
 
     def test_delete_player_privilege(self):
         with patch.object(db_handler.PlayersPrivilegesRepository, 'deletePrivilege', return_value=True) as delete_player_privilege:
@@ -118,7 +118,7 @@ class DbHandlerApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'status': True})
-        delete_player_privilege.assert_called_once_with('test', 'uuid-1', 1)
+        delete_player_privilege.assert_called_once_with(1, 'uuid-1', 1)
 
     def test_add_player_privilege_invalid_integer_payload_is_rejected(self):
         response = self.request_json('POST', '/playerPrivilege', {'player_uuid': 'uuid-1', 'privilege_id': 'abc'})
@@ -135,7 +135,7 @@ class DbHandlerApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'privileges': expected_privileges})
-        get_player_privileges.assert_called_once_with('test', 'uuid-1')
+        get_player_privileges.assert_called_once_with(1, 'uuid-1')
 
     def test_add_setting(self):
         with patch.object(db_handler.SettingsRepository, 'addSetting', return_value=True) as add_setting:
@@ -143,7 +143,7 @@ class DbHandlerApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'status': True})
-        add_setting.assert_called_once_with('test', 0, True)
+        add_setting.assert_called_once_with(1, 0, True)
 
     def test_remove_setting(self):
         with patch.object(db_handler.SettingsRepository, 'removeSetting', return_value=True) as remove_setting:
@@ -151,7 +151,7 @@ class DbHandlerApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'status': True})
-        remove_setting.assert_called_once_with('test', 0)
+        remove_setting.assert_called_once_with(1, 0)
 
     def test_change_setting_defaults_to_false(self):
         with patch.object(db_handler.SettingsRepository, 'changeSetting', return_value=True) as change_setting:
@@ -159,7 +159,7 @@ class DbHandlerApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'status': True})
-        change_setting.assert_called_once_with('test', 0, False)
+        change_setting.assert_called_once_with(1, 0, False)
 
     def test_missing_required_field_is_rejected(self):
         response = self.request_json('POST', '/favoriteServers', {})
