@@ -88,11 +88,12 @@ class InstallMinecraftServerTests(unittest.TestCase):
         self.assertIn("error", result)
 
     def test_returns_error_for_spigot(self):
-        result = manageLocalServers.installMinecraftServer(
-            serverSoftware="spigot",
-            serverVersion="1.21",
-            serverName="test-server",
-        )
+        with patch("manageLocalServers.getLocalServers", return_value=[]):
+            result = manageLocalServers.installMinecraftServer(
+                serverSoftware="spigot",
+                serverVersion="1.21",
+                serverName="test-server",
+            )
         self.assertIn("error", result)
 
     def test_returns_error_when_server_already_exists(self):
