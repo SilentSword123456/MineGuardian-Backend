@@ -1,5 +1,4 @@
 import os
-import questionary
 
 import serverSessionsManager
 from utils import downloadFile, createRunScript, getLocalServers
@@ -45,7 +44,7 @@ def installMinecraftServer(serverSoftware=None, serverVersion=None, serverName=N
         except requests.exceptions.RequestException as e:
             return {"error": f"Error fetching version info from {downloadUrl}: {e}"}
     elif serverSoftware == "spigot":
-        questionary.print("Spigot server installation is not yet implemented.", style="fg:red")
+        print("Spigot server installation is not yet implemented.")
         return  {"error": "Spigot server installation is not yet implemented."}
 
 
@@ -56,7 +55,7 @@ def installMinecraftServer(serverSoftware=None, serverVersion=None, serverName=N
     createRunScript(downloadPath)
 
     if not acceptEula:
-        questionary.print(f"You must accept the EULA to run the Minecraft server. Installation aborted. You can always edit the file manually found at {downloadPath}/eula.txt", style="fg:red")
+        print(f"You must accept the EULA to run the Minecraft server. Installation aborted. You can always edit the file manually found at {downloadPath}/eula.txt")
         return {"warning": "EULA not accepted, server installed but not runnable until eula.txt is updated with 'eula=true'"}
 
     addAcceptEula(downloadPath)
