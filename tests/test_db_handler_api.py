@@ -169,6 +169,61 @@ class DbHandlerApiTests(unittest.TestCase):
         response = self.request_json('POST', '/favoriteServers', {'server_id': 'abc'})
         self.assert_bad_request(response)
 
+    def test_create_user_does_not_require_auth(self):
+        """POST /user should succeed without a JWT token."""
+        with patch.object(db_handler.UserRepository, 'createUser', return_value=True):
+            response = self.request_json('POST', '/user', {'username': 'noauth', 'password': 'pw'}, use_auth=False)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()['status'])
+
+    def test_remove_user_requires_auth(self):
+        """DELETE /user without JWT should return 401."""
+        response = self.request_json('DELETE', '/user', {'username': 'test'}, use_auth=False)
+        self.assertEqual(response.status_code, 401)
+
+    def test_get_favorite_servers_requires_auth(self):
+        """GET /favoriteServers without JWT should return 401."""
+        response = self.client.get('/favoriteServers')
+        self.assertEqual(response.status_code, 401)
+
+    def test_add_player_missing_name_is_rejected(self):
+        """POST /player without 'name' should return 400."""
+        response = self.request_json('POST', '/player', {'uuid': 'some-uuid'})
+        self.assert_bad_request(response)
+
+    def test_add_player_missing_uuid_is_rejected(self):
+        """POST /player without 'uuid' should return 400."""
+        response = self.request_json('POST', '/player', {'name': 'Steve'})
+        self.assert_bad_request(response)
+
+    def test_get_player_privileges_missing_uuid_is_rejected(self):
+        """GET /playerPrivilege without 'player_uuid' should return 400."""
+        response = self.request_json('GET', '/playerPrivilege', {})
+        self.assert_bad_request(response)
+
+    def test_add_setting_missing_rule_is_rejected(self):
+        """POST /setting without 'rule' should return 400."""
+        response = self.request_json('POST', '/setting', {'approved': True})
+        self.assert_bad_request(response)
+
+    def test_remove_setting_missing_rule_is_rejected(self):
+        """DELETE /setting without 'rule' should return 400."""
+        response = self.request_json('DELETE', '/setting', {})
+        self.assert_bad_request(response)
+
+    def test_change_setting_with_approved_true(self):
+        """PATCH /setting with approved=True should pass approved=True to changeSetting."""
+        with patch.object(db_handler.SettingsRepository, 'changeSetting', return_value=True) as change_setting:
+            response = self.request_json('PATCH', '/setting', {'rule': 0, 'approved': True})
+
+        self.assertEqual(response.status_code, 200)
+        change_setting.assert_called_once_with(1, 0, True)
+
+    def test_remove_favorite_server_returns_400_on_invalid_id(self):
+        """DELETE /favoriteServers with non-integer server_id should return 400."""
+        response = self.request_json('DELETE', '/favoriteServers', {'server_id': 'not-a-number'})
+        self.assert_bad_request(response)
+
 
 if __name__ == '__main__':
     unittest.main()
