@@ -262,7 +262,7 @@ class ServersUsersPermsRepository():
             return False
         if not ServersRepository.doseServerExist(serverId):
             return False
-        if ServersRepository.getServerOwner(serverId) != userId or ServersPermissions.AddPermissionToServer.value not in ServersUsersPermsRepository.getPerms(userId, serverId):
+        if ServersRepository.getServerOwner(serverId) != userId and not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.AddPermissionToServer.value):
             return False
         if permId not in ServersPermissions:
             return False
@@ -293,7 +293,7 @@ class ServersUsersPermsRepository():
             return False
         if not ServersRepository.doseServerExist(serverId):
             return False
-        if ServersRepository.getServerOwner(serverId) != userId or ServersPermissions.RemovePermissionFromServer.value not in ServersUsersPermsRepository.getPerms(userId, serverId):
+        if ServersRepository.getServerOwner(serverId) != userId and not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.RemovePermissionFromServer.value):
             return False
 
         perm = db.session.query(ServersUsersPerms).filter(ServersUsersPerms.user_id == targetUserId, ServersUsersPerms.server_id == serverId, ServersUsersPerms.perm_id == permId).first()
@@ -302,3 +302,20 @@ class ServersUsersPermsRepository():
         db.session.delete(perm)
         db.session.commit()
         return True
+
+    @staticmethod
+    def doseUserHavePerm(userId: int, serverId: int, permId: int) -> bool:
+        if not UserRepository.doseUserExist(userId):
+            return False
+        if not ServersRepository.doseServerExist(serverId):
+            return False
+
+        perms = ServersUsersPermsRepository.getPerms(userId, serverId)
+        if not perms:
+            return False
+
+        for perm in perms:
+            if perm == permId:
+                return True
+
+        return False
