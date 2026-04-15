@@ -2,7 +2,8 @@ name: Test and Deploy
 on:
   push:
     branches:
-      - master, Development
+      - master
+      - Development
 jobs:
   test:
     runs-on: ubuntu-latest
