@@ -5,12 +5,17 @@ on:
     types: [completed]
     branches: [master]
 
+permissions:
+  contents: read
+  actions: read
+  packages: write
+
 jobs:
   check-workflows:
     runs-on: ubuntu-latest
     if: github.event.workflow_run.conclusion == 'success'
     outputs:
-      all-passed: ${{ steps.check.outputs.all_passed }}
+      all_passed: ${{ steps.check.outputs.all_passed }}
     steps:
       - name: Check all required workflows passed
         id: check
@@ -40,7 +45,7 @@ jobs:
 
   push-image:
     needs: check-workflows
-    if: needs.check-workflows.outputs.all-passed == 'true'
+    if: needs.check-workflows.outputs.all_passed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
