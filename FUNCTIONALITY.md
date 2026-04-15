@@ -675,15 +675,15 @@ Module-level globals:
 ## 8. services/auth.py — Authentication API
 
 ### `POST /login`
-- **Purpose:** Authenticate a user and return a JWT access token.
+- **Purpose:** Authenticate a user and set a JWT access token cookie.
 - **Request body:** `{ "user_id": "<username>", "password": "<plaintext>" }`
 - **Responses:**
   | Status | Condition | Body |
   |--------|-----------|------|
-  | 200 | Credentials valid | `{ "access_token": "<JWT>" }` |
+  | 200 | Credentials valid | Empty response body; JWT is sent in a `Set-Cookie` header as `accessToken` |
   | 400 | Missing `user_id` or `password` | `{ "message": "Missing user_id or password" }` |
   | 401 | Invalid credentials | `{ "message": "Invalid credentials" }` |
-- **Extras:** Uses `UserRepository.verify` for credential check; uses `UserRepository.getUserId` to embed the user's numeric ID in the JWT identity claim.
+- **Extras:** Uses `UserRepository.verify` for credential check; uses `UserRepository.getUserId` to embed the user's numeric ID in the JWT identity claim; cookie attributes are `HttpOnly`, `SameSite=Lax`, `Secure=False` (development default).
 
 ---
 
