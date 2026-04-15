@@ -1,6 +1,6 @@
 DOCS = {
     'list_servers': {
-        'summary': 'List all discovered servers',
+        'summary': 'List all discovered servers TESTTESTEST',
         'description': 'Returns all configured local Minecraft servers.',
         'responses': {
             200: 'List of available servers returned successfully.'
