@@ -4,12 +4,15 @@ This document describes the intended behaviour of every module, class, and funct
 in the codebase: its inputs, outputs, and any special edge cases the implementation
 must honour.  Tests should be written (or verified) against this specification.
 
+> **📖 Wiki version:** This specification is also available as a structured wiki with
+> separate pages per module. See the [wiki/](wiki/Home.md) for easier navigation.
+
 ---
 
 ## Table of Contents
 
-1. [Database/perms.py — Permission Enums](#1-databasepermspy--permission-enums)
-2. [Database/repositories.py — Repository Layer](#2-databaserepositoriespy--repository-layer)
+1. [Database/perms.py — Permission Enums](#1-databasepermspy--permission-enums) · [wiki](wiki/Permission-Enums.md)
+2. [Database/repositories.py — Repository Layer](#2-databaserepositoriespy--repository-layer) · [wiki](wiki/Repository-Layer.md)
    - [UserRepository](#userrepository)
    - [FavoriteServersRepository](#favoriteserversrepository)
    - [PlayerRepository](#playerrepository)
@@ -17,15 +20,15 @@ must honour.  Tests should be written (or verified) against this specification.
    - [SettingsRepository](#settingsrepository)
    - [ServersRepository](#serversrepository)
    - [ServersUsersPermsRepository](#serversuserspermsrepository)
-3. [rcon.py — RCON Client](#3-rconpy--rcon-client)
+3. [rcon.py — RCON Client](#3-rconpy--rcon-client) · [wiki](wiki/RCON-Client.md)
    - [RconClient](#rconclient)
-4. [utils.py — Utility Functions](#4-utilspy--utility-functions)
-5. [serverSessionsManager.py — ServerSession](#5-serversessionsmanagerpy--serversession)
-6. [manageLocalServers.py — Server Installation](#6-managelocalserverspy--server-installation)
-7. [services/server_services.py — Server Service Helpers](#7-servicesserver_servicespy--server-service-helpers)
-8. [services/auth.py — Authentication API](#8-servicesauthpy--authentication-api)
-9. [services/dbHandler.py — Database Handler API](#9-servicesdbhandlerpy--database-handler-api)
-10. [services/servers.py — Server Management API](#10-servicesserverspy--server-management-api)
+4. [utils.py — Utility Functions](#4-utilspy--utility-functions) · [wiki](wiki/Utility-Functions.md)
+5. [serverSessionsManager.py — ServerSession](#5-serversessionsmanagerpy--serversession) · [wiki](wiki/Server-Session-Manager.md)
+6. [manageLocalServers.py — Server Installation](#6-managelocalserverspy--server-installation) · [wiki](wiki/Server-Installation.md)
+7. [services/server_services.py — Server Service Helpers](#7-servicesserver_servicespy--server-service-helpers) · [wiki](wiki/Server-Service-Helpers.md)
+8. [services/auth.py — Authentication API](#8-servicesauthpy--authentication-api) · [wiki](wiki/Authentication-API.md)
+9. [services/dbHandler.py — Database Handler API](#9-servicesdbhandlerpy--database-handler-api) · [wiki](wiki/Database-Handler-API.md)
+10. [services/servers.py — Server Management API](#10-servicesserverspy--server-management-api) · [wiki](wiki/Server-Management-API.md)
 
 ---
 
