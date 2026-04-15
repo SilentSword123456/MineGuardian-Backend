@@ -27,7 +27,7 @@ app.security_schemes = {
         'bearerFormat': 'JWT',
     }
 }
-CORS(app)
+CORS(app, supports_credentials=True)
 socketio = SocketIO(
     app,
     cors_allowed_origins=app.config["SOCKETIO_CORS_ALLOWED_ORIGINS"],
