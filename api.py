@@ -45,7 +45,7 @@ generateDB(app)
 @app.route('/')
 def homeRoute():
     return jsonify({
-        'status': '---------WORKING123',
+        'status': 'Test4',
     })
 
 def register_socketio_listener(serverName, serverInstance):
