@@ -1,4 +1,5 @@
 /servers
+config.json
 /instance/mineguardian.db
 __pycache__/
 *.pyc
