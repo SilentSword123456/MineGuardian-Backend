@@ -102,8 +102,8 @@ class LoginRequestSchema(Schema):
 
 
 class LoginOutputSchema(Schema):
-    access_token = String()
-    message = String()
+    # Login success returns token via Set-Cookie, not JSON fields.
+    pass
 
 
 class ServerIdRequestSchema(Schema):
