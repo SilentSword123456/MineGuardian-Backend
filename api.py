@@ -42,12 +42,6 @@ db.init_app(app)
 
 generateDB(app)
 
-@app.route('/')
-def homeRoute():
-    return jsonify({
-        'status': 'Test4',
-    })
-
 def register_socketio_listener(serverName, serverInstance):
     """Ensures a SocketIO broadcast listener is registered for the server instance."""
     if not hasattr(serverInstance, '_socketio_listener_added'):
