@@ -47,8 +47,9 @@ class ServerRoutesTests(unittest.TestCase):
             response = self.client.post('/login', json={'user_id': 'test-user', 'password': 'test'})
 
         self.assertEqual(response.status_code, 200)
-        token = response.get_json()['access_token']
-        return {'Authorization': f'Bearer {token}'}
+        # JWT is stored in cookies (JWT_TOKEN_LOCATION=["cookies"] in api.py).
+        # The Flask test client persists cookies automatically across requests.
+        return {}
 
     def _workflow_server_root(self):
         return Path(__file__).resolve().parent.parent / 'servers' / self._workflow_server_name
@@ -235,8 +236,8 @@ class ServerRoutesTests(unittest.TestCase):
                 'password': self._workflow_password,
             })
             self.assertEqual(login_response.status_code, 200)
-            token = login_response.get_json()['access_token']
-            headers = {'Authorization': f'Bearer {token}'}
+            # JWT is stored in cookies; the test client persists them automatically.
+            headers = {}
             self._workflow_headers = headers
 
             with patch.object(servers_module.manageLocalServers, 'installMinecraftServer', side_effect=lambda *args, **kwargs: self._create_workflow_server_folder() or True) as install_server:
@@ -263,6 +264,14 @@ class ServerRoutesTests(unittest.TestCase):
                         workflow_server_id,
                         workflow_user_id,
                         ServersPermissions.RemovePermissionFromServer.value,
+                    )
+                )
+                self.assertTrue(
+                    ServersUsersPermsRepository.addPerm(
+                        workflow_user_id,
+                        workflow_server_id,
+                        workflow_user_id,
+                        ServersPermissions.GetServerInfo.value,
                     )
                 )
 

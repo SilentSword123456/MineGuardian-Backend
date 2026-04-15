@@ -11,21 +11,21 @@ class DbHandlerApiTests(unittest.TestCase):
         self.client = app.test_client()
         with patch.object(db_handler.UserRepository, 'verify', return_value=True), \
              patch.object(db_handler.UserRepository, 'getUserId', return_value=1):
-            login_response = self.request_json(
-                'POST',
+            login_response = self.client.open(
                 '/login',
-                {'user_id': 'test', 'password': 'test'},
-                use_auth=False,
+                method='POST',
+                data=json.dumps({'user_id': 'test', 'password': 'test'}),
+                content_type='application/json',
             )
 
         self.assertEqual(login_response.status_code, 200)
-        self.jwt_token = login_response.get_json()['access_token']
-        self.auth_headers = {'Authorization': f'Bearer {self.jwt_token}'}
+        # JWT is stored in cookies (JWT_TOKEN_LOCATION=["cookies"] in api.py).
+        # The Flask test client persists cookies automatically across requests.
 
     def request_json(self, method, path, payload=None, use_auth=True):
         data = None if payload is None else json.dumps(payload)
-        headers = self.auth_headers if use_auth else None
-        return self.client.open(path, method=method, data=data, headers=headers, content_type='application/json')
+        client = self.client if use_auth else app.test_client()
+        return client.open(path, method=method, data=data, content_type='application/json')
 
     def assert_bad_request(self, response):
         self.assertEqual(response.status_code, 400)
@@ -183,7 +183,7 @@ class DbHandlerApiTests(unittest.TestCase):
 
     def test_get_favorite_servers_requires_auth(self):
         """GET /favoriteServers without JWT should return 401."""
-        response = self.client.get('/favoriteServers')
+        response = app.test_client().get('/favoriteServers')
         self.assertEqual(response.status_code, 401)
 
     def test_add_player_missing_name_is_rejected(self):

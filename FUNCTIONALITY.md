@@ -689,7 +689,17 @@ Module-level globals:
 
 ## 9. services/dbHandler.py — Database Handler API
 
-All protected endpoints require a valid JWT (`Authorization: Bearer <token>`).
+All protected endpoints require a valid JWT stored in the `accessToken` cookie.
+The application is configured with `JWT_TOKEN_LOCATION = ["cookies"]` and
+`JWT_ACCESS_COOKIE_NAME = "accessToken"`, so clients must call `POST /login`
+first and include the resulting cookie on subsequent requests.  CSRF protection
+for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
+
+> **Testing note:** The Flask test client automatically persists cookies across
+> requests.  Tests authenticate by calling `POST /login` once (with patched
+> repositories) and then issue further requests without explicit headers — the
+> `accessToken` cookie is sent automatically.  To simulate an unauthenticated
+> request in tests, use a fresh `app.test_client()` that has no stored cookies.
 
 ### `POST /user`
 - **Purpose:** Create a new user account.

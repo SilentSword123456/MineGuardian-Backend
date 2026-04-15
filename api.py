@@ -21,6 +21,8 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mineguardian.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config["JWT_SECRET_KEY"] = getConfig()['jwtSecretKey']
 app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
+app.config["JWT_ACCESS_COOKIE_NAME"] = "accessToken"
+app.config["JWT_COOKIE_CSRF_PROTECT"] = False
 app.config["JWT_COOKIE_SECURE"] = os.environ.get('FLASK_ENV', 'production') != 'development'
 app.config["JWT_COOKIE_SAMESITE"] = "Lax"
 app.security_schemes = {
