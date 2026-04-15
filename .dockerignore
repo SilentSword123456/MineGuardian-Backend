@@ -1,0 +1,16 @@
+.git
+.github
+.gitignore
+.idea
+__pycache__
+*.pyc
+*.pyo
+servers
+instance
+*.db
+.dockerignore
+Dockerfile
+README.md
+FUNCTIONALITY.md
+*.iml
+tests
