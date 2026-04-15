@@ -43,7 +43,7 @@ db.init_app(app)
 generateDB(app)
 
 @app.route('/')
-def home():
+def homeRoute():
     return jsonify({
         'status': 'WORKING',
     })
