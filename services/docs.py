@@ -101,9 +101,9 @@ DOCS = {
     },
     'login': {
         'summary': 'Authenticate a user',
-        'description': 'Validates a `user_id` and password pair and returns a JWT access token on success.',
+        'description': 'Validates a `user_id` and password pair and sets the JWT access token in an `accessToken` HttpOnly cookie on success.',
         'responses': {
-            200: 'Access token returned successfully.',
+            200: 'Authentication successful. JWT is returned in `Set-Cookie: accessToken=...`.',
             400: 'Missing `user_id` or password.',
             401: 'Invalid credentials.'
         }
