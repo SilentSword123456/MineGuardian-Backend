@@ -4,9 +4,10 @@ from marshmallow.fields import Boolean, Float, Integer, List, Nested, String
 
 class ServerListItemSchema(Schema):
     name = String(required=True)
-    id = Integer(required=True)
+    server_id = Integer(required=True)
     isRunning = Boolean(required=True)
     max_memory_mb = Integer(required=True)
+    online_players = Nested(lambda: GeneralOnlinePlayersOutputSchema(), required=True)
 
 
 class ListServersOutputSchema(Schema):
@@ -14,12 +15,12 @@ class ListServersOutputSchema(Schema):
 
 
 class GeneralServerInfoOutputSchema(Schema):
-    name = String(required=True)
+    server_id = Integer(required=True)
     is_running = Boolean(required=True)
     pid = Integer(required=True)
     uptime_seconds = Float(required=True)
     max_memory_mb = Integer(required=True)
-    online_players = Nested(lambda: GeneralOnlinePlayersOutputSchema(), required=True)
+    max_players = Integer(required=True)
 
 
 class GeneralOnlinePlayersOutputSchema(Schema):
