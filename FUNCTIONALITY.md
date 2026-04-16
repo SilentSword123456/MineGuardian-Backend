@@ -683,7 +683,7 @@ Module-level globals:
   | 200 | Credentials valid | Empty response body; JWT is sent in a `Set-Cookie` header as `accessToken` |
   | 400 | Missing `user_id` or `password` | `{ "message": "Missing user_id or password" }` |
   | 401 | Invalid credentials | `{ "message": "Invalid credentials" }` |
-- **Extras:** Uses `UserRepository.verify` for credential check; uses `UserRepository.getUserId` to embed the user's numeric ID in the JWT identity claim; cookie attributes are `HttpOnly`, `SameSite=Lax`. The `Secure` flag is **`True`** by default (production mode, requires HTTPS). Set the environment variable `FLASK_ENV=development` (e.g. in a local `.env` file) to disable `Secure` so cookies work over plain HTTP during local development.
+- **Extras:** Uses `UserRepository.verify` for credential check; uses `UserRepository.getUserId` to embed the user's numeric ID in the JWT identity claim; cookie attributes are `HttpOnly` and use `SameSite=None` when `Secure=True` (default/production), or `SameSite=Lax` when `FLASK_ENV=development` (`Secure=False`) for local HTTP development.
 
 ---
 
