@@ -266,13 +266,16 @@ def createRunScript(path) -> str | None:
     return command
 
 
-def runMinecraftServer(serverName = None, path = "servers"):
+def runMinecraftServer(serverName=None, path="servers", serverId=None):
     if serverName is None:
         serverName = questionary.select("Select a server to run:", choices=[name for name in os.listdir(path)
         if os.path.isdir(os.path.join(path, name))]).ask()
 
     if serverName not in serverSessionsManager.serverInstances:
-        setupServerInstance(os.path.join(path, serverName), serverName)
+        if serverId is None:
+            print(f"Server ID is required to start '{serverName}'.")
+            return None
+        setupServerInstance(os.path.join(path, serverName), serverName, serverId)
 
     if(serverName in serverSessionsManager.serverInstances):
         server = serverSessionsManager.serverInstances[serverName]
@@ -341,10 +344,7 @@ def getLaunchCommand(path):
     if not path:
         return None
 
-    # Reject relative paths and any traversal attempts (e.g. ../../etc)
     normalized = os.path.normpath(path)
-    if not os.path.isabs(normalized):
-        return None
 
     fileName = ""
     if(os.name == "nt"):  # Windows
@@ -363,13 +363,18 @@ def getLaunchCommand(path):
     else:
         return None
 
-def setupServerInstance(path, serverName):
+def setupServerInstance(path, serverName, serverId):
     launchCommand = getLaunchCommand(path) or createRunScript(path)
     if launchCommand is None:
         print(f"Failed to get/create launch script for server '{serverName}'.")
         return None
 
-    server = serverSessionsManager.ServerSession(serverName, launchCommand, os.path.abspath(path))
+
+    if not serverId:
+        print(f"Failed to resolve server id for '{serverName}'.")
+        return None
+
+    server = serverSessionsManager.ServerSession(serverId, serverName, launchCommand, os.path.abspath(path))
     serverSessionsManager.serverInstances[serverName] = server
     return server
 
