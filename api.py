@@ -67,7 +67,7 @@ db.init_app(app)
 
 generateDB(app)
 
-_SENSITIVE_LOG_FIELDS = {"password", "token", "access_token", "refresh_token", "authorization", "cookie"}
+_SENSITIVE_LOG_FIELDS = {"password", "token", "access_token", "refresh_token", "authorization", "cookie", "secret", "api_key"}
 
 
 def _sanitize_for_log(value):
@@ -86,7 +86,7 @@ def _sanitize_for_log(value):
 
 @app.before_request
 def _log_request_start():
-    g._request_start_time = time.perf_counter()
+    g.request_start_time = time.perf_counter()
     payload = request.get_json(silent=True) if request.is_json else None
     logger.info(
         "HTTP request started method=%s path=%s endpoint=%s args=%s payload=%s",
@@ -100,15 +100,15 @@ def _log_request_start():
 
 @app.after_request
 def _log_request_end(response):
-    started_at = getattr(g, "_request_start_time", None)
-    duration_ms = ((time.perf_counter() - started_at) * 1000) if started_at else None
+    started_at = getattr(g, "request_start_time", None)
+    duration_ms = f"{((time.perf_counter() - started_at) * 1000):.2f}" if started_at else "unknown"
     logger.info(
-        "HTTP request completed method=%s path=%s endpoint=%s status=%s duration_ms=%.2f",
+        "HTTP request completed method=%s path=%s endpoint=%s status=%s duration_ms=%s",
         request.method,
         request.path,
         request.endpoint,
         response.status_code,
-        duration_ms if duration_ms is not None else -1.0,
+        duration_ms,
     )
     return response
 
@@ -135,7 +135,7 @@ def register_socketio_listener(serverName, serverInstance):
         print(f"SocketIO listeners already registered for server '{serverName}'")
 
 
-def praseSocketServerId(value):
+def parseSocketServerId(value):
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -153,7 +153,7 @@ def home():
 def handle_connect(auth=None):
     logger.info("SocketIO connect received args=%s", _sanitize_for_log(request.args.to_dict(flat=True)))
     userId = int(get_jwt_identity())
-    serverId = praseSocketServerId(request.args.get('serverId'))
+    serverId = parseSocketServerId(request.args.get('serverId'))
     if serverId is None:
         logger.warning("SocketIO connect rejected due to invalid serverId")
         emit('error', {'data': 'Invalid serverId'})
@@ -165,7 +165,7 @@ def handle_connect(auth=None):
 
     if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.ViewServer.value):
         logger.warning("SocketIO connect rejected permissions user_id=%s server_id=%s", userId, serverId)
-        abort(401, message='You dont have the permission to do that')
+        abort(401, message="You don't have permission to access this server")
 
     serverName = ServersRepository.getServerName(serverId)
     if not serverName:
@@ -199,8 +199,6 @@ def handle_connect(auth=None):
 
     except Exception as e:
         logger.exception("SocketIO connect failed server_name=%s error=%s", serverName, e)
-        import traceback
-        traceback.print_exc()
         emit('error', {'data': f"Connection error: {str(e)}"})
         return False
 
@@ -209,7 +207,7 @@ def handle_connect(auth=None):
 @socketio.on('disconnect')
 def handle_disconnect():
     logger.info("SocketIO disconnect received args=%s", _sanitize_for_log(request.args.to_dict(flat=True)))
-    serverId = praseSocketServerId(request.args.get('serverId'))
+    serverId = parseSocketServerId(request.args.get('serverId'))
     if serverId is None:
         return
 
@@ -228,7 +226,7 @@ def handle_disconnect():
 def handleSystemMessage(data):
     logger.info("SocketIO system event received payload=%s args=%s", _sanitize_for_log(data), _sanitize_for_log(request.args.to_dict(flat=True)))
     userId = int(get_jwt_identity())
-    serverId = praseSocketServerId(request.args.get('serverId'))
+    serverId = parseSocketServerId(request.args.get('serverId'))
     if serverId is None:
         emit('error', {'data': 'Invalid serverId'})
         return
@@ -237,7 +235,7 @@ def handleSystemMessage(data):
         abort(404, message='Server not found')
 
     if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.ViewServer.value):
-        abort(401, message='You dont have the permission to do that')
+        abort(401, message="You don't have permission to access this server")
 
     serverName = ServersRepository.getServerName(serverId)
     logger.info("SocketIO system event processed server_name=%s", serverName)
@@ -248,7 +246,7 @@ def handleSystemMessage(data):
 def handleConsole(data):
     logger.info("SocketIO console event received payload=%s args=%s", _sanitize_for_log(data), _sanitize_for_log(request.args.to_dict(flat=True)))
     userId = int(get_jwt_identity())
-    serverId = praseSocketServerId(request.args.get('serverId'))
+    serverId = parseSocketServerId(request.args.get('serverId'))
     if serverId is None:
         emit('error', {'data': 'Invalid serverId'})
         return
@@ -257,7 +255,7 @@ def handleConsole(data):
         abort(404, message='Server not found')
 
     if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.ViewServer.value):
-        abort(401, message='You dont have the permission to do that')
+        abort(401, message="You don't have permission to access this server")
 
     serverName = ServersRepository.getServerName(serverId)
     if not serverName:
