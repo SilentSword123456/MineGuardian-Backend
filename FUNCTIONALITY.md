@@ -52,6 +52,7 @@ Defines integer-valued enumerations used as permission IDs throughout the system
 | GetServerInfo             | 3     |
 | StartServer               | 4     |
 | StopServer                | 5     |
+| ViewServer                | 6     |
 
 ---
 
@@ -232,7 +233,7 @@ They are pure database operations with no side effects outside the database.
   - No server with `currentServerName` owned by the user exists.
   - A server with `newServerName` already exists under the same user.
 
-#### `doseServerExist(serverId: int) -> bool`
+#### `doesServerExist(serverId: int) -> bool`
 - **Purpose:** Check whether a server with the given primary-key ID exists.
 - **Input:** `serverId` (int).
 - **Output:** `True` if found; `False` otherwise.
@@ -248,6 +249,12 @@ They are pure database operations with no side effects outside the database.
 - **Output:** The server's integer ID if found; `0` if:
   - The user does not exist.
   - No server with that name owned by the user exists.
+
+#### `getServerName(serverId: int) -> str`
+- **Purpose:** Look up a server name by numeric server ID.
+- **Input:** `serverId` (int).
+- **Output:** Server name if found; `''` if missing.
+
 
 ---
 
@@ -285,6 +292,12 @@ They are pure database operations with no side effects outside the database.
   - Returns `False` if the user does not exist.
   - Returns `False` if the server does not exist.
   - Returns `False` if `getPerms` returns an empty list.
+
+#### `getServersWithUserPerm(userId: int, permId: int) -> list[int]`
+- **Purpose:** Return all server IDs where the user holds a specific permission.
+- **Input:** `userId` (int); `permId` (int, must be valid `ServersPermissions`).
+- **Output:** List of server IDs (possibly empty).
+- **Behaviour:** Returns `[]` for missing users, invalid permission IDs, or no matches.
 
 ---
 
@@ -503,10 +516,11 @@ Module-level globals:
 
 ### ServerSession
 
-#### `__init__(name, command, working_dir=None)`
+#### `__init__(id, name, command, working_dir=None)`
 - **Purpose:** Initialise a server session and reserve TCP ports.
-- **Inputs:** `name` (str); `command` (str or list); `working_dir` (str, path to the server folder).
+- **Inputs:** `id` (int); `name` (str); `command` (str or list); `working_dir` (str, path to the server folder).
 - **Behaviour:**
+  - Raises `KeyError` if `ServersRepository.doesServerExist(id)` is `False`.
   - If `command` is a `str`, splits it into a list via `str.split()`.
   - Calls `getNewPort` and `assignNewPort` to reserve a server port (`self.port`) and an RCON port (`self.rcon_port`).
   - Initial state: `_running = False`, `process = None`, `listeners = []`, `status_listeners = []`, `log_history = []`, `max_history = 100`.
@@ -575,7 +589,7 @@ Module-level globals:
 #### `get_process_info() -> dict`
 - **Purpose:** Return a snapshot of the server's current state.
 - **Output:** Dict with keys:
-  - `server_id` (str) — the server name.
+  - `server_id` (int) — database server ID.
   - `is_running` (bool).
   - `pid` (int) — `0` when not running.
   - `uptime_seconds` (float) — `0.0` when not running.
@@ -646,29 +660,26 @@ Module-level globals:
 
 ## 7. services/server_services.py — Server Service Helpers
 
-#### `get_all_servers() -> list[dict]`
-- **Purpose:** Return a list of all locally installed servers with their metadata.
-- **Output:** A list of dicts, one per directory found in `servers/`. Each dict contains:
-  - `server_id` (str) — directory name.
-  - `id` (int) — sequential 1-based index.
-  - `isRunning` (bool) — whether a running `ServerSession` exists for this server.
-  - `max_memory_mb` (int) — from `getMaxMemoryMB`.
-  - `online_players` (dict) — `{"max": <int>}`.
+#### `getAllServers(userId: int) -> list[int]`
+- **Purpose:** Return server IDs visible to a user.
+- **Input:** `userId` (int).
+- **Output:** List of server IDs where the user has `ViewServer` permission.
 
-#### `get_server_instance(serverName: str) -> ServerSession`
+#### `get_server_instance(serverId: int) -> ServerSession`
 - **Purpose:** Retrieve (or create) the `ServerSession` for a server, ready to start.
-- **Input:** `serverName` (str).
+- **Input:** `serverId` (int).
 - **Output:** A `ServerSession` instance.
 - **Raises `ValueError`** if the server is already running (i.e. a session exists and `is_running()` is `True`).
 - **Behaviour:**
+  - Resolves `serverName` from `ServersRepository.getServerName(serverId)`.
   - Returns the existing session if it exists but is not running.
-  - Calls `utils.setupServerInstance` to create a new session if none exists.
+  - Calls `utils.setupServerInstance(path, serverName, serverId)` to create a new session if none exists.
 
-#### `stop_server(serverName: str)`
+#### `stop_server(serverId: int)`
 - **Purpose:** Stop a running server.
-- **Input:** `serverName` (str).
+- **Input:** `serverId` (int).
 - **Output:** `None` (delegates to `ServerSession.stop()`).
-- **Raises `ValueError`** if no session exists for `serverName`.
+- **Raises `ValueError`** if no session exists for the resolved server name.
 
 ---
 
@@ -786,35 +797,36 @@ for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
 ## 10. services/servers.py — Server Management API
 
 ### `GET /servers`
-- **Auth required:** No.
-- **Purpose:** List all installed servers.
-- **Response:** `200 { "servers": [{ "server_id", "id", "isRunning", "max_memory_mb", "online_players" }, ...] }`.
+- **Auth required:** Yes (JWT cookie).
+- **Purpose:** List servers visible to the authenticated user (`ViewServer` permission).
+- **Response:** `200 { "servers": [{ "name", "server_id", "isRunning", "max_memory_mb", "online_players" }, ...] }`.
 
-### `GET /servers/<serverName>`
-- **Auth required:** Optional JWT.
+### `GET /servers/<serverId>`
+- **Auth required:** Yes.
 - **Purpose:** Return live or cached info about a specific server.
 - **Responses:**
   | Status | Condition | Body |
   |--------|-----------|------|
-  | 200 | Found | `{ "name", "is_running", "pid", "uptime_seconds", "max_memory_mb", "online_players" }` |
-  | 403 | JWT present and user lacks `GetServerInfo` permission | — |
-  | 404 | Server name not found | — |
+  | 200 | Found | `{ "server_id", "is_running", "pid", "uptime_seconds", "max_memory_mb", "max_players" }` |
+  | 403 | User lacks `GetServerInfo` permission | — |
+  | 404 | Server id not found | — |
 - **Extras:** If the server has a running `ServerSession`, values come from `serverInstance.get_process_info()`; otherwise defaults are used.
 
-### `POST /servers/<serverName>/start`
-- **Auth required:** No (TODO: should require StartServer perm).
-- **Responses:** `200 { "message": "..." }` | `400` if server is already running (`ValueError`).
+### `POST /servers/<serverId>/start`
+- **Auth required:** Yes.
+- **Responses:** `200 { "message": "..." }` | `400` if server is already running (`ValueError`) | `403` without `StartServer` permission | `404` if server id missing.
 
-### `POST /servers/<serverName>/stop`
-- **Auth required:** No (TODO: should require StopServer perm).
-- **Responses:** `200 { "message": "..." }` | `400` if no instance exists (`ValueError`).
+### `POST /servers/<serverId>/stop`
+- **Auth required:** Yes.
+- **Responses:** `200 { "message": "..." }` | `400` if no instance exists (`ValueError`) | `403` without `StopServer` permission | `404` if server id missing.
 
-### `GET /servers/<serverName>/stats`
-- **Auth required:** No.
+### `GET /servers/<serverId>/stats`
+- **Auth required:** Yes.
 - **Responses:**
   | Status | Condition |
   |--------|-----------|
   | 200 | Server is running; stats returned |
+  | 403 | User lacks `GetServerInfo` permission |
   | 404 | Server not found or not running |
   | 500 | Internal error collecting stats |
 
@@ -832,7 +844,7 @@ for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
 
 ### `DELETE /servers/<serverName>/uninstall`
 - **Auth required:** Yes.
-- **Responses:** `200 { "status": true, "message": "..." }` | `400` on install error | `404` on DB removal failure.
+- **Responses:** `200 { "status": true, "message": "..." }` | `false` return (short-circuit) when user lacks `RemovePermissionFromServer` | `400` on install error | `404` on DB removal failure.
 - **Extras:** Only the server owner (or a user with `RemovePermissionFromServer`) can uninstall.
 
 ### `GET /manage/<software>/getAvailableVersions`
@@ -840,6 +852,6 @@ for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
 - **Response:** `200 { "versions": ["latest", ...] }` | `400 { "message": "<error>" }`.
 
 ### `GET /servers/globalStats`
-- **Auth required:** No.
-- **Response:** `200` — aggregated stats dict (see `getGlobalStats`).
+- **Auth required:** Yes.
+- **Response:** `200` — aggregated stats dict for running sessions visible to the current user (`ViewServer`).
 - **Extras:** Returns `500` on unexpected exception.
