@@ -1,3 +1,5 @@
+import os
+
 from flask import request
 from apiflask import APIBlueprint, abort
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -6,7 +8,7 @@ import manageLocalServers
 import serverSessionsManager
 import utils
 import api
-from services.server_services import get_all_servers, get_server_instance, stop_server
+from services.server_services import getAllServers, get_server_instance, stop_server
 from services.docs import DOCS
 from services.schemas import (
     AddServerOutputSchema,
@@ -23,68 +25,79 @@ from Database.perms import ServersPermissions
 
 servers_bp = APIBlueprint('servers', __name__)
 
+
+def _parse_server_id(serverId):
+    try:
+        return int(serverId)
+    except (TypeError, ValueError):
+        abort(400, message='Invalid serverId')
+
 @servers_bp.route('/servers', methods=['GET'])
 @servers_bp.doc(**DOCS['list_servers'])
 @servers_bp.output(ListServersOutputSchema)
+@jwt_required()
 def list_servers():
-    return {'servers': get_all_servers()}, 200
+    userId = int(get_jwt_identity())
+    serversIds = getAllServers(userId)
+    servers = []
+    for serverId in serversIds:
+        serverName = ServersRepository.getServerName(serverId)
+        servers.append({
+            'name': serverName,
+            'server_id': serverId,
+            'isRunning': (
+                serverSessionsManager.serverInstances[serverName].is_running() if serverName in serverSessionsManager.serverInstances else False),
+            'max_memory_mb': utils.getMaxMemoryMB(os.path.join(api.DIR, "servers", serverName)),
+            'online_players': {'max': utils.getMaxPlayers(os.path.join(api.DIR, "servers", serverName))}
+        })
+    return {'servers': servers}, 200
 
-@servers_bp.route('/servers/<serverName>', methods=['GET'])
+@servers_bp.route('/servers/<serverId>', methods=['GET'])
 @servers_bp.doc(**DOCS['get_general_server_info'])
 @servers_bp.output(GeneralServerInfoOutputSchema)
-@jwt_required(optional=True)
-def getGeneralServerInfo(serverName):
-     userId = get_jwt_identity()
-     servers = get_all_servers()
+@jwt_required()
+def getGeneralServerInfo(serverId):
+     userId = int(get_jwt_identity())
+     serverId = _parse_server_id(serverId)
+     if not ServersRepository.doesServerExist(serverId):
+         abort(404, message='Server not found')
 
-     match = None
-     for s in servers:
-        if s['server_id'] == serverName:
-            match = s
-            break
+     if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.GetServerInfo.value):
+         abort(403, message='You dont have the permission to do this!')
 
-
-     if not match:
-             abort(404, message='Server not found')
-
-     if userId is not None:
-         userId = int(userId)
-         serverId = ServersRepository.getServerId(userId, serverName)
-         if serverId and not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.GetServerInfo.value):
-             abort(403, message='You dont have the permission to do this!')
-
+     serverName = ServersRepository.getServerName(serverId)
      serverInstance = serverSessionsManager.serverInstances.get(serverName)
      if serverInstance:
          info = serverInstance.get_process_info()
      else:
          info = {
-             'server_id': match['server_id'],
+             'server_id': serverId,
              'is_running': False,
              'pid': 0,
              'uptime_seconds': 0.0,
-             'max_memory_mb': match['max_memory_mb'],
-             'max_players': match.get('online_players', {}).get('max', 20),
+             'max_memory_mb': utils.getMaxMemoryMB(os.path.join(api.DIR, "servers", serverName)),
+             'max_players': utils.getMaxPlayers(os.path.join(api.DIR, "servers", serverName)),
          }
 
-     return {
-         'name': info.get('server_id', match['server_id']),
-         'is_running': info.get('is_running', False),
-         'pid': info.get('pid', 0),
-         'uptime_seconds': info.get('uptime_seconds', 0.0),
-         'max_memory_mb': info.get('max_memory_mb', match['max_memory_mb']),
-         'online_players': {'max': info.get('max_players', match.get('online_players', {}).get('max', 20))},
-     }, 200
+     return info, 200
 
 
 
-@servers_bp.route('/servers/<serverName>/start', methods=['POST'])
+@servers_bp.route('/servers/<serverId>/start', methods=['POST'])
 @servers_bp.doc(**DOCS['start_server'])
 @servers_bp.output(StartServerOutputSchema)
-def start_minecraft_server(serverName):
-    if not serverName:
-        abort(400, message='No serverName provided')
+@jwt_required()
+def start_minecraft_server(serverId):
+    userId = int(get_jwt_identity())
+    serverId = _parse_server_id(serverId)
+    if not ServersRepository.doesServerExist(serverId):
+        abort(404, message='Server not found')
+    if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.StartServer.value):
+        abort(403, message='You dont have the permission to do this!')
+
+    serverName = ServersRepository.getServerName(serverId)
     try:
-        serverInstance = get_server_instance(serverName)
+        serverInstance = get_server_instance(serverId)
         api.register_socketio_listener(serverName, serverInstance)
         serverInstance.start()
         return {'message': f"Server '{serverName}' started successfully"}, 200
@@ -93,24 +106,40 @@ def start_minecraft_server(serverName):
 
 
 
-@servers_bp.route('/servers/<serverName>/stop', methods=['POST'])
+@servers_bp.route('/servers/<serverId>/stop', methods=['POST'])
 @servers_bp.doc(**DOCS['stop_server'])
 @servers_bp.output(StopServerOutputSchema)
-def stop_minecraft_server(serverName):
-    if not serverName:
-        abort(400, message='No serverName provided')
+@jwt_required()
+def stop_minecraft_server(serverId):
+    userId = int(get_jwt_identity())
+    serverId = _parse_server_id(serverId)
+    if not ServersRepository.doesServerExist(serverId):
+        abort(404, message='Server not found')
+    if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.StopServer.value):
+        abort(403, message='You dont have the permission to do this!')
+
+    serverName = ServersRepository.getServerName(serverId)
     try:
-        stop_server(serverName)
+        stop_server(serverId)
         return {'message': f"Server '{serverName}' stopped successfully"}, 200
     except ValueError as e:
         abort(400, message=str(e))
 
 
 
-@servers_bp.route('/servers/<serverName>/stats', methods=['GET'])
+@servers_bp.route('/servers/<serverId>/stats', methods=['GET'])
 @servers_bp.doc(**DOCS['get_server_stats'])
 @servers_bp.output(GetServerStatsOutputSchema)
-def get_server_stats_endpoint(serverName):
+@jwt_required()
+def get_server_stats_endpoint(serverId):
+    userId = int(get_jwt_identity())
+    serverId = _parse_server_id(serverId)
+    if not ServersRepository.doesServerExist(serverId):
+        abort(404, message='Server not found')
+    if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.GetServerInfo.value):
+        abort(403, message='You dont have the permission to do this!')
+
+    serverName = ServersRepository.getServerName(serverId)
     if not serverName:
         abort(400, message='No serverName provided')
 
@@ -190,8 +219,16 @@ def get_available_software(software=""):
 @servers_bp.route('/servers/globalStats', methods=['GET'])
 @servers_bp.doc(**DOCS['get_global_stats'])
 @servers_bp.output(GetServerStatsOutputSchema)
+@jwt_required()
 def global_stats():
+    userId = int(get_jwt_identity())
+    serversIds = getAllServers(userId)
+    usersServers = []
+    for instance in serverSessionsManager.serverInstances.values():
+        if instance.id in serversIds:
+            usersServers.append(instance)
+
     try:
-        return utils.getGlobalStats(), 200
+        return utils.getGlobalStats(usersServers), 200
     except Exception as e:
         abort(500, message=f"Failed to retrieve global stats: {str(e)}")
