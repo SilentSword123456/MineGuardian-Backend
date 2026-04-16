@@ -3,12 +3,16 @@ import serverSessionsManager
 import utils
 from Database.perms import ServersPermissions
 from Database.repositories import ServersUsersPermsRepository, ServersRepository
+from Database.database import db, Servers
 
 DIR = os.path.dirname(os.path.abspath(__file__ + "/.."))
 
 def getAllServers(userId: int):
-    serversIds = ServersUsersPermsRepository.getServersWithUserPerm(userId, ServersPermissions.ViewServer.value)
-    return serversIds
+    granted = ServersUsersPermsRepository.getServersWithUserPerm(userId, ServersPermissions.ViewServer.value)
+    owned = []
+    for server in db.session.query(Servers).filter(Servers.owner_id == userId).all():
+        owned.append(server.id)
+    return list(set(granted) | set(owned))
 
 def get_server_instance(serverId):
     serverName = ServersRepository.getServerName(serverId)

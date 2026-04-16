@@ -353,15 +353,9 @@ class ServersUsersPermsRepository():
         except ValueError:
             return []
 
-        # Owners implicitly hold every permission on their own servers.
-        owned = db.session.query(Servers).filter(Servers.owner_id == userId).all()
-        server_ids = set(s.id for s in owned)
-
-        granted = db.session.query(ServersUsersPerms).filter(
+        rows = db.session.query(ServersUsersPerms).filter(
             ServersUsersPerms.user_id == userId,
             ServersUsersPerms.perm_id == permId,
         ).all()
-        for row in granted:
-            server_ids.add(row.server_id)
 
-        return list(server_ids)
+        return [row.server_id for row in rows]

@@ -515,29 +515,27 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
             ServersUsersPermsRepository.doseUserHavePerm(non_owner_id, server_id, ServersPermissions.ViewServer.value)
         )
 
-    def test_get_servers_with_user_perm_includes_owned_servers(self):
-        """getServersWithUserPerm includes servers owned by the user for every valid permission."""
-        owner_id = self._seed_user('owner-include-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
-        server_a = self._seed_server(owner_id, 'owner-include-a')
-        server_b = self._seed_server(owner_id, 'owner-include-b')
+    def test_get_servers_with_user_perm_does_not_include_owned_servers_without_explicit_row(self):
+        """getServersWithUserPerm only returns servers with an explicit grant row; ownership alone is not enough."""
+        owner_id = self._seed_user('gswup-owner-only', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_a = self._seed_server(owner_id, 'gswup-owned-a')
+        server_b = self._seed_server(owner_id, 'gswup-owned-b')
 
-        for perm in ServersPermissions:
-            result = ServersUsersPermsRepository.getServersWithUserPerm(owner_id, perm.value)
-            self.assertIn(server_a, result, msg=f"Owned server_a missing for perm {perm.name}")
-            self.assertIn(server_b, result, msg=f"Owned server_b missing for perm {perm.name}")
-
-    def test_get_servers_with_user_perm_merges_owned_and_granted(self):
-        """Servers granted via explicit rows are combined with owned servers without duplicates."""
-        owner_id = self._seed_user('owner-merge-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
-        other_owner_id = self._seed_user('owner-merge-other-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
-        owned_server = self._seed_server(owner_id, 'owner-merge-owned')
-        granted_server = self._seed_server(other_owner_id, 'owner-merge-granted')
-
-        self._seed_server_perm(granted_server, owner_id, ServersPermissions.ViewServer.value)
-
+        # No explicit ViewServer row — owned servers must NOT appear.
         result = ServersUsersPermsRepository.getServersWithUserPerm(owner_id, ServersPermissions.ViewServer.value)
-        self.assertIn(owned_server, result)
+        self.assertNotIn(server_a, result)
+        self.assertNotIn(server_b, result)
+
+    def test_get_servers_with_user_perm_returns_only_explicit_grants(self):
+        """When the user has an explicit grant on a server they don't own, only that server is returned."""
+        owner_id = self._seed_user('gswup-other-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        user_id = self._seed_user('gswup-granted-user', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        owned_server = self._seed_server(owner_id, 'gswup-other-owned')
+        granted_server = self._seed_server(owner_id, 'gswup-granted')
+
+        self._seed_server_perm(granted_server, user_id, ServersPermissions.ViewServer.value)
+
+        result = ServersUsersPermsRepository.getServersWithUserPerm(user_id, ServersPermissions.ViewServer.value)
         self.assertIn(granted_server, result)
-        # No duplicates: if both happen to appear, set-length must equal list-length
-        self.assertEqual(len(result), len(set(result)))
+        self.assertNotIn(owned_server, result)
 
