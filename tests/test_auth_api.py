@@ -228,7 +228,7 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(response.headers.get('Access-Control-Allow-Origin'), origin)
         self.assertEqual(response.headers.get('Access-Control-Allow-Credentials'), 'true')
 
-    def test_login_allows_untrusted_origin_temporarily(self):
+    def test_login_allows_any_origin(self):
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
               patch.object(auth.repositories.UserRepository, 'getUserId', return_value=14):
             origin = 'https://example.com'

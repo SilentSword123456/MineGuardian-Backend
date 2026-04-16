@@ -32,6 +32,8 @@ app.security_schemes = {
         'bearerFormat': 'JWT',
     }
 }
+# TEMPORARY: allows requests from any web origin while cross-server access is needed.
+# TODO: revert to a strict allowlist as soon as temporary access is no longer required.
 _ALLOWED_WEB_ORIGINS = "*"
 CORS(app, supports_credentials=True, origins=_ALLOWED_WEB_ORIGINS)
 socketio = SocketIO(
