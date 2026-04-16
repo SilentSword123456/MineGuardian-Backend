@@ -1,7 +1,6 @@
 from flask import jsonify, request
 from apiflask import APIFlask
 import os
-import re
 import time
 import eventlet
 from flask_cors import CORS
@@ -33,10 +32,7 @@ app.security_schemes = {
         'bearerFormat': 'JWT',
     }
 }
-_ALLOWED_WEB_ORIGINS = [
-    "https://frontend.silentlab.work",
-    re.compile(r"^https://[a-zA-Z0-9-]+\.andrei925-dumitru\.workers\.dev$"),
-]
+_ALLOWED_WEB_ORIGINS = "*"
 CORS(app, supports_credentials=True, origins=_ALLOWED_WEB_ORIGINS)
 socketio = SocketIO(
     app,

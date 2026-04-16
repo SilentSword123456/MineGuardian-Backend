@@ -228,18 +228,20 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(response.headers.get('Access-Control-Allow-Origin'), origin)
         self.assertEqual(response.headers.get('Access-Control-Allow-Credentials'), 'true')
 
-    def test_login_rejects_untrusted_origin(self):
+    def test_login_allows_untrusted_origin_temporarily(self):
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
-             patch.object(auth.repositories.UserRepository, 'getUserId', return_value=14):
+              patch.object(auth.repositories.UserRepository, 'getUserId', return_value=14):
+            origin = 'https://example.com'
             response = self.client.post(
                 '/login',
                 data=json.dumps({'user_id': 'testuser', 'password': 'testpass'}),
                 content_type='application/json',
-                headers={'Origin': 'https://example.com'}
+                headers={'Origin': origin}
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertIsNone(response.headers.get('Access-Control-Allow-Origin'))
+        self.assertEqual(response.headers.get('Access-Control-Allow-Origin'), origin)
+        self.assertEqual(response.headers.get('Access-Control-Allow-Credentials'), 'true')
 
 
 
