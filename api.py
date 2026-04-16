@@ -33,8 +33,14 @@ app.security_schemes = {
         'bearerFormat': 'JWT',
     }
 }
-# TEMPORARY: allows requests from any web origin while cross-server access is needed.
-# TODO(backend-team, 2026-04-16, TEMP-OPEN-CORS): revert to a strict allowlist.
+# ORIGINAL allowlist (temporarily disabled):
+# _ALLOWED_WEB_ORIGINS = [
+#     "https://frontend.silentlab.work",
+#     re.compile(r"^https://[a-zA-Z0-9-]+\.andrei925-dumitru\.workers\.dev$"),
+# ]
+#
+# TEMPORARY: allow from everywhere while cross-server access is needed.
+# TODO(backend-team, 2026-04-16, TEMP-OPEN-CORS): restore the allowlist above.
 _ALLOWED_WEB_ORIGINS = re.compile(r".*")
 CORS(app, supports_credentials=True, origins=_ALLOWED_WEB_ORIGINS)
 socketio = SocketIO(
