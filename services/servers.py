@@ -40,9 +40,10 @@ def _parse_server_id(serverId):
 @jwt_required()
 def list_servers():
     userId = int(get_jwt_identity())
-    logger.info("GET /servers requested for user_id=%s", userId)
+    logger.info("GET /servers requested")
+    logger.debug("GET /servers user context user_id=%s", userId)
     serversIds = getAllServers(userId)
-    logger.info("Resolved %s visible servers for user_id=%s", len(serversIds), userId)
+    logger.info("Resolved %s visible servers", len(serversIds))
     servers = []
     for serverId in serversIds:
         serverName = ServersRepository.getServerName(serverId)
@@ -55,7 +56,7 @@ def list_servers():
             'max_memory_mb': utils.getMaxMemoryMB(os.path.join(api.DIR, "servers", serverName)),
             'online_players': {'max': utils.getMaxPlayers(os.path.join(api.DIR, "servers", serverName))}
         })
-    logger.info("Returning /servers payload with %s entries for user_id=%s", len(servers), userId)
+    logger.info("Returning /servers payload with %s entries", len(servers))
     return {'servers': servers}, 200
 
 @servers_bp.route('/servers/<serverId>', methods=['GET'])
