@@ -13,3 +13,4 @@ class ServersPermissions(Enum):
     GetServerInfo = 3
     StartServer = 4
     StopServer = 5
+    ViewServer = 6
