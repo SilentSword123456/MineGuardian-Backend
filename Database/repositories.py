@@ -329,6 +329,10 @@ class ServersUsersPermsRepository():
         if not ServersRepository.doesServerExist(serverId):
             return False
 
+        # Server owners have implicit access to every permission.
+        if ServersRepository.getServerOwner(serverId) == userId:
+            return True
+
         perms = ServersUsersPermsRepository.getPerms(userId, serverId)
         if not perms:
             return False
@@ -349,13 +353,9 @@ class ServersUsersPermsRepository():
         except ValueError:
             return []
 
-        servers = db.session.query(ServersUsersPerms).filter(ServersUsersPerms.user_id == userId, ServersUsersPerms.perm_id == permId).all()
+        rows = db.session.query(ServersUsersPerms).filter(
+            ServersUsersPerms.user_id == userId,
+            ServersUsersPerms.perm_id == permId,
+        ).all()
 
-        if not servers:
-            return []
-
-        serversIds = []
-        for server in servers:
-            serversIds.append(server.server_id)
-
-        return serversIds
+        return [row.server_id for row in rows]

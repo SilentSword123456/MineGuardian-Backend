@@ -487,3 +487,55 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
         )
         self.assertEqual(ServersUsersPermsRepository.getServersWithUserPerm(target_user_id, 999), [])
 
+    # --- Owner-bypass tests ---
+
+    def test_does_user_have_perm_returns_true_for_owner_without_explicit_row(self):
+        """Server owner has implicit access to every permission, even without a DB row."""
+        owner_id = self._seed_user('owner-bypass-user', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_id = self._seed_server(owner_id, 'owner-bypass-server')
+
+        for perm in ServersPermissions:
+            self.assertTrue(
+                ServersUsersPermsRepository.doseUserHavePerm(owner_id, server_id, perm.value),
+                msg=f"Owner should have implicit access to {perm.name}",
+            )
+
+    def test_does_user_have_perm_non_owner_still_requires_explicit_row(self):
+        """A non-owner user must have an explicit permission row."""
+        owner_id = self._seed_user('owner-explicit-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        non_owner_id = self._seed_user('owner-explicit-non-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_id = self._seed_server(owner_id, 'owner-explicit-server')
+
+        self.assertFalse(
+            ServersUsersPermsRepository.doseUserHavePerm(non_owner_id, server_id, ServersPermissions.ViewServer.value)
+        )
+
+        self._seed_server_perm(server_id, non_owner_id, ServersPermissions.ViewServer.value)
+        self.assertTrue(
+            ServersUsersPermsRepository.doseUserHavePerm(non_owner_id, server_id, ServersPermissions.ViewServer.value)
+        )
+
+    def test_get_servers_with_user_perm_does_not_include_owned_servers_without_explicit_row(self):
+        """getServersWithUserPerm only returns servers with an explicit grant row; ownership alone is not enough."""
+        owner_id = self._seed_user('gswup-owner-only', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_a = self._seed_server(owner_id, 'gswup-owned-a')
+        server_b = self._seed_server(owner_id, 'gswup-owned-b')
+
+        # No explicit ViewServer row — owned servers must NOT appear.
+        result = ServersUsersPermsRepository.getServersWithUserPerm(owner_id, ServersPermissions.ViewServer.value)
+        self.assertNotIn(server_a, result)
+        self.assertNotIn(server_b, result)
+
+    def test_get_servers_with_user_perm_returns_only_explicit_grants(self):
+        """When the user has an explicit grant on a server they don't own, only that server is returned."""
+        owner_id = self._seed_user('gswup-other-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        user_id = self._seed_user('gswup-granted-user', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        owned_server = self._seed_server(owner_id, 'gswup-other-owned')
+        granted_server = self._seed_server(owner_id, 'gswup-granted')
+
+        self._seed_server_perm(granted_server, user_id, ServersPermissions.ViewServer.value)
+
+        result = ServersUsersPermsRepository.getServersWithUserPerm(user_id, ServersPermissions.ViewServer.value)
+        self.assertIn(granted_server, result)
+        self.assertNotIn(owned_server, result)
+

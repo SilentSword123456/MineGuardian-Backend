@@ -17,16 +17,47 @@ from services.server_services import getAllServers, get_server_instance, stop_se
 
 
 class GetAllServersTests(unittest.TestCase):
-    def test_returns_server_ids_with_view_permission(self):
-        with patch("services.server_services.ServersUsersPermsRepository.getServersWithUserPerm", return_value=[11, 13]) as get_servers:
+    def test_returns_granted_and_owned_server_ids(self):
+        """getAllServers unions explicitly-granted ViewServer servers with owned servers."""
+        with patch("services.server_services.ServersUsersPermsRepository.getServersWithUserPerm", return_value=[11, 13]) as get_servers, \
+             patch("services.server_services.db.session") as mock_session:
+            mock_session.query.return_value.filter.return_value.all.return_value = [
+                types.SimpleNamespace(id=20)
+            ]
             servers = getAllServers(7)
 
-        self.assertEqual(servers, [11, 13])
         get_servers.assert_called_once()
+        self.assertIn(11, servers)
+        self.assertIn(13, servers)
+        self.assertIn(20, servers)
+
+    def test_returns_only_owned_when_no_explicit_grants(self):
+        """getAllServers returns owned servers even when there are no explicit grant rows."""
+        with patch("services.server_services.ServersUsersPermsRepository.getServersWithUserPerm", return_value=[]), \
+             patch("services.server_services.db.session") as mock_session:
+            mock_session.query.return_value.filter.return_value.all.return_value = [
+                types.SimpleNamespace(id=5)
+            ]
+            result = getAllServers(7)
+
+        self.assertEqual(result, [5])
 
     def test_returns_empty_when_user_has_no_visible_servers(self):
-        with patch("services.server_services.ServersUsersPermsRepository.getServersWithUserPerm", return_value=[]):
+        with patch("services.server_services.ServersUsersPermsRepository.getServersWithUserPerm", return_value=[]), \
+             patch("services.server_services.db.session") as mock_session:
+            mock_session.query.return_value.filter.return_value.all.return_value = []
             self.assertEqual(getAllServers(77), [])
+
+    def test_no_duplicates_when_owned_also_has_explicit_grant(self):
+        """getAllServers deduplicates servers that are both owned and have an explicit grant."""
+        with patch("services.server_services.ServersUsersPermsRepository.getServersWithUserPerm", return_value=[5]), \
+             patch("services.server_services.db.session") as mock_session:
+            mock_session.query.return_value.filter.return_value.all.return_value = [
+                types.SimpleNamespace(id=5)
+            ]
+            result = getAllServers(7)
+
+        self.assertEqual(result, [5])
 
 
 class GetServerInstanceTests(unittest.TestCase):

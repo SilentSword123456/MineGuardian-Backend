@@ -260,6 +260,11 @@ They are pure database operations with no side effects outside the database.
 
 ### ServersUsersPermsRepository
 
+> **Owner-bypass model:** A server's owner is treated as having every `ServersPermissions`
+> implicitly — no permission row is needed in `ServersUsersPerms`.  This means:
+> - Adding a new permission enum value automatically works for all owners without any migration.
+> - `ServersUsersPerms` rows are only required for *delegated* (non-owner) access.
+
 #### `addPerm(userId: int, serverId: int, targetUserId: int, permId: int) -> bool`
 - **Purpose:** Grant a permission on a server to a target user.
 - **Input:** `userId` (int) — the granting user; `serverId` (int); `targetUserId` (int) — the user receiving the permission; `permId` (int — must be a valid `ServersPermissions` value).
@@ -279,25 +284,33 @@ They are pure database operations with no side effects outside the database.
   - No matching permission row exists for the target user.
 
 #### `getPerms(userId: int, serverId: int) -> list[int]`
-- **Purpose:** Return all permission IDs held by a user on a server.
+- **Purpose:** Return all *explicitly stored* permission IDs held by a user on a server.
 - **Input:** `userId` (int); `serverId` (int).
 - **Output:** A list of integer permission IDs (may be empty).
 - **Behaviour:** Returns `[]` if the user or server does not exist.
+- **Note:** Does **not** reflect the implicit owner bypass — use `doseUserHavePerm` to
+  check effective access.
 
 #### `doseUserHavePerm(userId: int, serverId: int, permId: int) -> bool`
-- **Purpose:** Check whether a user holds a specific permission on a server.
+- **Purpose:** Check whether a user effectively holds a specific permission on a server.
 - **Input:** `userId` (int); `serverId` (int); `permId` (int).
-- **Output:** `True` if the user has the permission; `False` otherwise.
+- **Output:** `True` if the user has the permission (explicitly or via ownership); `False` otherwise.
 - **Behaviour:**
   - Returns `False` if the user does not exist.
   - Returns `False` if the server does not exist.
-  - Returns `False` if `getPerms` returns an empty list.
+  - Returns `True` immediately if `userId` is the server's owner (**owner bypass**).
+  - Otherwise checks `getPerms` for an explicit row.
 
 #### `getServersWithUserPerm(userId: int, permId: int) -> list[int]`
-- **Purpose:** Return all server IDs where the user holds a specific permission.
+- **Purpose:** Return all server IDs where the user effectively holds a specific permission.
 - **Input:** `userId` (int); `permId` (int, must be valid `ServersPermissions`).
 - **Output:** List of server IDs (possibly empty).
-- **Behaviour:** Returns `[]` for missing users, invalid permission IDs, or no matches.
+- **Behaviour:**
+  - Returns `[]` for missing users or invalid permission IDs.
+  - Always includes every server owned by `userId` (**owner bypass**).
+  - Also includes servers where an explicit `ServersUsersPerms` row grants `permId` to `userId`.
+  - The combined result contains no duplicate IDs.
+
 
 ---
 
@@ -663,7 +676,9 @@ Module-level globals:
 #### `getAllServers(userId: int) -> list[int]`
 - **Purpose:** Return server IDs visible to a user.
 - **Input:** `userId` (int).
-- **Output:** List of server IDs where the user has `ViewServer` permission.
+- **Output:** List of server IDs where the user has effective `ViewServer` access —
+  this includes servers the user *owns* (via the owner bypass) as well as any servers
+  where an explicit `ViewServer` row has been granted.
 
 #### `get_server_instance(serverId: int) -> ServerSession`
 - **Purpose:** Retrieve (or create) the `ServerSession` for a server, ready to start.
@@ -796,9 +811,14 @@ for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
 
 ## 10. services/servers.py — Server Management API
 
+> **Permission model:** All protected routes use `ServersUsersPermsRepository.doseUserHavePerm`,
+> which applies the **owner bypass**: the server owner is implicitly granted every permission.
+> Non-owners require an explicit row in `ServersUsersPerms`.
+
 ### `GET /servers`
 - **Auth required:** Yes (JWT cookie).
-- **Purpose:** List servers visible to the authenticated user (`ViewServer` permission).
+- **Purpose:** List servers visible to the authenticated user — includes servers the user
+  *owns* (owner bypass) and servers where `ViewServer` has been explicitly granted.
 - **Response:** `200 { "servers": [{ "name", "server_id", "isRunning", "max_memory_mb", "online_players" }, ...] }`.
 
 ### `GET /servers/<serverId>`
@@ -810,19 +830,19 @@ for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
   |--------|-----------|------|
   | 200 | Found | `{ "server_id", "is_running", "pid", "uptime_seconds", "max_memory_mb", "max_players" }` |
   | 400 | Invalid `serverId` | — |
-  | 403 | User lacks `GetServerInfo` permission | — |
+  | 403 | User lacks `GetServerInfo` permission (owner is always allowed) | — |
   | 404 | Server id not found | — |
 - **Extras:** If the server has a running `ServerSession`, values come from `serverInstance.get_process_info()`; otherwise defaults are used.
 
 ### `POST /servers/<serverId>/start`
 - **Auth required:** Yes.
 - **Path params:** `serverId` must be an integer.
-- **Responses:** `200 { "message": "..." }` | `400` on invalid `serverId` or if server is already running (`ValueError`) | `403` without `StartServer` permission | `404` if server id does not exist.
+- **Responses:** `200 { "message": "..." }` | `400` on invalid `serverId` or if server is already running (`ValueError`) | `403` without `StartServer` permission (owner always allowed) | `404` if server id does not exist.
 
 ### `POST /servers/<serverId>/stop`
 - **Auth required:** Yes.
 - **Path params:** `serverId` must be an integer.
-- **Responses:** `200 { "message": "..." }` | `400` on invalid `serverId` or if no instance exists (`ValueError`) | `403` without `StopServer` permission | `404` if server id does not exist.
+- **Responses:** `200 { "message": "..." }` | `400` on invalid `serverId` or if no instance exists (`ValueError`) | `403` without `StopServer` permission (owner always allowed) | `404` if server id does not exist.
 
 ### `GET /servers/<serverId>/stats`
 - **Auth required:** Yes.
@@ -832,7 +852,7 @@ for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
   |--------|-----------|
   | 200 | Server is running; stats returned |
   | 400 | Invalid `serverId` |
-  | 403 | User lacks `GetServerInfo` permission |
+  | 403 | User lacks `GetServerInfo` permission (owner always allowed) |
   | 404 | Server not found or not running |
   | 500 | Internal error collecting stats |
 
@@ -851,7 +871,7 @@ for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
 ### `DELETE /servers/<serverName>/uninstall`
 - **Auth required:** Yes.
 - **Responses:** `200 { "status": true, "message": "..." }` | `false` return (short-circuit) when user lacks `RemovePermissionFromServer` | `400` on install error | `404` on DB removal failure.
-- **Extras:** Only the server owner (or a user with `RemovePermissionFromServer`) can uninstall.
+- **Extras:** Only the server owner (implicitly, via owner bypass) or a user with an explicit `RemovePermissionFromServer` row can uninstall.
 
 ### `GET /manage/<software>/getAvailableVersions`
 - **Auth required:** No.
@@ -859,5 +879,5 @@ for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
 
 ### `GET /servers/globalStats`
 - **Auth required:** Yes.
-- **Response:** `200` — aggregated stats dict for running sessions visible to the current user (`ViewServer`).
+- **Response:** `200` — aggregated stats dict for running sessions visible to the current user (owned servers + explicit `ViewServer` grants).
 - **Extras:** Returns `500` on unexpected exception.
