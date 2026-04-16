@@ -82,7 +82,7 @@ The API can be started directly from `main.py` or by calling `api.py` (though `m
 #### Authentication
 
 - `POST /login` validates `user_id` and `password` and sets JWT in a cookie named `accessToken`.
-- On successful login, the token is returned via `Set-Cookie` (HttpOnly, SameSite=Lax, `Secure=False` in current development config), not as a JSON `access_token` field.
+- On successful login, the token is returned via `Set-Cookie` (HttpOnly, `SameSite=None` with `Secure=True` outside local development; local development keeps `SameSite=Lax`/`Secure=False`), not as a JSON `access_token` field.
 - Invalid credentials still return `401` with JSON error payload.
 
 #### SocketIO Events

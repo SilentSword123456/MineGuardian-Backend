@@ -1,6 +1,7 @@
 from flask import jsonify, request
 from apiflask import APIFlask
 import os
+import re
 import time
 import eventlet
 from flask_cors import CORS
@@ -24,7 +25,7 @@ app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
 app.config["JWT_ACCESS_COOKIE_NAME"] = "accessToken"
 app.config["JWT_COOKIE_CSRF_PROTECT"] = False
 app.config["JWT_COOKIE_SECURE"] = os.environ.get('FLASK_ENV', 'production') != 'development'
-app.config["JWT_COOKIE_SAMESITE"] = "Lax"
+app.config["JWT_COOKIE_SAMESITE"] = "None" if app.config["JWT_COOKIE_SECURE"] else "Lax"
 app.security_schemes = {
     'BearerAuth': {
         'type': 'http',
@@ -32,7 +33,11 @@ app.security_schemes = {
         'bearerFormat': 'JWT',
     }
 }
-CORS(app, supports_credentials=True)
+_ALLOWED_WEB_ORIGINS = [
+    "https://frontend.silentlab.work",
+    re.compile(r"^https://[a-zA-Z0-9-]+\.andrei925-dumitru\.workers\.dev$"),
+]
+CORS(app, supports_credentials=True, origins=_ALLOWED_WEB_ORIGINS)
 socketio = SocketIO(
     app,
     cors_allowed_origins=app.config["SOCKETIO_CORS_ALLOWED_ORIGINS"],

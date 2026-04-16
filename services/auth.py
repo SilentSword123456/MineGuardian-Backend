@@ -14,6 +14,7 @@ auth_blueprint = APIBlueprint('auth', __name__)
 # Set FLASK_ENV=development in your environment (or a local .env file) to
 # allow cookies over plain HTTP during local development.
 _secure_cookies = os.environ.get('FLASK_ENV', 'production') != 'development'
+_cookie_samesite = "None" if _secure_cookies else "Lax"
 
 @auth_blueprint.route('/login', methods=['POST'])
 @auth_blueprint.doc(**DOCS['login'])
@@ -42,6 +43,6 @@ def login(request_data=None):
         access_token,
         httponly=True,
         secure=_secure_cookies,
-        samesite="Lax"
+        samesite=_cookie_samesite
     )
     return response

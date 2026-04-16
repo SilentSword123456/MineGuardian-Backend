@@ -26,6 +26,12 @@ class AuthApiTests(unittest.TestCase):
                 return cookie.split(';')[0].split('=', 1)[1]
         return None
 
+    def get_access_token_set_cookie_header(self, response):
+        for cookie in response.headers.getlist('Set-Cookie'):
+            if cookie.startswith('accessToken='):
+                return cookie
+        return None
+
     # Login endpoint tests
 
     def test_login_with_valid_credentials(self):
@@ -176,8 +182,66 @@ class AuthApiTests(unittest.TestCase):
         # Tokens should be different
         self.assertNotEqual(token1, token2)
 
+    def test_login_cookie_supports_cross_site_requests(self):
+        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
+             patch.object(auth.repositories.UserRepository, 'getUserId', return_value=55):
+            response = self.request_json('POST', '/login', {
+                'user_id': 'cross-site-user',
+                'password': 'pass'
+            })
+
+        set_cookie = self.get_access_token_set_cookie_header(response)
+        self.assertIsNotNone(set_cookie)
+        self.assertIn('HttpOnly', set_cookie)
+        self.assertIn('Secure', set_cookie)
+        self.assertIn('SameSite=None', set_cookie)
+
+    def test_login_allows_frontend_silentlab_origin(self):
+        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
+             patch.object(auth.repositories.UserRepository, 'getUserId', return_value=12):
+            response = self.client.post(
+                '/login',
+                data=json.dumps({'user_id': 'testuser', 'password': 'testpass'}),
+                content_type='application/json',
+                headers={'Origin': 'https://frontend.silentlab.work'}
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.headers.get('Access-Control-Allow-Origin'),
+            'https://frontend.silentlab.work'
+        )
+        self.assertEqual(response.headers.get('Access-Control-Allow-Credentials'), 'true')
+
+    def test_login_allows_workers_preview_origin(self):
+        origin = 'https://06b9ad2b-mineguardianui.andrei925-dumitru.workers.dev'
+        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
+             patch.object(auth.repositories.UserRepository, 'getUserId', return_value=13):
+            response = self.client.post(
+                '/login',
+                data=json.dumps({'user_id': 'testuser', 'password': 'testpass'}),
+                content_type='application/json',
+                headers={'Origin': origin}
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get('Access-Control-Allow-Origin'), origin)
+        self.assertEqual(response.headers.get('Access-Control-Allow-Credentials'), 'true')
+
+    def test_login_rejects_untrusted_origin(self):
+        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
+             patch.object(auth.repositories.UserRepository, 'getUserId', return_value=14):
+            response = self.client.post(
+                '/login',
+                data=json.dumps({'user_id': 'testuser', 'password': 'testpass'}),
+                content_type='application/json',
+                headers={'Origin': 'https://example.com'}
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.headers.get('Access-Control-Allow-Origin'))
+
 
 
 if __name__ == '__main__':
     unittest.main()
-
