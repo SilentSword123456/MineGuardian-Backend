@@ -804,28 +804,34 @@ for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
 ### `GET /servers/<serverId>`
 - **Auth required:** Yes.
 - **Purpose:** Return live or cached info about a specific server.
+- **Path params:** `serverId` must be an integer.
 - **Responses:**
   | Status | Condition | Body |
   |--------|-----------|------|
   | 200 | Found | `{ "server_id", "is_running", "pid", "uptime_seconds", "max_memory_mb", "max_players" }` |
+  | 400 | Invalid `serverId` | — |
   | 403 | User lacks `GetServerInfo` permission | — |
   | 404 | Server id not found | — |
 - **Extras:** If the server has a running `ServerSession`, values come from `serverInstance.get_process_info()`; otherwise defaults are used.
 
 ### `POST /servers/<serverId>/start`
 - **Auth required:** Yes.
-- **Responses:** `200 { "message": "..." }` | `400` if server is already running (`ValueError`) | `403` without `StartServer` permission | `404` if server id missing.
+- **Path params:** `serverId` must be an integer.
+- **Responses:** `200 { "message": "..." }` | `400` on invalid `serverId` or if server is already running (`ValueError`) | `403` without `StartServer` permission | `404` if server id does not exist.
 
 ### `POST /servers/<serverId>/stop`
 - **Auth required:** Yes.
-- **Responses:** `200 { "message": "..." }` | `400` if no instance exists (`ValueError`) | `403` without `StopServer` permission | `404` if server id missing.
+- **Path params:** `serverId` must be an integer.
+- **Responses:** `200 { "message": "..." }` | `400` on invalid `serverId` or if no instance exists (`ValueError`) | `403` without `StopServer` permission | `404` if server id does not exist.
 
 ### `GET /servers/<serverId>/stats`
 - **Auth required:** Yes.
+- **Path params:** `serverId` must be an integer.
 - **Responses:**
   | Status | Condition |
   |--------|-----------|
   | 200 | Server is running; stats returned |
+  | 400 | Invalid `serverId` |
   | 403 | User lacks `GetServerInfo` permission |
   | 404 | Server not found or not running |
   | 500 | Internal error collecting stats |
