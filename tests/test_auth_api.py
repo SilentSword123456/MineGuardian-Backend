@@ -214,7 +214,7 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(response.headers.get('Access-Control-Allow-Credentials'), 'true')
 
     def test_login_allows_workers_preview_origin(self):
-        origin = 'https://06b9ad2b-mineguardianui.andrei925-dumitru.workers.dev'
+        origin = 'https://preview-mineguardianui.andrei925-dumitru.workers.dev'
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
              patch.object(auth.repositories.UserRepository, 'getUserId', return_value=13):
             response = self.client.post(
