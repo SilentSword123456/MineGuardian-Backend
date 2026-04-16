@@ -233,10 +233,14 @@ class OwnerBypassRoutesTests(unittest.TestCase):
     """Verify that the server owner can access every protected route without
     explicit permission rows in ServersUsersPerms."""
 
+    MOCK_USER_ID = 7
+
     def setUp(self):
         self.client = app.test_client()
 
-    def _login(self, user_id=7):
+    def _login(self, user_id=None):
+        if user_id is None:
+            user_id = self.MOCK_USER_ID
         with patch('services.auth.repositories.UserRepository.verify', return_value=True), \
              patch('services.auth.repositories.UserRepository.getUserId', return_value=user_id):
             response = self.client.post('/login', json={'user_id': 'owner', 'password': 'pw'})
