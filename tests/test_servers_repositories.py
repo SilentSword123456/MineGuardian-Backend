@@ -348,10 +348,17 @@ class ServersRepositoryTests(RepositoryTestCase):
         owner_id = self._seed_user('server-exist-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
         server_id = self._seed_server(owner_id, 'exists')
 
-        self.assertTrue(ServersRepository.doseServerExist(server_id))
+        self.assertTrue(ServersRepository.doesServerExist(server_id))
         self.assertEqual(ServersRepository.getServerOwner(server_id), owner_id)
-        self.assertFalse(ServersRepository.doseServerExist(999999))
+        self.assertFalse(ServersRepository.doesServerExist(999999))
         self.assertEqual(ServersRepository.getServerOwner(999999), 0)
+
+    def test_get_server_name(self):
+        owner_id = self._seed_user('server-name-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_id = self._seed_server(owner_id, 'lookup-me')
+
+        self.assertEqual(ServersRepository.getServerName(server_id), 'lookup-me')
+        self.assertEqual(ServersRepository.getServerName(999999), '')
 
 
 class ServersUsersPermsRepositoryTests(RepositoryTestCase):
@@ -464,4 +471,19 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
 
         self.assertTrue(ServersUsersPermsRepository.doseUserHavePerm(target_user_id, server_id, ServersPermissions.AddPermissionToServer.value))
         self.assertTrue(ServersUsersPermsRepository.doseUserHavePerm(target_user_id, server_id, ServersPermissions.RemovePermissionFromServer.value))
+
+    def test_get_servers_with_user_perm_returns_matching_server_ids(self):
+        owner_id = self._seed_user('perm-view-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        target_user_id = self._seed_user('perm-view-target', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_a = self._seed_server(owner_id, 'perm-view-a')
+        server_b = self._seed_server(owner_id, 'perm-view-b')
+
+        self._seed_server_perm(server_a, target_user_id, ServersPermissions.ViewServer.value)
+        self._seed_server_perm(server_b, target_user_id, ServersPermissions.ViewServer.value)
+
+        self.assertEqual(
+            sorted(ServersUsersPermsRepository.getServersWithUserPerm(target_user_id, ServersPermissions.ViewServer.value)),
+            sorted([server_a, server_b]),
+        )
+        self.assertEqual(ServersUsersPermsRepository.getServersWithUserPerm(target_user_id, 999), [])
 
