@@ -1,4 +1,5 @@
 import os
+import logging
 
 from flask import request
 from apiflask import APIBlueprint, abort
@@ -24,6 +25,7 @@ from Database.repositories import *
 from Database.perms import ServersPermissions
 
 servers_bp = APIBlueprint('servers', __name__)
+logger = logging.getLogger(__name__)
 
 
 def _parse_server_id(serverId):
@@ -38,10 +40,14 @@ def _parse_server_id(serverId):
 @jwt_required()
 def list_servers():
     userId = int(get_jwt_identity())
+    logger.info("GET /servers requested")
+    logger.debug("GET /servers user context user_id=%s", userId)
     serversIds = getAllServers(userId)
+    logger.info("Resolved %s visible servers", len(serversIds))
     servers = []
     for serverId in serversIds:
         serverName = ServersRepository.getServerName(serverId)
+        logger.debug("Building /servers response item for server_id=%s server_name=%s", serverId, serverName)
         servers.append({
             'name': serverName,
             'server_id': serverId,
@@ -50,6 +56,7 @@ def list_servers():
             'max_memory_mb': utils.getMaxMemoryMB(os.path.join(api.DIR, "servers", serverName)),
             'online_players': {'max': utils.getMaxPlayers(os.path.join(api.DIR, "servers", serverName))}
         })
+    logger.info("Returning /servers payload with %s entries", len(servers))
     return {'servers': servers}, 200
 
 @servers_bp.route('/servers/<serverId>', methods=['GET'])

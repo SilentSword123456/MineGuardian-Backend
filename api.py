@@ -3,6 +3,7 @@ from apiflask import APIFlask, abort
 import os
 import re
 import time
+import logging
 import eventlet
 from flask_cors import CORS
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -18,6 +19,11 @@ from services.auth import jwt, auth_blueprint
 from Database.perms import ServersPermissions
 
 DIR = os.path.dirname(os.path.abspath(__file__))
+logging.basicConfig(
+    level=getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s - %(message)s",
+    force=True,
+)
 
 app = APIFlask(__name__)
 app.config.update(getConfig()['flaskConfig'])
