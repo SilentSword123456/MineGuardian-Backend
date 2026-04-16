@@ -1,4 +1,4 @@
-from flask import jsonify, request
+from flask import jsonify, request, g
 from apiflask import APIFlask, abort
 import os
 import re
@@ -24,6 +24,7 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s - %(message)s",
     force=True,
 )
+logger = logging.getLogger(__name__)
 
 app = APIFlask(__name__)
 app.config.update(getConfig()['flaskConfig'])
@@ -66,6 +67,51 @@ db.init_app(app)
 
 generateDB(app)
 
+_SENSITIVE_LOG_FIELDS = {"password", "token", "access_token", "refresh_token", "authorization", "cookie"}
+
+
+def _sanitize_for_log(value):
+    if isinstance(value, dict):
+        sanitized = {}
+        for key, item in value.items():
+            if str(key).lower() in _SENSITIVE_LOG_FIELDS:
+                sanitized[key] = "***"
+            else:
+                sanitized[key] = _sanitize_for_log(item)
+        return sanitized
+    if isinstance(value, list):
+        return [_sanitize_for_log(item) for item in value]
+    return value
+
+
+@app.before_request
+def _log_request_start():
+    g._request_start_time = time.perf_counter()
+    payload = request.get_json(silent=True) if request.is_json else None
+    logger.info(
+        "HTTP request started method=%s path=%s endpoint=%s args=%s payload=%s",
+        request.method,
+        request.path,
+        request.endpoint,
+        _sanitize_for_log(request.args.to_dict(flat=True)),
+        _sanitize_for_log(payload),
+    )
+
+
+@app.after_request
+def _log_request_end(response):
+    started_at = getattr(g, "_request_start_time", None)
+    duration_ms = ((time.perf_counter() - started_at) * 1000) if started_at else None
+    logger.info(
+        "HTTP request completed method=%s path=%s endpoint=%s status=%s duration_ms=%.2f",
+        request.method,
+        request.path,
+        request.endpoint,
+        response.status_code,
+        duration_ms if duration_ms is not None else -1.0,
+    )
+    return response
+
 def register_socketio_listener(serverName, serverInstance):
     """Ensures a SocketIO broadcast listener is registered for the server instance."""
     if not hasattr(serverInstance, '_socketio_listener_added'):
@@ -105,21 +151,25 @@ def home():
 @socketio.on('connect')
 @jwt_required()
 def handle_connect(auth=None):
+    logger.info("SocketIO connect received args=%s", _sanitize_for_log(request.args.to_dict(flat=True)))
     userId = int(get_jwt_identity())
     serverId = praseSocketServerId(request.args.get('serverId'))
     if serverId is None:
+        logger.warning("SocketIO connect rejected due to invalid serverId")
         emit('error', {'data': 'Invalid serverId'})
         return False
 
     if not ServersRepository.doesServerExist(serverId):
+        logger.warning("SocketIO connect rejected server not found server_id=%s", serverId)
         abort(404, message='Server not found')
 
     if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.ViewServer.value):
+        logger.warning("SocketIO connect rejected permissions user_id=%s server_id=%s", userId, serverId)
         abort(401, message='You dont have the permission to do that')
 
     serverName = ServersRepository.getServerName(serverId)
     if not serverName:
-        print("Connection attempt without serverName")
+        logger.warning("SocketIO connect rejected due to missing server name server_id=%s", serverId)
         emit('error', {'data': 'No serverName provided in connection'})
         return False
 
@@ -133,7 +183,7 @@ def handle_connect(auth=None):
         register_socketio_listener(serverName, serverInstance)
 
         join_room(serverName)
-        print(f'Client connected to server room: {serverName}')
+        logger.info("SocketIO connect accepted user_id=%s server_id=%s server_name=%s", userId, serverId, serverName)
         emit('system', {'data': f"Connected to server {serverName}"})
 
         for line in serverInstance.log_history:
@@ -148,7 +198,7 @@ def handle_connect(auth=None):
         socketio.emit('status', {'running': live_running}, to=serverName, include_self=False)
 
     except Exception as e:
-        print(f"ERROR in handle_connect for '{serverName}': {e}")
+        logger.exception("SocketIO connect failed server_name=%s error=%s", serverName, e)
         import traceback
         traceback.print_exc()
         emit('error', {'data': f"Connection error: {str(e)}"})
@@ -158,6 +208,7 @@ def handle_connect(auth=None):
 
 @socketio.on('disconnect')
 def handle_disconnect():
+    logger.info("SocketIO disconnect received args=%s", _sanitize_for_log(request.args.to_dict(flat=True)))
     serverId = praseSocketServerId(request.args.get('serverId'))
     if serverId is None:
         return
@@ -168,13 +219,14 @@ def handle_disconnect():
     serverName = ServersRepository.getServerName(serverId)
     if serverName:
         leave_room(serverName)
-        print(f'Client disconnected from server room: {serverName}')
+        logger.info("SocketIO disconnected from room server_id=%s server_name=%s", serverId, serverName)
     else:
-        print('Client disconnected (no serverName)')
+        logger.info('SocketIO disconnected without server name server_id=%s', serverId)
 
 @socketio.on('system')
 @jwt_required()
 def handleSystemMessage(data):
+    logger.info("SocketIO system event received payload=%s args=%s", _sanitize_for_log(data), _sanitize_for_log(request.args.to_dict(flat=True)))
     userId = int(get_jwt_identity())
     serverId = praseSocketServerId(request.args.get('serverId'))
     if serverId is None:
@@ -188,12 +240,13 @@ def handleSystemMessage(data):
         abort(401, message='You dont have the permission to do that')
 
     serverName = ServersRepository.getServerName(serverId)
-    print(f'Message from server {serverName}: {data}')
+    logger.info("SocketIO system event processed server_name=%s", serverName)
     emit('system', {'data': f"Server {serverName} received: {data['message']}"})
 
 @socketio.on('console')
 @jwt_required()
 def handleConsole(data):
+    logger.info("SocketIO console event received payload=%s args=%s", _sanitize_for_log(data), _sanitize_for_log(request.args.to_dict(flat=True)))
     userId = int(get_jwt_identity())
     serverId = praseSocketServerId(request.args.get('serverId'))
     if serverId is None:
@@ -212,10 +265,12 @@ def handleConsole(data):
         return
 
     if serverName not in serverSessionsManager.serverInstances:
+        logger.warning("SocketIO console command rejected because server is offline server_name=%s", serverName)
         emit('console', {'data': f"Server '{serverName}' is not running."})
         return
 
     serverInstance = serverSessionsManager.serverInstances[serverName]
+    logger.info("SocketIO console command forwarded server_name=%s", serverName)
     serverInstance.send_command(data['message'])
 
 def _broadcast_stats():
