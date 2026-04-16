@@ -1,18 +1,21 @@
 from flask import jsonify, request
-from apiflask import APIFlask
+from apiflask import APIFlask, abort
 import os
 import re
 import time
 import eventlet
 from flask_cors import CORS
+from flask_jwt_extended import jwt_required, get_jwt_identity
 import serverSessionsManager
 import utils
 from Database.database import db, generateDB
+from Database.repositories import ServersRepository, ServersUsersPermsRepository
 from services.dbHandler import db_blueprint
 from utils import getConfig
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from services.servers import servers_bp
 from services.auth import jwt, auth_blueprint
+from Database.perms import ServersPermissions
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -79,6 +82,13 @@ def register_socketio_listener(serverName, serverInstance):
     else:
         print(f"SocketIO listeners already registered for server '{serverName}'")
 
+
+def praseSocketServerId(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
 @app.route('/health')
 def home():
     return jsonify({
@@ -87,8 +97,21 @@ def home():
     }), 200
 
 @socketio.on('connect')
+@jwt_required()
 def handle_connect(auth=None):
-    serverName = request.args.get('serverName')
+    userId = int(get_jwt_identity())
+    serverId = praseSocketServerId(request.args.get('serverId'))
+    if serverId is None:
+        emit('error', {'data': 'Invalid serverId'})
+        return False
+
+    if not ServersRepository.doesServerExist(serverId):
+        abort(404, message='Server not found')
+
+    if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.ViewServer.value):
+        abort(401, message='You dont have the permission to do that')
+
+    serverName = ServersRepository.getServerName(serverId)
     if not serverName:
         print("Connection attempt without serverName")
         emit('error', {'data': 'No serverName provided in connection'})
@@ -97,7 +120,7 @@ def handle_connect(auth=None):
     try:
         if serverName not in serverSessionsManager.serverInstances:
             print(f"Initializing new server instance for '{serverName}' during connection")
-            serverInstance = utils.setupServerInstance(os.path.join(DIR, "servers", serverName), serverName)
+            serverInstance = utils.setupServerInstance(os.path.join(DIR, "servers", serverName), serverName, serverId)
         else:
             serverInstance = serverSessionsManager.serverInstances[serverName]
 
@@ -129,7 +152,14 @@ def handle_connect(auth=None):
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    serverName = request.args.get('serverName')
+    serverId = praseSocketServerId(request.args.get('serverId'))
+    if serverId is None:
+        return
+
+    if not ServersRepository.doesServerExist(serverId):
+        return
+
+    serverName = ServersRepository.getServerName(serverId)
     if serverName:
         leave_room(serverName)
         print(f'Client disconnected from server room: {serverName}')
@@ -137,14 +167,40 @@ def handle_disconnect():
         print('Client disconnected (no serverName)')
 
 @socketio.on('system')
+@jwt_required()
 def handleSystemMessage(data):
-    serverName = request.args.get('serverName')
+    userId = int(get_jwt_identity())
+    serverId = praseSocketServerId(request.args.get('serverId'))
+    if serverId is None:
+        emit('error', {'data': 'Invalid serverId'})
+        return
+
+    if not ServersRepository.doesServerExist(serverId):
+        abort(404, message='Server not found')
+
+    if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.ViewServer.value):
+        abort(401, message='You dont have the permission to do that')
+
+    serverName = ServersRepository.getServerName(serverId)
     print(f'Message from server {serverName}: {data}')
     emit('system', {'data': f"Server {serverName} received: {data['message']}"})
 
 @socketio.on('console')
+@jwt_required()
 def handleConsole(data):
-    serverName = request.args.get('serverName')
+    userId = int(get_jwt_identity())
+    serverId = praseSocketServerId(request.args.get('serverId'))
+    if serverId is None:
+        emit('error', {'data': 'Invalid serverId'})
+        return
+
+    if not ServersRepository.doesServerExist(serverId):
+        abort(404, message='Server not found')
+
+    if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.ViewServer.value):
+        abort(401, message='You dont have the permission to do that')
+
+    serverName = ServersRepository.getServerName(serverId)
     if not serverName:
         emit('error', {'data': 'No serverName provided'})
         return
