@@ -22,6 +22,7 @@ DIR = os.path.dirname(os.path.abspath(__file__))
 logging.basicConfig(
     level=getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO),
     format="%(asctime)s %(levelname)s %(name)s - %(message)s",
+    force=True,
 )
 
 app = APIFlask(__name__)
