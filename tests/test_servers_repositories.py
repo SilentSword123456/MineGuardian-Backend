@@ -489,7 +489,7 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
 
     # --- Owner-bypass tests ---
 
-    def test_dose_user_have_perm_returns_true_for_owner_without_explicit_row(self):
+    def test_does_user_have_perm_returns_true_for_owner_without_explicit_row(self):
         """Server owner has implicit access to every permission, even without a DB row."""
         owner_id = self._seed_user('owner-bypass-user', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
         server_id = self._seed_server(owner_id, 'owner-bypass-server')
@@ -500,7 +500,7 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
                 msg=f"Owner should have implicit access to {perm.name}",
             )
 
-    def test_dose_user_have_perm_non_owner_still_requires_explicit_row(self):
+    def test_does_user_have_perm_non_owner_still_requires_explicit_row(self):
         """A non-owner user must have an explicit permission row."""
         owner_id = self._seed_user('owner-explicit-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
         non_owner_id = self._seed_user('owner-explicit-non-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
