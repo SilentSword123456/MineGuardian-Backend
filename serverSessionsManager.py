@@ -1,3 +1,5 @@
+from Database.repositories import ServersRepository
+
 serverInstances = {}
 usedPorts = set()
 
@@ -11,7 +13,9 @@ import utils
 from rcon import RconClient, RconError, RconAuthError
 
 class ServerSession:
-    def __init__(self, name, command, working_dir=None):
+    def __init__(self, id, name, command, working_dir=None):
+        if not ServersRepository.doesServerExist(id):
+            raise KeyError(f"Server with id '{id}' does not exist")
         self.name = name
         if isinstance(command, str):
             self.command = command.split()
@@ -36,6 +40,7 @@ class ServerSession:
         self._rcon: RconClient | None = None
         self._rcon_lock = eventlet.semaphore.Semaphore()
         self._stats_lock = eventlet.semaphore.Semaphore()
+        self.id = id
 
     @property
     def running(self):
@@ -414,7 +419,7 @@ class ServerSession:
         max_players = self.max_players if is_running and self.max_players is not None else utils.getMaxPlayers(self.working_dir)
 
         return {
-            "server_id": self.name,
+            "server_id": self.id,
             "is_running": is_running,
             "pid": pid,
             "uptime_seconds": uptime_seconds,
