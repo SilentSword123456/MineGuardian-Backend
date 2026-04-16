@@ -7,16 +7,17 @@ no actual process, file or network I/O is performed.
 """
 
 import unittest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 
-def _make_session(name="test-server", command="java -jar server.jar"):
+def _make_session(server_id=1, name="test-server", command="java -jar server.jar"):
     """Return a ServerSession with all side-effectful setup patched out."""
     with patch("utils.getNewPort", side_effect=[25565, 25575]), \
          patch("utils.assignNewPort", side_effect=[25565, 25575]), \
-         patch("utils.getConfig", return_value={"rconPassword": "secret"}):
+         patch("utils.getConfig", return_value={"rconPassword": "secret"}), \
+         patch("serverSessionsManager.ServersRepository.doesServerExist", return_value=True):
         import serverSessionsManager
-        session = serverSessionsManager.ServerSession(name, command, working_dir="/fake/servers/test")
+        session = serverSessionsManager.ServerSession(server_id, name, command, working_dir="/fake/servers/test")
     return session
 
 
@@ -31,9 +32,10 @@ class ServerSessionInitTests(unittest.TestCase):
 
     def test_command_list_is_stored_as_is(self):
         with patch("utils.getNewPort", side_effect=[25565, 25575]), \
-             patch("utils.assignNewPort", side_effect=[25565, 25575]):
+             patch("utils.assignNewPort", side_effect=[25565, 25575]), \
+             patch("serverSessionsManager.ServersRepository.doesServerExist", return_value=True):
             import serverSessionsManager
-            s = serverSessionsManager.ServerSession("s", ["java", "-jar", "server.jar"], working_dir="/fake/servers/s")
+            s = serverSessionsManager.ServerSession(1, "s", ["java", "-jar", "server.jar"], working_dir="/fake/servers/s")
         self.assertEqual(s.command, ["java", "-jar", "server.jar"])
 
     def test_initial_state_is_not_running(self):
@@ -275,16 +277,16 @@ class GetProcessInfoTests(unittest.TestCase):
         self.assertFalse(info["is_running"])
         self.assertEqual(info["pid"], 0)
         self.assertEqual(info["uptime_seconds"], 0.0)
-        self.assertEqual(info["server_id"], self.session.name)
+        self.assertEqual(info["server_id"], self.session.id)
 
     def test_returns_server_id_matching_name(self):
-        s = _make_session(name="my-cool-server")
+        s = _make_session(server_id=55, name="my-cool-server")
         s._running = False
         s.process = None
         with patch("utils.getMaxMemoryMB", return_value=512), \
              patch("utils.getMaxPlayers", return_value=10):
             info = s.get_process_info()
-        self.assertEqual(info["server_id"], "my-cool-server")
+        self.assertEqual(info["server_id"], 55)
 
     def test_returns_running_info_with_pid_when_running(self):
         self.session._running = True
