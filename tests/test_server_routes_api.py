@@ -223,6 +223,105 @@ class ServerRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
 
 
+# ---------------------------------------------------------------------------
+# Owner-bypass route tests
+# All protected endpoints must succeed for the server owner even when
+# doseUserHavePerm has no explicit row (owner bypass is applied in the repo).
+# ---------------------------------------------------------------------------
+
+class OwnerBypassRoutesTests(unittest.TestCase):
+    """Verify that the server owner can access every protected route without
+    explicit permission rows in ServersUsersPerms."""
+
+    def setUp(self):
+        self.client = app.test_client()
+
+    def _login(self, user_id=7):
+        with patch('services.auth.repositories.UserRepository.verify', return_value=True), \
+             patch('services.auth.repositories.UserRepository.getUserId', return_value=user_id):
+            response = self.client.post('/login', json={'user_id': 'owner', 'password': 'pw'})
+        self.assertEqual(response.status_code, 200)
+
+    def test_list_servers_includes_owned_servers(self):
+        """GET /servers returns servers where the user is the owner."""
+        self._login()
+        # getAllServers calls getServersWithUserPerm; owner bypass means server 5
+        # is included even though no explicit ViewServer row exists.
+        with patch.object(servers_module, 'getAllServers', return_value=[5]), \
+             patch.object(servers_module.ServersRepository, 'getServerName', return_value='ownerServer'), \
+             patch.object(servers_module.serverSessionsManager, 'serverInstances', {}), \
+             patch.object(servers_module.utils, 'getMaxMemoryMB', return_value=1024), \
+             patch.object(servers_module.utils, 'getMaxPlayers', return_value=10):
+            response = self.client.get('/servers')
+        self.assertEqual(response.status_code, 200)
+        server_ids = [s['server_id'] for s in response.get_json()['servers']]
+        self.assertIn(5, server_ids)
+
+    def test_get_server_info_owner_bypass(self):
+        """GET /servers/<id> succeeds for the owner without an explicit GetServerInfo row."""
+        self._login()
+        # Simulate doseUserHavePerm returning True because the logged-in user
+        # (id=7) is the server owner — the repository applies the bypass.
+        with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
+             patch.object(servers_module.ServersRepository, 'getServerName', return_value='ownerServer'), \
+             patch.object(servers_module.serverSessionsManager, 'serverInstances', {}), \
+             patch.object(servers_module.utils, 'getMaxMemoryMB', return_value=512), \
+             patch.object(servers_module.utils, 'getMaxPlayers', return_value=5):
+            response = self.client.get('/servers/9')
+        self.assertEqual(response.status_code, 200)
+
+    def test_start_server_owner_bypass(self):
+        """POST /servers/<id>/start succeeds for the owner without an explicit StartServer row."""
+        self._login()
+        server_instance = Mock()
+        with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
+             patch.object(servers_module.ServersRepository, 'getServerName', return_value='ownerServer'), \
+             patch.object(servers_module, 'get_server_instance', return_value=server_instance), \
+             patch.object(servers_module.api, 'register_socketio_listener'):
+            response = self.client.post('/servers/9/start')
+        self.assertEqual(response.status_code, 200)
+
+    def test_stop_server_owner_bypass(self):
+        """POST /servers/<id>/stop succeeds for the owner without an explicit StopServer row."""
+        self._login()
+        with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
+             patch.object(servers_module.ServersRepository, 'getServerName', return_value='ownerServer'), \
+             patch.object(servers_module, 'stop_server'):
+            response = self.client.post('/servers/9/stop')
+        self.assertEqual(response.status_code, 200)
+
+    def test_server_stats_owner_bypass(self):
+        """GET /servers/<id>/stats succeeds for the owner without an explicit GetServerInfo row."""
+        self._login()
+        server_instance = DummyServerInstance(running=True)
+        stats = {
+            'cpu_usage_percent': 5.0,
+            'memory_usage_mb': 256.0,
+            'max_memory_mb': 1024,
+            'online_players': {'online': 0, 'max': 10, 'players': []},
+        }
+        with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
+             patch.object(servers_module.ServersRepository, 'getServerName', return_value='ownerServer'), \
+             patch.object(servers_module.serverSessionsManager, 'serverInstances', {'ownerServer': server_instance}), \
+             patch.object(servers_module.utils, 'getServerStats', return_value=stats):
+            response = self.client.get('/servers/9/stats')
+        self.assertEqual(response.status_code, 200)
+
+    def test_remove_server_owner_bypass(self):
+        """DELETE /servers/<name>/uninstall succeeds for the owner without an explicit row."""
+        self._login()
+        with patch.object(servers_module.ServersRepository, 'getServerId', return_value=9), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
+             patch.object(servers_module.manageLocalServers, 'uninstallMinecraftServer', return_value=True), \
+             patch.object(servers_module.ServersRepository, 'removeServer', return_value=True):
+            response = self.client.delete('/servers/ownerServer/uninstall')
+        self.assertEqual(response.status_code, 200)
+
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -487,3 +487,57 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
         )
         self.assertEqual(ServersUsersPermsRepository.getServersWithUserPerm(target_user_id, 999), [])
 
+    # --- Owner-bypass tests ---
+
+    def test_dose_user_have_perm_returns_true_for_owner_without_explicit_row(self):
+        """Server owner has implicit access to every permission, even without a DB row."""
+        owner_id = self._seed_user('owner-bypass-user', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_id = self._seed_server(owner_id, 'owner-bypass-server')
+
+        for perm in ServersPermissions:
+            self.assertTrue(
+                ServersUsersPermsRepository.doseUserHavePerm(owner_id, server_id, perm.value),
+                msg=f"Owner should have implicit access to {perm.name}",
+            )
+
+    def test_dose_user_have_perm_non_owner_still_requires_explicit_row(self):
+        """A non-owner user must have an explicit permission row."""
+        owner_id = self._seed_user('owner-explicit-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        non_owner_id = self._seed_user('owner-explicit-non-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_id = self._seed_server(owner_id, 'owner-explicit-server')
+
+        self.assertFalse(
+            ServersUsersPermsRepository.doseUserHavePerm(non_owner_id, server_id, ServersPermissions.ViewServer.value)
+        )
+
+        self._seed_server_perm(server_id, non_owner_id, ServersPermissions.ViewServer.value)
+        self.assertTrue(
+            ServersUsersPermsRepository.doseUserHavePerm(non_owner_id, server_id, ServersPermissions.ViewServer.value)
+        )
+
+    def test_get_servers_with_user_perm_includes_owned_servers(self):
+        """getServersWithUserPerm includes servers owned by the user for every valid permission."""
+        owner_id = self._seed_user('owner-include-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_a = self._seed_server(owner_id, 'owner-include-a')
+        server_b = self._seed_server(owner_id, 'owner-include-b')
+
+        for perm in ServersPermissions:
+            result = ServersUsersPermsRepository.getServersWithUserPerm(owner_id, perm.value)
+            self.assertIn(server_a, result, msg=f"Owned server_a missing for perm {perm.name}")
+            self.assertIn(server_b, result, msg=f"Owned server_b missing for perm {perm.name}")
+
+    def test_get_servers_with_user_perm_merges_owned_and_granted(self):
+        """Servers granted via explicit rows are combined with owned servers without duplicates."""
+        owner_id = self._seed_user('owner-merge-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        other_owner_id = self._seed_user('owner-merge-other-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        owned_server = self._seed_server(owner_id, 'owner-merge-owned')
+        granted_server = self._seed_server(other_owner_id, 'owner-merge-granted')
+
+        self._seed_server_perm(granted_server, owner_id, ServersPermissions.ViewServer.value)
+
+        result = ServersUsersPermsRepository.getServersWithUserPerm(owner_id, ServersPermissions.ViewServer.value)
+        self.assertIn(owned_server, result)
+        self.assertIn(granted_server, result)
+        # No duplicates: if both happen to appear, set-length must equal list-length
+        self.assertEqual(len(result), len(set(result)))
+
