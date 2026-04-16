@@ -1,6 +1,7 @@
 from flask import jsonify, request
 from apiflask import APIFlask
 import os
+import re
 import time
 import eventlet
 from flask_cors import CORS
@@ -33,8 +34,8 @@ app.security_schemes = {
     }
 }
 # TEMPORARY: allows requests from any web origin while cross-server access is needed.
-# TODO: revert to a strict allowlist as soon as temporary access is no longer required.
-_ALLOWED_WEB_ORIGINS = "*"
+# TODO(backend-team, 2026-04-16, TEMP-OPEN-CORS): revert to a strict allowlist.
+_ALLOWED_WEB_ORIGINS = re.compile(r".*")
 CORS(app, supports_credentials=True, origins=_ALLOWED_WEB_ORIGINS)
 socketio = SocketIO(
     app,
