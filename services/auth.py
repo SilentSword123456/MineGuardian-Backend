@@ -62,5 +62,5 @@ def isSessionValid():
     if not UserRepository.doseUserExist(userId):
         return {'status': False}, 401
 
-    return {'status': True}
+    return {'status': True}, 200
 
