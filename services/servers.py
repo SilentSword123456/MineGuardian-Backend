@@ -105,7 +105,7 @@ def start_minecraft_server(serverId):
     serverName = ServersRepository.getServerName(serverId)
     try:
         serverInstance = get_server_instance(serverId)
-        api.register_socketio_listener(serverName, serverInstance)
+        api.register_socketio_listeners(serverName, serverInstance)
         started = serverInstance.start()
         if not started:
             abort(500, message=f"Server '{serverName}' failed to start. Check that Java is installed and the server files are intact.")
@@ -192,18 +192,20 @@ def add_server():
 
     return {'status': True, 'message': f"Server '{serverName}' installed and registered successfully"}, 200
 
-@servers_bp.route('/servers/<serverName>/uninstall', methods=['DELETE'])
+@servers_bp.route('/servers/<serverId>/uninstall', methods=['DELETE'])
 @servers_bp.doc(**DOCS['remove_server'])
 @servers_bp.output(RemoveServerOutputSchema)
 @jwt_required()
-def remove_server(serverName):
+def remove_server(serverId):
     userId = int(get_jwt_identity())
-    if not serverName:
-        abort(400, message='No serverName provided')
+    serverId = _parse_server_id(serverId)
+    if not ServersRepository.doesServerExist(serverId):
+        abort(404, message='Server not found')
 
-    serverId = ServersRepository.getServerId(userId, serverName)
-    if not ServersUsersPermsRepository.doseUserHavePerm(userId,serverId, ServersPermissions.RemovePermissionFromServer.value):
-        return False
+    if not ServersUsersPermsRepository.doseUserHavePerm(userId,serverId, ServersPermissions.UninstallServer.value):
+        abort(403, message='You dont have the permission to do this!')
+
+    serverName = ServersRepository.getServerName(serverId)
     status = manageLocalServers.uninstallMinecraftServer(serverName)
     if isinstance(status, dict) and 'error' in status:
         abort(400, message=status['error'])
