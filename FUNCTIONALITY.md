@@ -26,6 +26,7 @@ must honour.  Tests should be written (or verified) against this specification.
 8. [services/auth.py — Authentication API](#8-servicesauthpy--authentication-api)
 9. [services/dbHandler.py — Database Handler API](#9-servicesdbhandlerpy--database-handler-api)
 10. [services/servers.py — Server Management API](#10-servicesserverspy--server-management-api)
+11. [api.py — SocketIO Event Contract](#11-apipy--socketio-event-contract)
 
 ---
 
@@ -883,3 +884,50 @@ for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
 - **Auth required:** Yes.
 - **Path params:** `serverId` must be an integer.
 - **Responses:** `200 { "status": true, "message": "..." }` | `400` on invalid `serverId` or uninstall failure | `403` when user lacks `UninstallServer` permission (owner is implicitly allowed) | `404` when server id does not exist or DB removal fails.
+
+---
+
+## 11. api.py — SocketIO Event Contract
+
+The websocket contract is **sid-bound**:
+- `connect` is the only event that accepts `auth.serverId`.
+- On successful connect, backend binds `sid -> {user_id, server_id, server_name}` in `_sid_server_context`.
+- Subsequent `system` and `console` events derive target server from sid-bound context (no per-message `auth.serverId`).
+- `disconnect` clears sid-bound context and removes the socket from the server room.
+
+### Socket Event: `connect`
+- **Auth required:** Yes (`@jwt_required()`, JWT cookie).
+- **Input auth payload:** `{ "serverId": <int> }`.
+- **Server actions on success:**
+  - validates server existence and `ViewServer` permission,
+  - creates or reuses `ServerSession`,
+  - registers stream listeners,
+  - stores sid context,
+  - joins room `server_name`,
+  - emits `system`, replayed `console` history, current `status`, and current `resources`.
+- **Failure:** emits `error` and rejects connect (`return False`).
+
+### Socket Event: `system`
+- **Auth required:** Yes.
+- **Input payload:** `{ "message": "..." }`.
+- **Server behavior:** validates sid context + permission and emits a system echo message.
+
+### Socket Event: `console`
+- **Auth required:** Yes.
+- **Input payload:** `{ "message": "..." }` (non-empty string required).
+- **Server behavior:** validates sid context + permission, sends command via `ServerSession.send_command`, and emits `console_ack`.
+
+### Socket Event: `console_ack`
+- **Purpose:** explicit command delivery acknowledgement.
+- **Payload shape:** `{ "ok": <bool>, "code": <str>, "message": <str> }`.
+- **Codes:**
+  - `SENT` — command forwarded.
+  - `INVALID_SERVER` — sid not bound / unauthorized context.
+  - `INVALID_MESSAGE` — message missing or blank.
+  - `SERVER_OFFLINE` — target server session not running.
+  - `DISPATCH_FAILED` — command could not be written to process stdin.
+
+### Socket Event: `disconnect`
+- **Auth payload:** none.
+- **Server behavior:** removes sid context, leaves room using stored `server_name`, logs disconnect context.
+
