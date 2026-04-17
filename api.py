@@ -4,6 +4,7 @@ import os
 import re
 import time
 import logging
+import weakref
 import eventlet
 from flask_cors import CORS
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -27,36 +28,36 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = APIFlask(__name__)
-app.config.update(getConfig()['flaskConfig'])
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mineguardian.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config["JWT_SECRET_KEY"] = getConfig()['jwtSecretKey']
+app.config.update(getConfig()["flaskConfig"])
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///mineguardian.db"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["JWT_SECRET_KEY"] = getConfig()["jwtSecretKey"]
 app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
 app.config["JWT_ACCESS_COOKIE_NAME"] = "accessToken"
 app.config["JWT_COOKIE_CSRF_PROTECT"] = False
-app.config["JWT_COOKIE_SECURE"] = os.environ.get('FLASK_ENV', 'production') != 'development'
+app.config["JWT_COOKIE_SECURE"] = os.environ.get("FLASK_ENV", "production") != "development"
 app.config["JWT_COOKIE_SAMESITE"] = "None" if app.config["JWT_COOKIE_SECURE"] else "Lax"
 app.security_schemes = {
-    'BearerAuth': {
-        'type': 'http',
-        'scheme': 'bearer',
-        'bearerFormat': 'JWT',
+    "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
     }
 }
-# ORIGINAL allowlist (temporarily disabled):
-# _ALLOWED_WEB_ORIGINS = [
-#     "https://frontend.silentlab.work",
-#     re.compile(r"^https://[a-zA-Z0-9-]+\.andrei925-dumitru\.workers\.dev$"),
-# ]
-#
-# TEMPORARY: allow from everywhere while cross-server access is needed.
-# TODO(backend-team, 2026-04-16, TEMP-OPEN-CORS): restore the allowlist above.
-_ALLOWED_WEB_ORIGINS = re.compile(r".*")
+
+# Explicit origin allowlist. Add entries here as needed — never use a
+# catch-all in production.
+_ALLOWED_WEB_ORIGINS = [
+    "https://frontend.silentlab.work",
+    re.compile(r"^https://[a-zA-Z0-9-]+\.andrei925-dumitru\.workers\.dev$"),
+    "http://localhost:5173"
+]
 CORS(app, supports_credentials=True, origins=_ALLOWED_WEB_ORIGINS)
+
 socketio = SocketIO(
     app,
     cors_allowed_origins=app.config["SOCKETIO_CORS_ALLOWED_ORIGINS"],
-    async_mode="eventlet"
+    async_mode="eventlet",
 )
 
 app.register_blueprint(servers_bp)
@@ -64,21 +65,51 @@ app.register_blueprint(db_blueprint)
 app.register_blueprint(auth_blueprint)
 jwt.init_app(app)
 db.init_app(app)
-
 generateDB(app)
 
-_SENSITIVE_LOG_FIELDS = {"password", "token", "access_token", "refresh_token", "authorization", "cookie", "secret", "api_key"}
+# ─── Listener registry ────────────────────────────────────────────────────────
+# Using a WeakSet so entries are automatically removed when a server instance
+# is garbage-collected, with no monkey-patching required.
+_listener_registered: weakref.WeakSet = weakref.WeakSet()
+# Bind each socket connection to one validated server context.
+_sid_server_context: dict[str, dict[str, int | str]] = {}
+
+
+def register_socketio_listeners(server_name: str, server_instance) -> None:
+    """Idempotently attach SocketIO broadcast listeners to a server instance."""
+    if server_instance in _listener_registered:
+        logger.debug("SocketIO listeners already registered server_name=%s", server_name)
+        return
+
+    logger.info("Registering SocketIO listeners server_name=%s", server_name)
+
+    def console_listener(line: str) -> None:
+        socketio.emit("console", {"data": line}, to=server_name)
+        eventlet.sleep(0)
+
+    def status_listener(is_running: bool) -> None:
+        socketio.emit("status", {"running": is_running}, to=server_name)
+        eventlet.sleep(0)
+
+    server_instance.add_listener(console_listener)
+    server_instance.add_status_listener(status_listener)
+    _listener_registered.add(server_instance)
+
+
+# ─── Logging helpers ──────────────────────────────────────────────────────────
+
+_SENSITIVE_LOG_FIELDS = {
+    "password", "token", "access_token", "refresh_token",
+    "authorization", "cookie", "secret", "api_key",
+}
 
 
 def _sanitize_for_log(value):
     if isinstance(value, dict):
-        sanitized = {}
-        for key, item in value.items():
-            if str(key).lower() in _SENSITIVE_LOG_FIELDS:
-                sanitized[key] = "***"
-            else:
-                sanitized[key] = _sanitize_for_log(item)
-        return sanitized
+        return {
+            k: "***" if str(k).lower() in _SENSITIVE_LOG_FIELDS else _sanitize_for_log(v)
+            for k, v in value.items()
+        }
     if isinstance(value, list):
         return [_sanitize_for_log(item) for item in value]
     return value
@@ -101,7 +132,7 @@ def _log_request_start():
 @app.after_request
 def _log_request_end(response):
     started_at = getattr(g, "request_start_time", None)
-    duration_ms = f"{((time.perf_counter() - started_at) * 1000):.2f}" if started_at else "unknown"
+    duration_ms = f"{(time.perf_counter() - started_at) * 1000:.2f}" if started_at else "unknown"
     logger.info(
         "HTTP request completed method=%s path=%s endpoint=%s status=%s duration_ms=%s",
         request.method,
@@ -112,220 +143,282 @@ def _log_request_end(response):
     )
     return response
 
-def register_socketio_listener(serverName, serverInstance):
-    """Ensures a SocketIO broadcast listener is registered for the server instance."""
-    if not hasattr(serverInstance, '_socketio_listener_added'):
-        print(f"Registering SocketIO listeners for server '{serverName}'")
-        # Existing console listener
-        def socketio_console_listener(line):
-            socketio.emit('console', {'data': line}, to=serverName)
-            eventlet.sleep(0) # Yield for the event loop
-        serverInstance.add_listener(socketio_console_listener)
 
-        # New status listener (the "hook" in action)
-        def socketio_status_listener(is_running):
-            socketio.emit('status', {'running': is_running}, to=serverName)
-            eventlet.sleep(0)
+# ─── Helpers ─────────────────────────────────────────────────────────────────
 
-        # Register the status listener to the server instance
-        serverInstance.add_status_listener(socketio_status_listener)
-
-        serverInstance._socketio_listener_added = True
-    else:
-        print(f"SocketIO listeners already registered for server '{serverName}'")
-
-
-def parseSocketServerId(value):
+def _parse_server_id(value) -> int | None:
     try:
         return int(value)
     except (TypeError, ValueError):
         return None
 
-@app.route('/health')
-def home():
-    return jsonify({
-        'status': 'ok',
-        'timestamp': time.time()
-    }), 200
 
-@socketio.on('connect')
+def _current_sid() -> str | None:
+    # request.sid is injected by Flask-SocketIO during socket events.
+    return getattr(request, "sid", None)
+
+
+def _resolve_server(auth_payload: dict) -> tuple[int, str] | tuple[None, None]:
+    """
+    Extract and validate serverId from the SocketIO auth payload.
+    Returns (serverId, serverName) or (None, None) on failure.
+
+    All events — connect, disconnect, console, system — pass serverId
+    through the auth object for consistency.
+    """
+    server_id = _parse_server_id(auth_payload.get("serverId") if auth_payload else None)
+    if server_id is None:
+        return None, None
+    if not ServersRepository.doesServerExist(server_id):
+        return None, None
+    server_name = ServersRepository.getServerName(server_id)
+    return server_id, server_name
+
+
+# ─── REST ────────────────────────────────────────────────────────────────────
+
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok", "timestamp": time.time()}), 200
+
+
+# ─── SocketIO events ─────────────────────────────────────────────────────────
+
+@socketio.on("connect")
 @jwt_required()
 def handle_connect(auth=None):
-    logger.info("SocketIO connect received args=%s", _sanitize_for_log(request.args.to_dict(flat=True)))
-    userId = int(get_jwt_identity())
-    serverId = parseSocketServerId(request.args.get('serverId'))
-    if serverId is None:
-        logger.warning("SocketIO connect rejected due to invalid serverId")
-        emit('error', {'data': 'Invalid serverId'})
+    sid = _current_sid()
+    logger.info("SocketIO connect sid=%s auth=%s", sid, _sanitize_for_log(auth or {}))
+    user_id = int(get_jwt_identity())
+    server_id, server_name = _resolve_server(auth)
+
+    if server_id is None:
+        logger.warning("SocketIO connect rejected: invalid or missing serverId sid=%s", sid)
+        emit("error", {"data": "Invalid serverId"})
         return False
 
-    if not ServersRepository.doesServerExist(serverId):
-        logger.warning("SocketIO connect rejected server not found server_id=%s", serverId)
-        abort(404, message='Server not found')
-
-    if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.ViewServer.value):
-        logger.warning("SocketIO connect rejected permissions user_id=%s server_id=%s", userId, serverId)
+    if not ServersUsersPermsRepository.doseUserHavePerm(
+            user_id, server_id, ServersPermissions.ViewServer.value
+    ):
+        logger.warning(
+            "SocketIO connect rejected: no permission sid=%s user_id=%s server_id=%s",
+            sid, user_id, server_id,
+        )
         abort(401, message="You don't have permission to access this server")
-
-    serverName = ServersRepository.getServerName(serverId)
-    if not serverName:
-        logger.warning("SocketIO connect rejected due to missing server name server_id=%s", serverId)
-        emit('error', {'data': 'No serverName provided in connection'})
-        return False
 
     try:
-        if serverName not in serverSessionsManager.serverInstances:
-            print(f"Initializing new server instance for '{serverName}' during connection")
-            serverInstance = utils.setupServerInstance(os.path.join(DIR, "servers", serverName), serverName, serverId)
+        if server_name not in serverSessionsManager.serverInstances:
+            logger.info("Initialising server instance server_name=%s", server_name)
+            server_instance = utils.setupServerInstance(
+                os.path.join(DIR, "servers", server_name), server_name, server_id
+            )
         else:
-            serverInstance = serverSessionsManager.serverInstances[serverName]
+            server_instance = serverSessionsManager.serverInstances[server_name]
 
-        register_socketio_listener(serverName, serverInstance)
+        register_socketio_listeners(server_name, server_instance)
+        if sid:
+            _sid_server_context[sid] = {
+                "user_id": user_id,
+                "server_id": server_id,
+                "server_name": server_name,
+            }
+        join_room(server_name)
 
-        join_room(serverName)
-        logger.info("SocketIO connect accepted user_id=%s server_id=%s server_name=%s", userId, serverId, serverName)
-        emit('system', {'data': f"Connected to server {serverName}"})
+        logger.info(
+            "SocketIO connect accepted sid=%s user_id=%s server_id=%s server_name=%s",
+            sid, user_id, server_id, server_name,
+        )
+        emit("system", {"data": f"Connected to server {server_name}"})
 
-        for line in serverInstance.log_history:
-            emit('console', {'data': line})
+        for line in server_instance.log_history:
+            emit("console", {"data": line})
 
-        live_running = serverInstance.running
-        emit('status', {'running': live_running})
+        is_running = server_instance.running
+        emit("status", {"running": is_running})
+        emit("resources", utils.getServerStats(server_instance))
 
-        stats = utils.getServerStats(serverInstance)
-        emit('resources', stats)
+        # Broadcast current status to other clients in the room
+        socketio.emit("status", {"running": is_running}, to=server_name, include_self=False)
 
-        socketio.emit('status', {'running': live_running}, to=serverName, include_self=False)
-
-    except Exception as e:
-        logger.exception("SocketIO connect failed server_name=%s error=%s", serverName, e)
-        emit('error', {'data': f"Connection error: {str(e)}"})
+    except Exception:
+        if sid:
+            _sid_server_context.pop(sid, None)
+        logger.exception("SocketIO connect failed sid=%s server_name=%s", sid, server_name)
+        emit("error", {"data": "Connection error — please try again"})
         return False
 
 
-
-@socketio.on('disconnect')
+@socketio.on("disconnect")
 def handle_disconnect():
-    logger.info("SocketIO disconnect received args=%s", _sanitize_for_log(request.args.to_dict(flat=True)))
-    serverId = parseSocketServerId(request.args.get('serverId'))
-    if serverId is None:
+    sid = _current_sid()
+    context = _sid_server_context.pop(sid, None) if sid else None
+    if not context:
+        logger.info("SocketIO disconnected sid=%s with no bound server context", sid)
         return
 
-    if not ServersRepository.doesServerExist(serverId):
-        return
+    server_name = str(context["server_name"])
+    leave_room(server_name)
+    logger.info(
+        "SocketIO disconnected sid=%s user_id=%s server_id=%s server_name=%s",
+        sid,
+        context["user_id"],
+        context["server_id"],
+        server_name,
+    )
 
-    serverName = ServersRepository.getServerName(serverId)
-    if serverName:
-        leave_room(serverName)
-        logger.info("SocketIO disconnected from room server_id=%s server_name=%s", serverId, serverName)
-    else:
-        logger.info('SocketIO disconnected without server name server_id=%s', serverId)
 
-@socketio.on('system')
-@jwt_required()
-def handleSystemMessage(data):
-    logger.info("SocketIO system event received payload=%s args=%s", _sanitize_for_log(data), _sanitize_for_log(request.args.to_dict(flat=True)))
-    userId = int(get_jwt_identity())
-    serverId = parseSocketServerId(request.args.get('serverId'))
-    if serverId is None:
-        emit('error', {'data': 'Invalid serverId'})
-        return
+def _require_server_access():
+    """
+    Shared guard for event handlers that require an authenticated user with
+    ViewServer permission. Uses sid-bound server context from connect.
+    Returns (user_id, server_id, server_name) or emits an error and returns
+    (None, None, None).
+    """
+    user_id = int(get_jwt_identity())
+    sid = _current_sid()
+    context = _sid_server_context.get(sid) if sid else None
+    if not context:
+        logger.warning("SocketIO access denied: no bound server context sid=%s", sid)
+        emit("error", {"data": "No active server binding for this connection"})
+        return None, None, None
 
-    if not ServersRepository.doesServerExist(serverId):
-        abort(404, message='Server not found')
+    server_id = int(context["server_id"])
+    server_name = str(context["server_name"])
+    bound_user_id = int(context["user_id"])
+    if bound_user_id != user_id:
+        logger.warning(
+            "SocketIO access denied: sid/user mismatch sid=%s bound_user_id=%s user_id=%s",
+            sid, bound_user_id, user_id,
+        )
+        emit("error", {"data": "Invalid socket user context"})
+        return None, None, None
 
-    if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.ViewServer.value):
+    if not ServersUsersPermsRepository.doseUserHavePerm(
+            user_id, server_id, ServersPermissions.ViewServer.value
+    ):
+        logger.warning(
+            "SocketIO access denied: no permission sid=%s user_id=%s server_id=%s",
+            sid, user_id, server_id,
+        )
         abort(401, message="You don't have permission to access this server")
 
-    serverName = ServersRepository.getServerName(serverId)
-    logger.info("SocketIO system event processed server_name=%s", serverName)
-    emit('system', {'data': f"Server {serverName} received: {data['message']}"})
+    return user_id, server_id, server_name
 
-@socketio.on('console')
+
+@socketio.on("system")
 @jwt_required()
-def handleConsole(data):
-    logger.info("SocketIO console event received payload=%s args=%s", _sanitize_for_log(data), _sanitize_for_log(request.args.to_dict(flat=True)))
-    userId = int(get_jwt_identity())
-    serverId = parseSocketServerId(request.args.get('serverId'))
-    if serverId is None:
-        emit('error', {'data': 'Invalid serverId'})
+def handle_system(data):
+    logger.info("SocketIO system event payload=%s", _sanitize_for_log(data))
+    payload = data if isinstance(data, dict) else {}
+    _, _, server_name = _require_server_access()
+    if server_name is None:
+        return
+    emit("system", {"data": f"Server {server_name} received: {payload.get('message', '')}"})
+
+
+@socketio.on("console")
+@jwt_required()
+def handle_console(data):
+    logger.info("SocketIO console event payload=%s", _sanitize_for_log(data))
+    payload = data if isinstance(data, dict) else {}
+    user_id, server_id, server_name = _require_server_access()
+    if server_name is None:
+        emit("console_ack", {
+            "ok": False,
+            "code": "INVALID_SERVER",
+            "message": "Invalid or unauthorized server access",
+        })
         return
 
-    if not ServersRepository.doesServerExist(serverId):
-        abort(404, message='Server not found')
-
-    if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.ViewServer.value):
-        abort(401, message="You don't have permission to access this server")
-
-    serverName = ServersRepository.getServerName(serverId)
-    if not serverName:
-        emit('error', {'data': 'No serverName provided'})
+    message = payload.get("message")
+    if not isinstance(message, str) or not message.strip():
+        logger.warning(
+            "Console command rejected: invalid message user_id=%s server_id=%s server_name=%s",
+            user_id, server_id, server_name,
+        )
+        emit("error", {"data": "Invalid console message"})
+        emit("console_ack", {
+            "ok": False,
+            "code": "INVALID_MESSAGE",
+            "message": "Console message must be a non-empty string",
+        })
         return
 
-    if serverName not in serverSessionsManager.serverInstances:
-        logger.warning("SocketIO console command rejected because server is offline server_name=%s", serverName)
-        emit('console', {'data': f"Server '{serverName}' is not running."})
+    if server_name not in serverSessionsManager.serverInstances:
+        logger.warning(
+            "Console command rejected: server offline user_id=%s server_id=%s server_name=%s",
+            user_id, server_id, server_name,
+        )
+        emit("console", {"data": f"Server '{server_name}' is not running."})
+        emit("console_ack", {
+            "ok": False,
+            "code": "SERVER_OFFLINE",
+            "message": f"Server '{server_name}' is not running.",
+        })
         return
 
-    serverInstance = serverSessionsManager.serverInstances[serverName]
-    logger.info("SocketIO console command forwarded server_name=%s", serverName)
-    serverInstance.send_command(data['message'])
-
-def _broadcast_stats():
-    """Background task to broadcast server stats via SocketIO every 5 seconds."""
-    # Ensure this task only runs once in the current process
-    if getattr(_broadcast_stats, '_running', False):
+    server_instance = serverSessionsManager.serverInstances[server_name]
+    sent = server_instance.send_command(message)
+    if not sent:
+        logger.warning(
+            "Console command dispatch failed user_id=%s server_id=%s server_name=%s",
+            user_id, server_id, server_name,
+        )
+        emit("console_ack", {
+            "ok": False,
+            "code": "DISPATCH_FAILED",
+            "message": "Command was not accepted by the server process",
+        })
         return
-    _broadcast_stats._running = True
 
+    logger.info(
+        "Console command forwarded user_id=%s server_id=%s server_name=%s message_len=%s",
+        user_id, server_id, server_name, len(message),
+    )
+    emit("console_ack", {
+        "ok": True,
+        "code": "SENT",
+        "message": "Command forwarded",
+    })
+
+
+# ─── Background stats broadcast ──────────────────────────────────────────────
+
+def _emit_server_stats(server_name: str, server_instance) -> None:
+    try:
+        stats = utils.getServerStats(server_instance, force=True)
+        socketio.emit("resources", stats, to=server_name)
+    except Exception:
+        logger.exception("Error broadcasting stats server_name=%s", server_name)
+
+
+def _broadcast_stats() -> None:
     while True:
         socketio.sleep(5)
-        # Use list() to avoid dictionary modification issues
-        for serverName, serverInstance in list(serverSessionsManager.serverInstances.items()):
-            if serverInstance.is_running():
-                # Spawn separate greenlets to collect stats in parallel for each server
-                socketio.start_background_task(_emit_server_stats, serverName, serverInstance)
+        for server_name, server_instance in list(serverSessionsManager.serverInstances.items()):
+            if server_instance.is_running():
+                socketio.start_background_task(_emit_server_stats, server_name, server_instance)
 
-def _emit_server_stats(serverName, serverInstance):
-    """Worker greenlet to collect and emit stats for a single server."""
-    try:
-        # Collect stats using the centralized function (force=True to get fresh data for broadcast)
-        # get_server_stats now handles its own per-server locking
-        stats = utils.getServerStats(serverInstance, force=True)
 
-        # Emit to specific room for this server
-        socketio.emit('resources', stats, to=serverName)
-        # print(f"Broadcasted stats for server '{serverName}'")
-    except Exception as e:
-        print(f"Error broadcasting stats for '{serverName}': {e}")
+_broadcast_started = False
 
-# Background task management
-_broadcast_stats_started = False
 
-def start_background_tasks():
-    global _broadcast_stats_started
-    if _broadcast_stats_started:
+def _start_background_tasks() -> None:
+    global _broadcast_started
+    if _broadcast_started:
         return
-    
-    # In debug mode, Werkzeug's reloader starts the app twice. 
-    # We only want the background task in the child process.
-    if app.debug and os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+    # In debug mode, Werkzeug's reloader forks the process; only start in child.
+    if app.debug and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
         return
-
-    print("Starting background stats broadcast task...")
+    logger.info("Starting background stats broadcast task")
     socketio.start_background_task(_broadcast_stats)
-    _broadcast_stats_started = True
+    _broadcast_started = True
 
-# We don't call it here at module level anymore
-# start_background_tasks()
 
-def startServer(debug=False, port=5000, host="0.0.0.0"):
-    # Ensure background tasks are started (only once per process)
-    # If using reloader, only start in the child process.
-    if not debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        start_background_tasks()
-
+def startServer(debug: bool = False, port: int = 5000, host: str = "0.0.0.0") -> None:
+    _start_background_tasks()
     socketio.run(app, debug=debug, port=port, host=host)
 
-def stopServer():
+
+def stopServer() -> None:
     socketio.stop()
