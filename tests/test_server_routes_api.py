@@ -136,7 +136,7 @@ class ServerRoutesTests(unittest.TestCase):
              patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
              patch.object(servers_module.ServersRepository, 'getServerName', return_value='myCoolServer'), \
              patch.object(servers_module, 'get_server_instance', return_value=server_instance) as get_server_instance, \
-             patch.object(servers_module.api, 'register_socketio_listener') as register_listener:
+             patch.object(servers_module.api, 'register_socketio_listeners') as register_listener:
             response = self.client.post('/servers/9/start')
 
         self.assertEqual(response.status_code, 200)
@@ -178,11 +178,12 @@ class ServerRoutesTests(unittest.TestCase):
 
     def test_manage_remove_server_success(self):
         self._login()
-        with patch.object(servers_module.ServersRepository, 'getServerId', return_value=9), \
+        with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
+             patch.object(servers_module.ServersRepository, 'getServerName', return_value='myCoolServer'), \
              patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
              patch.object(servers_module.manageLocalServers, 'uninstallMinecraftServer', return_value=True) as uninstall_server, \
              patch.object(servers_module.ServersRepository, 'removeServer', return_value=True):
-            response = self.client.delete('/servers/myCoolServer/uninstall')
+            response = self.client.delete('/servers/9/uninstall')
 
         self.assertEqual(response.status_code, 200)
         uninstall_server.assert_called_once_with('myCoolServer')
@@ -283,7 +284,7 @@ class OwnerBypassRoutesTests(unittest.TestCase):
              patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
              patch.object(servers_module.ServersRepository, 'getServerName', return_value='ownerServer'), \
              patch.object(servers_module, 'get_server_instance', return_value=server_instance), \
-             patch.object(servers_module.api, 'register_socketio_listener'):
+             patch.object(servers_module.api, 'register_socketio_listeners'):
             response = self.client.post('/servers/9/start')
         self.assertEqual(response.status_code, 200)
 
@@ -316,13 +317,14 @@ class OwnerBypassRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_remove_server_owner_bypass(self):
-        """DELETE /servers/<name>/uninstall succeeds for the owner without an explicit row."""
+        """DELETE /servers/<id>/uninstall succeeds for the owner without an explicit row."""
         self._login()
-        with patch.object(servers_module.ServersRepository, 'getServerId', return_value=9), \
+        with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
+             patch.object(servers_module.ServersRepository, 'getServerName', return_value='ownerServer'), \
              patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
              patch.object(servers_module.manageLocalServers, 'uninstallMinecraftServer', return_value=True), \
              patch.object(servers_module.ServersRepository, 'removeServer', return_value=True):
-            response = self.client.delete('/servers/ownerServer/uninstall')
+            response = self.client.delete('/servers/9/uninstall')
         self.assertEqual(response.status_code, 200)
 
 
