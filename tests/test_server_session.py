@@ -337,5 +337,78 @@ class CleanupTests(unittest.TestCase):
         s.cleanup()  # Should not raise
 
 
+        s = _make_session()
+        s._rcon = None
+        s.cleanup()  # Should not raise
+
+
+# ---------------------------------------------------------------------------
+# Java version check in ServerSession.start()
+# ---------------------------------------------------------------------------
+
+class StartJavaVersionCheckTests(unittest.TestCase):
+    def setUp(self):
+        self.session = _make_session(command="java -jar server.jar")
+        self.session.working_dir = "/fake/servers/test"
+
+    def test_returns_false_when_required_java_not_installed(self):
+        """start() must return False when the server needs Java 21 but only Java 17 is present."""
+        with patch("shutil.which", return_value="/usr/bin/java"), \
+             patch("utils.getMcVersion", return_value="1.21.4"), \
+             patch("utils.getRequiredJavaVersion", return_value=21), \
+             patch("utils.getInstalledJavaMajorVersions", return_value={17}):
+            result = self.session.start()
+        self.assertFalse(result)
+
+    def test_returns_false_when_no_java_installed(self):
+        """start() must return False when no Java is found (original path check)."""
+        with patch("shutil.which", return_value=None):
+            result = self.session.start()
+        self.assertFalse(result)
+
+    def test_proceeds_when_sufficient_java_installed(self):
+        """start() should attempt to launch the process when Java is sufficient."""
+        with patch("shutil.which", return_value="/usr/bin/java"), \
+             patch("utils.getMcVersion", return_value="1.21.4"), \
+             patch("utils.getRequiredJavaVersion", return_value=21), \
+             patch("utils.getInstalledJavaMajorVersions", return_value={21}), \
+             patch("subprocess.Popen") as mock_popen, \
+             patch("eventlet.spawn"):
+            mock_proc = MagicMock()
+            mock_proc.pid = 9999
+            mock_popen.return_value = mock_proc
+            result = self.session.start()
+        self.assertTrue(result)
+        mock_popen.assert_called_once()
+
+    def test_proceeds_when_higher_java_installed(self):
+        """Java 25 satisfies a server that requires Java 21."""
+        with patch("shutil.which", return_value="/usr/bin/java"), \
+             patch("utils.getMcVersion", return_value="1.21.4"), \
+             patch("utils.getRequiredJavaVersion", return_value=21), \
+             patch("utils.getInstalledJavaMajorVersions", return_value={25}), \
+             patch("subprocess.Popen") as mock_popen, \
+             patch("eventlet.spawn"):
+            mock_proc = MagicMock()
+            mock_proc.pid = 9999
+            mock_popen.return_value = mock_proc
+            result = self.session.start()
+        self.assertTrue(result)
+        mock_popen.assert_called_once()
+
+    def test_skips_java_version_check_when_no_metadata(self):
+        """If mineguardian.json is absent, start() skips the version check."""
+        with patch("shutil.which", return_value="/usr/bin/java"), \
+             patch("utils.getMcVersion", return_value=None), \
+             patch("subprocess.Popen") as mock_popen, \
+             patch("eventlet.spawn"):
+            mock_proc = MagicMock()
+            mock_proc.pid = 9999
+            mock_popen.return_value = mock_proc
+            result = self.session.start()
+        self.assertTrue(result)
+        mock_popen.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -285,5 +285,126 @@ class UninstallMinecraftServerTests(unittest.TestCase):
             self.assertNotIn(server_name, server_instances)
 
 
+            self.assertTrue(result)
+            mock_instance.cleanup.assert_called_once()
+            self.assertNotIn(server_name, server_instances)
+
+
+# ---------------------------------------------------------------------------
+# Java version check during installMinecraftServer
+# ---------------------------------------------------------------------------
+
+class InstallMinecraftServerJavaCheckTests(unittest.TestCase):
+    """Verify that install is blocked when the required Java version is absent."""
+
+    def _manifest_for(self, version_id):
+        return {
+            "latest": {"release": version_id},
+            "versions": [{"id": version_id, "url": f"https://example.com/{version_id}.json"}],
+        }
+
+    def _mock_manifest_response(self, manifest):
+        m = MagicMock()
+        m.json.return_value = manifest
+        m.raise_for_status = MagicMock()
+        return m
+
+    def test_returns_error_when_java_not_sufficient(self):
+        """Installing a 1.21 server without Java 21 should return an error."""
+        manifest = self._manifest_for("1.21.1")
+        with patch("manageLocalServers.getLocalServers", return_value=[]), \
+             patch("manageLocalServers.requests.get",
+                   return_value=self._mock_manifest_response(manifest)), \
+             patch("manageLocalServers.getInstalledJavaMajorVersions", return_value={17}):
+            result = manageLocalServers.installMinecraftServer(
+                serverSoftware="vanilla",
+                serverVersion="1.21.1",
+                serverName="new-server",
+                acceptEula=True,
+            )
+        self.assertIn("error", result)
+        self.assertIn("Java 21", result["error"])
+
+    def test_proceeds_when_java_is_sufficient(self):
+        """Installing a 1.21 server with Java 21 should succeed."""
+        manifest = self._manifest_for("1.21.1")
+        version_info = {"downloads": {"server": {"url": "https://example.com/server.jar"}}}
+
+        mock_manifest = self._mock_manifest_response(manifest)
+        mock_version = MagicMock()
+        mock_version.json.return_value = version_info
+        mock_version.raise_for_status = MagicMock()
+
+        with patch("manageLocalServers.getLocalServers", return_value=[]), \
+             patch("manageLocalServers.requests.get",
+                   side_effect=[mock_manifest, mock_version]), \
+             patch("manageLocalServers.getInstalledJavaMajorVersions", return_value={21}), \
+             patch("manageLocalServers.downloadFile"), \
+             patch("manageLocalServers.saveMcVersion"), \
+             patch("manageLocalServers.createRunScript"), \
+             patch("manageLocalServers.addAcceptEula"):
+            result = manageLocalServers.installMinecraftServer(
+                serverSoftware="vanilla",
+                serverVersion="1.21.1",
+                serverName="new-server",
+                acceptEula=True,
+            )
+        self.assertTrue(result)
+
+    def test_proceeds_with_higher_java_than_required(self):
+        """Java 25 should satisfy a server that requires Java 21."""
+        manifest = self._manifest_for("1.21.1")
+        version_info = {"downloads": {"server": {"url": "https://example.com/server.jar"}}}
+
+        mock_manifest = self._mock_manifest_response(manifest)
+        mock_version = MagicMock()
+        mock_version.json.return_value = version_info
+        mock_version.raise_for_status = MagicMock()
+
+        with patch("manageLocalServers.getLocalServers", return_value=[]), \
+             patch("manageLocalServers.requests.get",
+                   side_effect=[mock_manifest, mock_version]), \
+             patch("manageLocalServers.getInstalledJavaMajorVersions", return_value={25}), \
+             patch("manageLocalServers.downloadFile"), \
+             patch("manageLocalServers.saveMcVersion"), \
+             patch("manageLocalServers.createRunScript"), \
+             patch("manageLocalServers.addAcceptEula"):
+            result = manageLocalServers.installMinecraftServer(
+                serverSoftware="vanilla",
+                serverVersion="1.21.1",
+                serverName="new-server",
+                acceptEula=True,
+            )
+        self.assertTrue(result)
+
+    def test_saves_mc_version_metadata_on_success(self):
+        """mineguardian.json should be written with the resolved version."""
+        manifest = self._manifest_for("1.18.2")
+        version_info = {"downloads": {"server": {"url": "https://example.com/server.jar"}}}
+
+        mock_manifest = self._mock_manifest_response(manifest)
+        mock_version = MagicMock()
+        mock_version.json.return_value = version_info
+        mock_version.raise_for_status = MagicMock()
+
+        with patch("manageLocalServers.getLocalServers", return_value=[]), \
+             patch("manageLocalServers.requests.get",
+                   side_effect=[mock_manifest, mock_version]), \
+             patch("manageLocalServers.getInstalledJavaMajorVersions", return_value={17}), \
+             patch("manageLocalServers.downloadFile"), \
+             patch("manageLocalServers.saveMcVersion") as mock_save, \
+             patch("manageLocalServers.createRunScript"), \
+             patch("manageLocalServers.addAcceptEula"):
+            manageLocalServers.installMinecraftServer(
+                serverSoftware="vanilla",
+                serverVersion="1.18.2",
+                serverName="new-server",
+                acceptEula=True,
+            )
+        mock_save.assert_called_once()
+        _, saved_version = mock_save.call_args[0]
+        self.assertEqual(saved_version, "1.18.2")
+
+
 if __name__ == "__main__":
     unittest.main()

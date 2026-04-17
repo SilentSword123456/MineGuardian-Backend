@@ -1,7 +1,14 @@
 import os
 
 import serverSessionsManager
-from utils import downloadFile, createRunScript, getLocalServers
+from utils import (
+    downloadFile,
+    createRunScript,
+    getLocalServers,
+    getRequiredJavaVersion,
+    getInstalledJavaMajorVersions,
+    saveMcVersion,
+)
 import requests
 
 def installMinecraftServer(serverSoftware=None, serverVersion=None, serverName=None, acceptEula=False):
@@ -35,6 +42,19 @@ def installMinecraftServer(serverSoftware=None, serverVersion=None, serverName=N
         except requests.exceptions.RequestException as e:
             return {"error": f"Error fetching version data from {allVersionsDownloadPage}: {e}"}
 
+        # Check that the required Java version is available before downloading.
+        requiredJava = getRequiredJavaVersion(serverVersion)
+        installedVersions = getInstalledJavaMajorVersions()
+        if not any(v >= requiredJava for v in installedVersions):
+            return {
+                "error": (
+                    f"Minecraft {serverVersion} requires Java {requiredJava} or newer, "
+                    f"but no suitable Java installation was found on this system "
+                    f"(found: {sorted(installedVersions) if installedVersions else 'none'}). "
+                    f"Please install Java {requiredJava}+ before installing this server."
+                )
+            }
+
         try:
             response = requests.get(downloadUrl)
             response.raise_for_status()
@@ -51,6 +71,9 @@ def installMinecraftServer(serverSoftware=None, serverVersion=None, serverName=N
 
     downloadPath = os.path.join("servers", serverName)
     downloadFile(downloadUrl, downloadPath + "/server.jar")
+
+    # Persist the Minecraft version so the start-up check can use it later.
+    saveMcVersion(downloadPath, serverVersion)
 
     createRunScript(downloadPath)
 
