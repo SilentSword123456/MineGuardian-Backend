@@ -1,11 +1,147 @@
 from __future__ import annotations
 import os
+import re
 import secrets
+import shutil
+import subprocess
 import questionary
 import requests
 import json
 import time
 import serverSessionsManager
+
+# ---------------------------------------------------------------------------
+# Minecraft → Java version helpers
+# ---------------------------------------------------------------------------
+
+# Mapping of Minecraft version prefixes/ranges to the minimum required Java
+# major version.  Entries are checked in order so more specific prefixes must
+# come before broader ones.
+_MC_JAVA_REQUIREMENTS: list[tuple[tuple[int, ...], int]] = [
+    # MC 1.20.5+ requires Java 21
+    ((1, 20, 5), 21),
+    # MC 1.17 – 1.20.4 requires Java 17
+    ((1, 17), 17),
+    # MC 1.0 – 1.16.x requires Java 8
+    ((1, 0), 8),
+]
+
+
+def getRequiredJavaVersion(mcVersion: str) -> int:
+    """Return the minimum Java major version required by the given Minecraft version string.
+
+    Examples::
+
+        getRequiredJavaVersion("1.21.4")  # → 21
+        getRequiredJavaVersion("1.18.2")  # → 17
+        getRequiredJavaVersion("1.16.5")  # → 8
+
+    Returns 8 (the lowest known requirement) for any unrecognised version string.
+    """
+    parts = []
+    for segment in mcVersion.split("."):
+        # Strip non-numeric suffixes such as "-rc1"
+        numeric = re.match(r"(\d+)", segment)
+        if numeric:
+            parts.append(int(numeric.group(1)))
+
+    if not parts:
+        return 8
+
+    version_tuple = tuple(parts)
+
+    for threshold, java_ver in _MC_JAVA_REQUIREMENTS:
+        if version_tuple >= threshold:
+            return java_ver
+
+    return 8
+
+
+def getInstalledJavaMajorVersions() -> set[int]:
+    """Return the set of Java major versions available on this system.
+
+    Checks the ``java`` executable on PATH as well as every JVM installation
+    found under ``/usr/lib/jvm`` (the standard location on Debian/Ubuntu).
+    """
+    candidates: list[str] = []
+
+    if shutil.which("java"):
+        candidates.append("java")
+
+    jvm_base = "/usr/lib/jvm"
+    if os.path.isdir(jvm_base):
+        for entry in os.listdir(jvm_base):
+            java_bin = os.path.join(jvm_base, entry, "bin", "java")
+            if os.path.isfile(java_bin) and os.access(java_bin, os.X_OK):
+                candidates.append(java_bin)
+
+    found: set[int] = set()
+    for candidate in candidates:
+        version = _getJavaMajorVersion(candidate)
+        if version is not None:
+            found.add(version)
+
+    return found
+
+
+def _getJavaMajorVersion(java_executable: str) -> int | None:
+    """Run *java_executable* ``-version`` and return the major version number."""
+    try:
+        result = subprocess.run(
+            [java_executable, "-version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        output = result.stderr or result.stdout
+        # Output examples:
+        #   openjdk version "17.0.9" 2023-10-17
+        #   java version "1.8.0_392"          (old scheme where 1.8 == Java 8)
+        match = re.search(r'version "(\d+)(?:\.(\d+))?', output)
+        if match:
+            major = int(match.group(1))
+            if major == 1 and match.group(2):
+                # Old versioning scheme: "1.8" → Java 8
+                major = int(match.group(2))
+            return major
+    except Exception:
+        pass
+    return None
+
+
+def getMcVersion(serverPath: str) -> str | None:
+    """Read the Minecraft version stored in the server's ``mineguardian.json`` metadata file.
+
+    Returns ``None`` if the file does not exist or cannot be read.
+    """
+    meta_path = os.path.join(serverPath, "mineguardian.json")
+    if not os.path.isfile(meta_path):
+        return None
+    try:
+        with open(meta_path, "r") as f:
+            data = json.load(f)
+        return data.get("mc_version")
+    except Exception:
+        return None
+
+
+def saveMcVersion(serverPath: str, mcVersion: str) -> None:
+    """Persist the Minecraft version to ``mineguardian.json`` inside *serverPath*.
+
+    The resolved path must be located inside the ``servers/`` directory to
+    prevent accidental writes outside the expected tree.
+    """
+    abs_path = os.path.abspath(serverPath)
+    servers_dir = os.path.abspath("servers")
+    if not abs_path.startswith(servers_dir + os.sep):
+        print(f"Warning: refusing to write metadata outside servers directory: '{abs_path}'")
+        return
+    meta_path = os.path.join(abs_path, "mineguardian.json")
+    try:
+        with open(meta_path, "w") as f:
+            json.dump({"mc_version": mcVersion}, f)
+    except Exception as e:
+        print(f"Warning: could not save server metadata to '{meta_path}': {e}")
 
 
 def displayTitle():
