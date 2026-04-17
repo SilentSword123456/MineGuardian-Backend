@@ -20,7 +20,7 @@ class EndpointMapApiTests(unittest.TestCase):
 		self.assertEqual(manage_add_server_post.get('security'), [{'BearerAuth': []}])
 		self.assertIn('Requires JWT Bearer token', manage_add_server_post.get('description', ''))
 
-		remove_server_delete = spec['paths']['/servers/{serverName}/uninstall']['delete']
+		remove_server_delete = spec['paths']['/servers/{serverId}/uninstall']['delete']
 		self.assertEqual(remove_server_delete.get('security'), [{'BearerAuth': []}])
 		self.assertIn('Requires JWT Bearer token', remove_server_delete.get('description', ''))
 
@@ -45,7 +45,7 @@ class EndpointMapApiTests(unittest.TestCase):
 			'/servers/<serverId>/start': {'POST'},
 			'/servers/<serverId>/stop': {'POST'},
 			'/servers/<serverId>/stats': {'GET'},
-			'/servers/<serverName>/uninstall': {'DELETE'},
+			'/servers/<serverId>/uninstall': {'DELETE'},
 			'/servers/globalStats': {'GET'},
 			'/manage/addServer': {'POST'},
 			'/manage/<software>/getAvailableVersions': {'GET'},
