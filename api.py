@@ -50,13 +50,17 @@ app.security_schemes = {
 _ALLOWED_WEB_ORIGINS = [
     "https://frontend.silentlab.work",
     re.compile(r"^https://[a-zA-Z0-9-]+\.andrei925-dumitru\.workers\.dev$"),
-    "http://localhost:5173"
 ]
-CORS(app, supports_credentials=True, origins=_ALLOWED_WEB_ORIGINS)
+
+# Accept from all if not in production, else only from allowed origins
+_IS_PRODUCTION = os.environ.get("FLASK_ENV", "production") == "production"
+_CORS_ORIGINS = _ALLOWED_WEB_ORIGINS if _IS_PRODUCTION else "*"
+
+CORS(app, supports_credentials=True, origins=_CORS_ORIGINS)
 
 socketio = SocketIO(
     app,
-    cors_allowed_origins=app.config["SOCKETIO_CORS_ALLOWED_ORIGINS"],
+    cors_allowed_origins=_CORS_ORIGINS,
     async_mode="eventlet",
 )
 
