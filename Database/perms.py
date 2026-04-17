@@ -14,3 +14,4 @@ class ServersPermissions(Enum):
     StartServer = 4
     StopServer = 5
     ViewServer = 6
+    UninstallServer = 7
