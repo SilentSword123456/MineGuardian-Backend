@@ -6,6 +6,7 @@ usedPorts = set()
 import eventlet
 import eventlet.tpool
 import os
+import shutil
 import subprocess
 import time
 import psutil
@@ -95,6 +96,10 @@ class ServerSession:
     def start(self):
         if self.running:
             print(f"Server '{self.name}' is already running!")
+            return False
+
+        if shutil.which("java") is None:
+            print(f"Failed to start server '{self.name}': Java is not installed or not on PATH. Please install a Java Runtime Environment (JRE) and ensure 'java' is accessible.")
             return False
 
         try:
