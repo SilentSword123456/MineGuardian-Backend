@@ -285,11 +285,6 @@ class UninstallMinecraftServerTests(unittest.TestCase):
             self.assertNotIn(server_name, server_instances)
 
 
-            self.assertTrue(result)
-            mock_instance.cleanup.assert_called_once()
-            self.assertNotIn(server_name, server_instances)
-
-
 # ---------------------------------------------------------------------------
 # Java version check during installMinecraftServer
 # ---------------------------------------------------------------------------
