@@ -3,12 +3,11 @@ FROM python:3.12-slim
 ARG TEMURIN_JRE_URL="https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.2%2B10/OpenJDK25U-jre_x64_linux_hotspot_25.0.2_10.tar.gz"
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates curl tar && \
-    mkdir -p /opt/java && \
+    apt-get install -y --no-install-recommends ca-certificates curl && \
+    mkdir -p /opt/java/current && \
     curl -fsSL "$TEMURIN_JRE_URL" -o /tmp/temurin-jre.tar.gz && \
-    tar -xzf /tmp/temurin-jre.tar.gz -C /opt/java && \
+    tar -xzf /tmp/temurin-jre.tar.gz -C /opt/java/current --strip-components=1 && \
     rm -f /tmp/temurin-jre.tar.gz && \
-    ln -s /opt/java/jdk-25.0.2+10-jre /opt/java/current && \
     apt-get purge -y --auto-remove curl && \
     rm -rf /var/lib/apt/lists/*
 
