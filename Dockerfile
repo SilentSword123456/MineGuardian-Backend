@@ -1,15 +1,20 @@
 FROM python:3.12-slim
 
+ARG TEMURIN_JRE_URL="https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.2%2B10/OpenJDK25U-jre_x64_linux_hotspot_25.0.2_10.tar.gz"
+
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends default-jre-headless wget gnupg && \
-    mkdir -p /etc/apt/keyrings && \
-    wget -qO /etc/apt/keyrings/adoptium.asc https://packages.adoptium.net/artifactory/api/gpg/key/public && \
-    echo "deb [signed-by=/etc/apt/keyrings/adoptium.asc] https://packages.adoptium.net/artifactory/deb bookworm main" \
-        > /etc/apt/sources.list.d/adoptium.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends temurin-25-jre-headless && \
-    apt-get purge -y --auto-remove wget gnupg && \
+    apt-get install -y --no-install-recommends ca-certificates curl && \
+    mkdir -p /opt/java/current && \
+    curl -fsSL "$TEMURIN_JRE_URL" -o /tmp/temurin-jre.tar.gz && \
+    tar -xzf /tmp/temurin-jre.tar.gz -C /opt/java/current --strip-components=1 && \
+    rm -f /tmp/temurin-jre.tar.gz && \
+    apt-get purge -y --auto-remove curl && \
     rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/opt/java/current
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+
+RUN java -version
 
 RUN groupadd --gid 1000 appuser && \
     useradd --uid 1000 --gid appuser --create-home appuser
