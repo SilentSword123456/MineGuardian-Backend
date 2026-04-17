@@ -879,16 +879,7 @@ for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
   | 400 | Install error | — |
   | 500 | DB registration failed | — |
 
-### `DELETE /servers/<serverName>/uninstall`
+### `DELETE /servers/<serverId>/uninstall`
 - **Auth required:** Yes.
-- **Responses:** `200 { "status": true, "message": "..." }` | `false` return (short-circuit) when user lacks `RemovePermissionFromServer` | `400` on install error | `404` on DB removal failure.
-- **Extras:** Only the server owner (implicitly, via owner bypass) or a user with an explicit `RemovePermissionFromServer` row can uninstall.
-
-### `GET /manage/<software>/getAvailableVersions`
-- **Auth required:** No.
-- **Response:** `200 { "versions": ["latest", ...] }` | `400 { "message": "<error>" }`.
-
-### `GET /servers/globalStats`
-- **Auth required:** Yes.
-- **Response:** `200` — aggregated stats dict for running sessions visible to the current user (owned servers + explicit `ViewServer` grants).
-- **Extras:** Returns `500` on unexpected exception.
+- **Path params:** `serverId` must be an integer.
+- **Responses:** `200 { "status": true, "message": "..." }` | `400` on invalid `serverId` or uninstall failure | `403` when user lacks `UninstallServer` permission (owner is implicitly allowed) | `404` when server id does not exist or DB removal fails.
