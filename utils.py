@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 import re
 import secrets
+import shutil
 import subprocess
 import questionary
 import requests
@@ -64,7 +65,6 @@ def getInstalledJavaMajorVersions() -> set[int]:
     """
     candidates: list[str] = []
 
-    import shutil
     if shutil.which("java"):
         candidates.append("java")
 
@@ -126,8 +126,17 @@ def getMcVersion(serverPath: str) -> str | None:
 
 
 def saveMcVersion(serverPath: str, mcVersion: str) -> None:
-    """Persist the Minecraft version to ``mineguardian.json`` inside *serverPath*."""
-    meta_path = os.path.join(serverPath, "mineguardian.json")
+    """Persist the Minecraft version to ``mineguardian.json`` inside *serverPath*.
+
+    The resolved path must be located inside the ``servers/`` directory to
+    prevent accidental writes outside the expected tree.
+    """
+    abs_path = os.path.abspath(serverPath)
+    servers_dir = os.path.abspath("servers")
+    if not abs_path.startswith(servers_dir + os.sep):
+        print(f"Warning: refusing to write metadata outside servers directory: '{abs_path}'")
+        return
+    meta_path = os.path.join(abs_path, "mineguardian.json")
     try:
         with open(meta_path, "w") as f:
             json.dump({"mc_version": mcVersion}, f)

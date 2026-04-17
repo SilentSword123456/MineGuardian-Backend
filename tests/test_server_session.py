@@ -337,11 +337,6 @@ class CleanupTests(unittest.TestCase):
         s.cleanup()  # Should not raise
 
 
-        s = _make_session()
-        s._rcon = None
-        s.cleanup()  # Should not raise
-
-
 # ---------------------------------------------------------------------------
 # Java version check in ServerSession.start()
 # ---------------------------------------------------------------------------

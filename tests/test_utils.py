@@ -728,10 +728,32 @@ class GetMcVersionTests(unittest.TestCase):
 
 
 class SaveMcVersionTests(unittest.TestCase):
+    def _mock_abspath_for_tmpdir(self, tmpdir):
+        """Return a side-effect for os.path.abspath that maps 'servers' → tmpdir/servers.
+
+        Captures the real ``os.path.abspath`` before the patch is applied to
+        avoid infinite recursion when the fallback calls the function.
+        """
+        servers_dir = os.path.join(tmpdir, "servers")
+        _real_abspath = os.path.abspath  # saved before patch is activated
+
+        def mock_abspath(p):
+            if p == "servers":
+                return servers_dir
+            return _real_abspath(p)
+
+        return mock_abspath
+
     def test_writes_metadata_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            utils.saveMcVersion(tmpdir, "1.18.2")
-            meta_path = os.path.join(tmpdir, "mineguardian.json")
+            server_dir = os.path.join(tmpdir, "servers", "test-server")
+            os.makedirs(server_dir)
+
+            with patch("utils.os.path.abspath",
+                       side_effect=self._mock_abspath_for_tmpdir(tmpdir)):
+                utils.saveMcVersion(server_dir, "1.18.2")
+
+            meta_path = os.path.join(server_dir, "mineguardian.json")
             self.assertTrue(os.path.isfile(meta_path))
             import json as _json
             with open(meta_path) as f:
@@ -739,9 +761,22 @@ class SaveMcVersionTests(unittest.TestCase):
             self.assertEqual(data["mc_version"], "1.18.2")
 
     def test_does_not_raise_on_write_error(self):
-        with patch("builtins.open", side_effect=OSError("disk full")):
-            # Should not propagate the exception
-            utils.saveMcVersion("/fake/path", "1.21")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            server_dir = os.path.join(tmpdir, "servers", "test-server")
+            os.makedirs(server_dir)
+            mock_fn = self._mock_abspath_for_tmpdir(tmpdir)
+
+            with patch("utils.os.path.abspath", side_effect=mock_fn), \
+                 patch("builtins.open", side_effect=OSError("disk full")):
+                utils.saveMcVersion(server_dir, "1.21")  # Should not raise
+
+    def test_refuses_write_outside_servers_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            mock_fn = self._mock_abspath_for_tmpdir(tmpdir)
+            with patch("utils.os.path.abspath", side_effect=mock_fn), \
+                 patch("builtins.open") as mock_open_fn:
+                utils.saveMcVersion("/tmp/evil/path", "1.21")
+            mock_open_fn.assert_not_called()
 
 
 if __name__ == "__main__":
