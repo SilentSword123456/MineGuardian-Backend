@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 # Stub out the `api` module before importing server_services, as servers.py
 # (which server_services imports indirectly) also imports `api`.
 api_stub = types.ModuleType("api")
-api_stub.register_socketio_listener = lambda *a, **kw: None
+api_stub.register_socketio_listeners = lambda *a, **kw: None
 api_stub.socketio = types.SimpleNamespace(emit=lambda *a, **kw: None)
 if "api" not in sys.modules:
     sys.modules["api"] = api_stub
