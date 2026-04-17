@@ -239,7 +239,7 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(response.headers.get('Access-Control-Allow-Origin'), origin)
         self.assertEqual(response.headers.get('Access-Control-Allow-Credentials'), 'true')
 
-    def test_login_allows_any_origin(self):
+    def test_login_disallows_unauthorized_origin(self):
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
               patch.object(auth.repositories.UserRepository, 'getUserId', return_value=14):
             origin = 'https://example.com'
@@ -251,8 +251,8 @@ class AuthApiTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers.get('Access-Control-Allow-Origin'), origin)
-        self.assertEqual(response.headers.get('Access-Control-Allow-Credentials'), 'true')
+        # Unauthorized origin should NOT be in the Access-Control-Allow-Origin header
+        self.assertNotEqual(response.headers.get('Access-Control-Allow-Origin'), origin)
 
     # Session validation endpoint tests
 
