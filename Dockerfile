@@ -8,10 +8,11 @@ RUN apt-get update && \
     curl -fsSL "$TEMURIN_JRE_URL" -o /tmp/temurin-jre.tar.gz && \
     tar -xzf /tmp/temurin-jre.tar.gz -C /opt/java && \
     rm -f /tmp/temurin-jre.tar.gz && \
+    ln -s /opt/java/jdk-25.0.2+10-jre /opt/java/current && \
     apt-get purge -y --auto-remove curl && \
     rm -rf /var/lib/apt/lists/*
 
-ENV JAVA_HOME=/opt/java/jdk-25.0.2+10-jre
+ENV JAVA_HOME=/opt/java/current
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
 RUN java -version
