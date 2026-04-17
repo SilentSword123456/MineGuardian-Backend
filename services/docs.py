@@ -124,6 +124,16 @@ DOCS = {
             401: 'Invalid credentials.'
         }
     },
+    'is_session_valid': {
+        'summary': 'Validate the current JWT session',
+        'description': 'Requires JWT Bearer token in the `accessToken` cookie. Returns `status=true` when the token identity maps to an existing user, otherwise returns `status=false` with 401.',
+        'security': [{'BearerAuth': []}],
+        'responses': {
+            200: 'Session is valid for an existing user.',
+            401: 'Missing/invalid token or token identity no longer maps to an existing user.',
+            422: 'JWT token is malformed or cannot be processed.'
+        }
+    },
     'add_favorite_server': {
         'summary': 'Add a favorite server',
         'description': 'Requires JWT Bearer token. Adds a server_id to the authenticated user favorites.',

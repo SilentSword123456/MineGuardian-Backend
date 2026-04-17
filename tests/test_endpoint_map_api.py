@@ -27,6 +27,10 @@ class EndpointMapApiTests(unittest.TestCase):
 		create_user_post = spec['paths']['/user']['post']
 		self.assertNotIn('security', create_user_post)
 
+		is_session_valid_get = spec['paths']['/isSessionValid']['get']
+		self.assertEqual(is_session_valid_get.get('security'), [{'BearerAuth': []}])
+		self.assertIn('Requires JWT Bearer token', is_session_valid_get.get('description', ''))
+
 	def test_current_routes_are_registered(self):
 		routes = {}
 		for rule in app.url_map.iter_rules():
@@ -35,6 +39,7 @@ class EndpointMapApiTests(unittest.TestCase):
 		expected_routes = {
 			'/health': {'GET'},
 			'/login': {'POST'},
+			'/isSessionValid': {'GET'},
 			'/servers': {'GET'},
 			'/servers/<serverId>': {'GET'},
 			'/servers/<serverId>/start': {'POST'},

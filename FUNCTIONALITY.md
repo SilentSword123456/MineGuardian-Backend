@@ -711,6 +711,17 @@ Module-level globals:
   | 401 | Invalid credentials | `{ "message": "Invalid credentials" }` |
 - **Extras:** Uses `UserRepository.verify` for credential check; uses `UserRepository.getUserId` to embed the user's numeric ID in the JWT identity claim; cookie attributes are `HttpOnly` and use `SameSite=None` when `Secure=True` (default/production), or `SameSite=Lax` when `FLASK_ENV=development` (`Secure=False`) for local HTTP development.
 
+### `GET /isSessionValid`
+- **Purpose:** Validate that the caller has a usable JWT cookie and that the token identity still points to an existing user.
+- **Auth required:** Yes (JWT in `accessToken` cookie).
+- **Responses:**
+  | Status | Condition | Body |
+  |--------|-----------|------|
+  | 200 | Token is valid and identity user exists | `{ "status": true }` |
+  | 401 | Token missing/invalid for auth context, token identity is not a valid integer user ID, or user no longer exists | `{ "status": false }` *(identity/user checks)* |
+  | 422 | Token is malformed/unparseable | framework JWT error payload |
+- **Extras:** Identity is expected to be a numeric user ID encoded in the JWT. If conversion to `int` fails, the endpoint returns `401` with `status=false`.
+
 ---
 
 ## 9. services/dbHandler.py — Database Handler API

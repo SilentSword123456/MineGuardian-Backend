@@ -2,6 +2,8 @@ import json
 import unittest
 from unittest.mock import patch
 
+from flask_jwt_extended import create_access_token
+
 from api import app
 from services import auth
 
@@ -31,6 +33,15 @@ class AuthApiTests(unittest.TestCase):
             if cookie.startswith('accessToken='):
                 return cookie
         return None
+
+    def request_with_access_token(self, path, token):
+        # Flask/Werkzeug test clients read cookies from the cookie jar, not raw Cookie header.
+        try:
+            self.client.set_cookie('accessToken', token)
+        except TypeError:
+            # Backward-compatible signature used by older Flask/Werkzeug versions.
+            self.client.set_cookie('localhost', 'accessToken', token)
+        return self.client.get(path)
 
     # Login endpoint tests
 
@@ -242,6 +253,45 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get('Access-Control-Allow-Origin'), origin)
         self.assertEqual(response.headers.get('Access-Control-Allow-Credentials'), 'true')
+
+    # Session validation endpoint tests
+
+    def test_is_session_valid_returns_true_for_existing_user(self):
+        token = create_access_token(identity='42')
+        with patch.object(auth.UserRepository, 'doseUserExist', return_value=True) as user_exists_mock:
+            response = self.request_with_access_token('/isSessionValid', token)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {'status': True})
+        user_exists_mock.assert_called_once_with(42)
+
+    def test_is_session_valid_returns_false_when_user_does_not_exist(self):
+        token = create_access_token(identity='99')
+        with patch.object(auth.UserRepository, 'doseUserExist', return_value=False) as user_exists_mock:
+            response = self.request_with_access_token('/isSessionValid', token)
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.get_json(), {'status': False})
+        user_exists_mock.assert_called_once_with(99)
+
+    def test_is_session_valid_returns_false_when_identity_is_not_numeric(self):
+        token = create_access_token(identity='not-an-int')
+        with patch.object(auth.UserRepository, 'doseUserExist') as user_exists_mock:
+            response = self.request_with_access_token('/isSessionValid', token)
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.get_json(), {'status': False})
+        user_exists_mock.assert_not_called()
+
+    def test_is_session_valid_requires_auth_cookie(self):
+        response = self.client.get('/isSessionValid')
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_is_session_valid_rejects_malformed_token(self):
+        response = self.request_with_access_token('/isSessionValid', 'not.a.jwt')
+
+        self.assertEqual(response.status_code, 422)
 
 
 
