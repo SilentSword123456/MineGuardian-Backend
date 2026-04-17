@@ -106,7 +106,9 @@ def start_minecraft_server(serverId):
     try:
         serverInstance = get_server_instance(serverId)
         api.register_socketio_listener(serverName, serverInstance)
-        serverInstance.start()
+        started = serverInstance.start()
+        if not started:
+            abort(500, message=f"Server '{serverName}' failed to start. Check that Java is installed and the server files are intact.")
         return {'message': f"Server '{serverName}' started successfully"}, 200
     except ValueError as e:
         abort(400, message=str(e))
