@@ -85,14 +85,14 @@ DOCS = {
     },
     'remove_server': {
         'summary': 'Uninstall a server',
-        'description': 'Requires JWT Bearer token. Uninstalls and removes the selected server from local storage and unregisters it for the authenticated user. If the user lacks RemovePermissionFromServer permission, the endpoint short-circuits and returns boolean `false`.',
+        'description': 'Requires JWT Bearer token and UninstallServer permission. Path parameter `serverId` must be an integer. Uninstalls the selected server and removes its record for the authenticated user.',
         'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Server uninstalled and removed successfully.',
-            400: 'Missing server server name or uninstall failed.',
+            400: 'Invalid serverId or uninstall failed.',
             401: 'Missing or invalid JWT token.',
-            422: 'JWT token is malformed or cannot be processed.',
-            404: 'Server uninstall succeeded but database record could not be removed.'
+            403: 'User lacks UninstallServer permission.',
+            404: 'Server not found or database record could not be removed.'
         }
     },
     'create_user': {
