@@ -30,7 +30,7 @@ class SocketIOSidContextTests(unittest.TestCase):
                  patch.object(api.serverSessionsManager, "serverInstances", {"TestServer": server_instance}):
                 inspect.unwrap(api.handle_console)({"message": "list"})
 
-        server_instance.send_command.assert_called_once_with("list")
+        server_instance.send_command.assert_called_once_with("list", 7)
         emit_mock.assert_any_call("console_ack", {
             "ok": True,
             "code": "SENT",
@@ -98,7 +98,7 @@ class SocketIOSidContextTests(unittest.TestCase):
             ack = console_acks[-1]["args"][0]
             self.assertTrue(ack["ok"])
             self.assertEqual(ack["code"], "SENT")
-            server_instance.send_command.assert_called_once_with("list")
+            server_instance.send_command.assert_called_once_with("list", 7)
 
             socket_client.disconnect()
 

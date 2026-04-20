@@ -89,8 +89,8 @@ def register_socketio_listeners(server_name: str, server_instance) -> None:
 
     logger.info("Registering SocketIO listeners server_name=%s", server_name)
 
-    def console_listener(line: str) -> None:
-        socketio.emit("console", {"data": line}, to=server_name)
+    def console_listener(entry: dict) -> None:
+        socketio.emit("console", entry, to=server_name)
         eventlet.sleep(0)
 
     def status_listener(is_running: bool) -> None:
@@ -236,8 +236,8 @@ def handle_connect(auth=None):
         )
         emit("system", {"data": f"Connected to server {server_name}"})
 
-        for line in server_instance.log_history:
-            emit("console", {"data": line})
+        for entry in server_instance.log_history:
+            emit("console", entry)
 
         is_running = server_instance.running
         emit("status", {"running": is_running})
@@ -364,7 +364,7 @@ def handle_console(data):
         return
 
     server_instance = serverSessionsManager.serverInstances[server_name]
-    sent = server_instance.send_command(message)
+    sent = server_instance.send_command(message, user_id)
     if not sent:
         logger.warning(
             "Console command dispatch failed user_id=%s server_id=%s server_name=%s",
