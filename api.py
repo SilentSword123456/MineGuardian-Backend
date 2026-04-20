@@ -56,7 +56,7 @@ _ALLOWED_WEB_ORIGINS = [
 
 # Accept from all if not in production, else only from allowed origins
 _IS_PRODUCTION = os.environ.get("FLASK_ENV", "production") == "production"
-_CORS_ORIGINS = _ALLOWED_WEB_ORIGINS if _IS_PRODUCTION else "*"
+_CORS_ORIGINS = _ALLOWED_WEB_ORIGINS if _IS_PRODUCTION else "http://localhost:5173"
 
 CORS(app, supports_credentials=True, origins=_CORS_ORIGINS)
 
