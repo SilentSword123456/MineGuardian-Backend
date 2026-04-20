@@ -1,4 +1,4 @@
-from flask import jsonify, request
+from flask import jsonify, request, session
 from apiflask import APIFlask
 import os
 import time
@@ -12,6 +12,8 @@ from utils import getConfig
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from services.servers import servers_bp
 from services.auth import jwt, auth_blueprint
+from flask_jwt_extended import decode_token
+from Database import repositories
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -53,8 +55,8 @@ def register_socketio_listener(serverName, serverInstance):
     if not hasattr(serverInstance, '_socketio_listener_added'):
         print(f"Registering SocketIO listeners for server '{serverName}'")
         # Existing console listener
-        def socketio_console_listener(line):
-            socketio.emit('console', {'data': line}, to=serverName)
+        def socketio_console_listener(entry):
+            socketio.emit('console', {'data': entry['line'], 'user': entry['source']}, to=serverName)
             eventlet.sleep(0) # Yield for the event loop
         serverInstance.add_listener(socketio_console_listener)
 
@@ -85,6 +87,25 @@ def handle_connect(auth=None):
         emit('error', {'data': 'No serverName provided in connection'})
         return False
 
+    # Get user information from JWT token if available
+    user_id = None
+    user_name = "Anonymous"
+
+    if auth and 'token' in auth:
+        try:
+            decoded = decode_token(auth['token'])
+            user_id = int(decoded['sub'])
+            user_name = repositories.UserRepository.getUsername(user_id) or "Unknown"
+        except Exception as e:
+            print(f"Failed to decode token during connect: {e}")
+            # We still allow connection as "Anonymous" if no token or invalid token, 
+            # or we can reject it. The guidelines say "validates JWT", so let's be strict if auth is provided.
+            emit('error', {'data': 'Invalid authentication token'})
+            return False
+    
+    session['user_id'] = user_id
+    session['user_name'] = user_name
+
     try:
         if serverName not in serverSessionsManager.serverInstances:
             print(f"Initializing new server instance for '{serverName}' during connection")
@@ -95,11 +116,11 @@ def handle_connect(auth=None):
         register_socketio_listener(serverName, serverInstance)
 
         join_room(serverName)
-        print(f'Client connected to server room: {serverName}')
-        emit('system', {'data': f"Connected to server {serverName}"})
+        print(f'Client connected to server room: {serverName} as {user_name}')
+        emit('system', {'data': f"Connected to server {serverName} as {user_name}"})
 
-        for line in serverInstance.log_history:
-            emit('console', {'data': line})
+        for entry in serverInstance.log_history:
+            emit('console', {'data': entry['line'], 'user': entry['source']})
 
         live_running = serverInstance.running
         emit('status', {'running': live_running})
@@ -141,11 +162,12 @@ def handleConsole(data):
         return
 
     if serverName not in serverSessionsManager.serverInstances:
-        emit('console', {'data': f"Server '{serverName}' is not running."})
+        emit('console', {'data': f"Server '{serverName}' is not running.", "user": "server"})
         return
 
     serverInstance = serverSessionsManager.serverInstances[serverName]
-    serverInstance.send_command(data['message'])
+    userName = session.get('user_name', 'Anonymous')
+    serverInstance.send_command(data['message'], source=userName)
 
 def _broadcast_stats():
     """Background task to broadcast server stats via SocketIO every 5 seconds."""
