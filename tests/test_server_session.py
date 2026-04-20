@@ -138,8 +138,11 @@ class UpdateHistoryTests(unittest.TestCase):
 
     def test_appends_lines_to_history(self):
         self.session._updateHistory("line 1")
-        self.session._updateHistory("line 2")
-        self.assertEqual(self.session.log_history, ["line 1", "line 2"])
+        self.session._updateHistory("line 2", source="user1")
+        self.assertEqual(self.session.log_history, [
+            {"line": "line 1", "source": "server"},
+            {"line": "line 2", "source": "user1"}
+        ])
 
     def test_history_is_capped_at_max_history(self):
         self.session.max_history = 3
@@ -147,9 +150,9 @@ class UpdateHistoryTests(unittest.TestCase):
             self.session._updateHistory(f"line {i}")
         self.assertEqual(len(self.session.log_history), 3)
         # The oldest entries should be dropped
-        self.assertNotIn("line 0", self.session.log_history)
-        self.assertNotIn("line 1", self.session.log_history)
-        self.assertIn("line 4", self.session.log_history)
+        self.assertNotIn({"line": "line 0", "source": "server"}, self.session.log_history)
+        self.assertNotIn({"line": "line 1", "source": "server"}, self.session.log_history)
+        self.assertIn({"line": "line 4", "source": "server"}, self.session.log_history)
 
 
 class BroadcastTests(unittest.TestCase):
@@ -158,16 +161,16 @@ class BroadcastTests(unittest.TestCase):
 
     def test_broadcast_updates_history(self):
         self.session._broadcast("hello")
-        self.assertIn("hello", self.session.log_history)
+        self.assertIn({"line": "hello", "source": "server"}, self.session.log_history)
 
     def test_broadcast_calls_all_listeners(self):
         cb1 = MagicMock()
         cb2 = MagicMock()
         self.session.add_listener(cb1)
         self.session.add_listener(cb2)
-        self.session._broadcast("test line")
-        cb1.assert_called_once_with("test line")
-        cb2.assert_called_once_with("test line")
+        self.session._broadcast("test line", source="custom")
+        cb1.assert_called_once_with({"line": "test line", "source": "custom"})
+        cb2.assert_called_once_with({"line": "test line", "source": "custom"})
 
     def test_broadcast_does_not_raise_when_listener_raises(self):
         broken = MagicMock(side_effect=RuntimeError("listener error"))
@@ -256,6 +259,21 @@ class SendCommandTests(unittest.TestCase):
         self.session.process = mock_proc
         result = self.session.send_command("   ")
         self.assertFalse(result)
+
+    def test_send_command_broadcasts_with_source(self):
+        self.session._running = True
+        mock_proc = MagicMock()
+        mock_proc.poll.return_value = None
+        self.session.process = mock_proc
+        
+        cb = MagicMock()
+        self.session.add_listener(cb)
+        
+        with patch("eventlet.tpool.execute"):
+            self.session.send_command("list", source="admin")
+            
+        cb.assert_called_once_with({"line": "> list", "source": "admin"})
+        self.assertIn({"line": "> list", "source": "admin"}, self.session.log_history)
 
 
 # ---------------------------------------------------------------------------
