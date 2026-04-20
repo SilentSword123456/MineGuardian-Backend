@@ -1,9 +1,12 @@
+from Database.repositories import ServersRepository
+
 serverInstances = {}
 usedPorts = set()
 
 import eventlet
 import eventlet.tpool
 import os
+import shutil
 import subprocess
 import time
 import psutil
@@ -11,7 +14,9 @@ import utils
 from rcon import RconClient, RconError, RconAuthError
 
 class ServerSession:
-    def __init__(self, name, command, working_dir=None):
+    def __init__(self, id, name, command, working_dir=None):
+        if not ServersRepository.doesServerExist(id):
+            raise KeyError(f"Server with id '{id}' does not exist")
         self.name = name
         if isinstance(command, str):
             self.command = command.split()
@@ -36,6 +41,7 @@ class ServerSession:
         self._rcon: RconClient | None = None
         self._rcon_lock = eventlet.semaphore.Semaphore()
         self._stats_lock = eventlet.semaphore.Semaphore()
+        self.id = id
 
     @property
     def running(self):
@@ -93,6 +99,23 @@ class ServerSession:
         if self.running:
             print(f"Server '{self.name}' is already running!")
             return False
+
+        if shutil.which("java") is None:
+            print(f"Failed to start server '{self.name}': Java is not installed or not on PATH. Please install a Java Runtime Environment (JRE) and ensure 'java' is accessible.")
+            return False
+
+        mcVersion = utils.getMcVersion(self.working_dir) if self.working_dir else None
+        if mcVersion:
+            requiredJava = utils.getRequiredJavaVersion(mcVersion)
+            installedVersions = utils.getInstalledJavaMajorVersions()
+            if not any(v >= requiredJava for v in installedVersions):
+                print(
+                    f"Failed to start server '{self.name}': Minecraft {mcVersion} requires "
+                    f"Java {requiredJava} or newer, but no suitable Java installation was found "
+                    f"(found: {sorted(installedVersions) if installedVersions else 'none'}). "
+                    f"Please install Java {requiredJava}+."
+                )
+                return False
 
         try:
             # We must use eventlet.patcher.original('subprocess') if we want the real one, 
@@ -416,7 +439,7 @@ class ServerSession:
         max_players = self.max_players if is_running and self.max_players is not None else utils.getMaxPlayers(self.working_dir)
 
         return {
-            "server_id": self.name,
+            "server_id": self.id,
             "is_running": is_running,
             "pid": pid,
             "uptime_seconds": uptime_seconds,

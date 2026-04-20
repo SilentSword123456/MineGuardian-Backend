@@ -11,7 +11,6 @@ A Python-based backend and CLI tool for managing Minecraft servers. It allows yo
 - **Automatic Installation**: Helper scripts to download Vanilla Minecraft servers.
 - **Server Management**: Run multiple servers in the background.
 - **Auto-start API**: Configuration option to automatically launch the API server on startup.
-- **Demo Client**: Minimal Python client for testing websocket connectivity.
 
 ## Stack
 
@@ -74,22 +73,46 @@ The API can be started directly from `main.py` or by calling `api.py` (though `m
 
 #### API Endpoints
 
-- `GET /`: Health check.
-- `GET /servers`: List all available servers and their statuses.
-- `POST /start_server`: Start a specific server. Body: `{"serverName": "name"}`.
-- `POST /stop_server`: Stop a specific server. Body: `{"serverName": "name"}`.
+- `GET /health`: Health check.
+- `POST /login`: Authenticate and set `accessToken` JWT cookie.
+- `GET /isSessionValid`: Validate current JWT session.
+- `GET /servers`: List visible servers.
+- `GET /servers/<serverId>`: Get server details.
+- `POST /servers/<serverId>/start`: Start server by id.
+- `POST /servers/<serverId>/stop`: Stop server by id.
+- `GET /servers/<serverId>/stats`: Get live server stats.
+- `DELETE /servers/<serverId>/uninstall`: Uninstall server by id.
+- `POST /manage/addServer`: Install/register server.
+- `GET /manage/<software>/getAvailableVersions`: List installable versions.
+- `GET /servers/globalStats`: Aggregate runtime stats for visible running servers.
+
+#### Authentication
+
+- `POST /login` validates `user_id` and `password` and sets JWT in a cookie named `accessToken`.
+- On successful login, the token is returned via `Set-Cookie` (HttpOnly, `SameSite=None` with `Secure=True` outside local development; local development keeps `SameSite=Lax`/`Secure=False`), not as a JSON `access_token` field.
+- Invalid credentials still return `401` with JSON error payload.
 
 #### SocketIO Events
 
-- `connect`: Connect with `serverName` as a query parameter.
-    - Joining a server's room automatically replays the last 100 lines of console history.
-- `console`: 
-    - Receive: Real-time server logs.
-    - Send: Send commands to the server console. Body: `{"message": "command"}`.
-- `message`:
-    - Receive: General status messages or echo of sent messages.
+- `connect`:
+    - Send auth payload once: `{ "serverId": <int> }`.
+    - On success, backend binds `sid -> {user_id, server_id, server_name}`, joins the server room, replays console history, and emits `status/resources`.
+- `console`:
+    - Receive: real-time server logs for the connected server room.
+    - Send command payload: `{ "message": "command" }`.
+    - Response ack event: `console_ack` with `{ "ok", "code", "message" }`.
+- `system`:
+    - Send payload: `{ "message": "..." }`.
+    - Receive system informational messages.
+- `status`:
+    - Receive running-state updates for current server room.
+- `resources`:
+    - Receive periodic resource updates.
 - `error`:
-    - Receive: Error messages if something goes wrong (e.g., invalid payload, server not running).
+    - Receive error messages for invalid socket context/payloads.
+
+`console_ack.code` values:
+- `SENT`, `INVALID_SERVER`, `INVALID_MESSAGE`, `SERVER_OFFLINE`, `DISPATCH_FAILED`.
 
 ## Configuration (`config.json`)
 
@@ -120,29 +143,24 @@ The project uses a `config.json` file for settings:
 
 ```text
 .
-├── websocket_client/       # Minimal Python WS client for manual testing
-│   └── client.py
-├── tests/                  # Automated test suite
-│   ├── test_api_websockets.py
-│   └── reproduce_errors.py
+├── tests/                  # Automated unittest suite
 ├── services/               # Modular service layer and blueprints
-│   ├── servers.py          # API Routes for server management
+│   ├── servers.py          # API routes for server management
 │   └── server_services.py  # Business logic for server operations
-├── api.py                  # Flask and SocketIO implementation
+├── api.py                  # Flask + SocketIO implementation
 ├── main.py                 # CLI entry point and menu logic
-├── setup.py                # Server installation and instance setup logic
-├── utils.py                # Helper functions (config, download, etc.)
+├── manageLocalServers.py   # Server installation/uninstall logic
+├── utils.py                # Helpers (config, setup, stats, etc.)
 ├── serverSessionsManager.py # Manages server processes and I/O
 ├── config.json             # Application configuration
 ├── requirements.txt        # Python dependencies
 └── servers/                # Directory where Minecraft servers are stored
-    └── <server_name>/      # Individual server files
 ```
 
 ## Scripts
 
 - `main.py`: The primary script to interact with the application.
-- `setup.py`: Contains functions for `installMinecraftServer`, `runMinecraftServer`, and `setupServerInstance`.
+- `manageLocalServers.py`: Contains install/uninstall helpers for local Minecraft servers.
 - `serverSessionsManager.py`: Handles the `subprocess.Popen` lifecycle for Minecraft servers.
 
 ## Env Vars
@@ -152,25 +170,17 @@ Currently, the application relies on `config.json`.
 
 ## Tests
 
-The project includes a suite of automated tests using `unittest`:
+The project includes an automated `unittest` suite under `tests/`.
 
-- **Websocket Tests**: `python -m unittest tests/test_api_websockets.py`
-    - Covers connection, history replay, message echo, and console streaming.
-- **Negative Tests**: `python -m unittest tests/reproduce_errors.py`
-    - Verifies that malformed websocket payloads do not crash the server.
+Run all tests:
+```bash
+python -m unittest
+```
 
-## Demo Client
-
-A minimal websocket client is provided in `websocket_client/client.py`.
-
-To use it:
-1. Start the API Server via `main.py`.
-2. Ensure at least one Minecraft server is running.
-3. Run the client:
-   ```bash
-   python websocket_client/client.py <serverName>
-   ```
-   Example: `python websocket_client/client.py myCoolServer`
+Run selected API route tests:
+```bash
+python -m unittest tests/test_server_routes_api.py tests/test_endpoint_map_api.py
+```
 
 ## License
 

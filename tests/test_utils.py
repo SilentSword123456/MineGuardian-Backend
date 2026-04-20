@@ -594,5 +594,190 @@ class GetGlobalStatsTests(unittest.TestCase):
         self.assertEqual(result["online_players"]["max"], 10)
 
 
+# ---------------------------------------------------------------------------
+# getRequiredJavaVersion
+# ---------------------------------------------------------------------------
+
+class GetRequiredJavaVersionTests(unittest.TestCase):
+    def test_1_21_requires_java_21(self):
+        self.assertEqual(utils.getRequiredJavaVersion("1.21"), 21)
+
+    def test_1_21_4_requires_java_21(self):
+        self.assertEqual(utils.getRequiredJavaVersion("1.21.4"), 21)
+
+    def test_1_20_5_requires_java_21(self):
+        self.assertEqual(utils.getRequiredJavaVersion("1.20.5"), 21)
+
+    def test_1_20_4_requires_java_17(self):
+        self.assertEqual(utils.getRequiredJavaVersion("1.20.4"), 17)
+
+    def test_1_18_requires_java_17(self):
+        self.assertEqual(utils.getRequiredJavaVersion("1.18"), 17)
+
+    def test_1_17_requires_java_17(self):
+        self.assertEqual(utils.getRequiredJavaVersion("1.17"), 17)
+
+    def test_1_16_5_requires_java_8(self):
+        self.assertEqual(utils.getRequiredJavaVersion("1.16.5"), 8)
+
+    def test_1_8_requires_java_8(self):
+        self.assertEqual(utils.getRequiredJavaVersion("1.8"), 8)
+
+    def test_unknown_version_returns_8(self):
+        self.assertEqual(utils.getRequiredJavaVersion("unknown"), 8)
+
+    def test_empty_string_returns_8(self):
+        self.assertEqual(utils.getRequiredJavaVersion(""), 8)
+
+    def test_version_with_rc_suffix(self):
+        # "1.21-rc1" should parse as 1.21 → Java 21
+        self.assertEqual(utils.getRequiredJavaVersion("1.21-rc1"), 21)
+
+
+# ---------------------------------------------------------------------------
+# getInstalledJavaMajorVersions / _getJavaMajorVersion
+# ---------------------------------------------------------------------------
+
+class GetInstalledJavaMajorVersionsTests(unittest.TestCase):
+    def test_returns_version_from_path_java(self):
+        with patch("shutil.which", return_value="/usr/bin/java"), \
+             patch("utils.os.path.isdir", return_value=False), \
+             patch("utils._getJavaMajorVersion", return_value=17):
+            result = utils.getInstalledJavaMajorVersions()
+        self.assertIn(17, result)
+
+    def test_returns_empty_set_when_no_java_found(self):
+        with patch("shutil.which", return_value=None), \
+             patch("utils.os.path.isdir", return_value=False):
+            result = utils.getInstalledJavaMajorVersions()
+        self.assertEqual(result, set())
+
+    def test_discovers_jvms_under_usr_lib_jvm(self):
+        with patch("shutil.which", return_value=None), \
+             patch("utils.os.path.isdir", return_value=True), \
+             patch("utils.os.listdir", return_value=["temurin-25"]), \
+             patch("utils.os.path.isfile", return_value=True), \
+             patch("utils.os.access", return_value=True), \
+             patch("utils._getJavaMajorVersion", return_value=25):
+            result = utils.getInstalledJavaMajorVersions()
+        self.assertIn(25, result)
+
+    def test_ignores_jvm_entries_without_java_binary(self):
+        with patch("shutil.which", return_value=None), \
+             patch("utils.os.path.isdir", return_value=True), \
+             patch("utils.os.listdir", return_value=["some-dir"]), \
+             patch("utils.os.path.isfile", return_value=False):
+            result = utils.getInstalledJavaMajorVersions()
+        self.assertEqual(result, set())
+
+
+class GetJavaMajorVersionTests(unittest.TestCase):
+    def _make_completed_process(self, stderr):
+        result = MagicMock()
+        result.stderr = stderr
+        result.stdout = ""
+        return result
+
+    def test_parses_java_17_version_string(self):
+        output = 'openjdk version "17.0.9" 2023-10-17'
+        with patch("subprocess.run", return_value=self._make_completed_process(output)):
+            self.assertEqual(utils._getJavaMajorVersion("java"), 17)
+
+    def test_parses_java_25_version_string(self):
+        output = 'openjdk version "25" 2025-09-16'
+        with patch("subprocess.run", return_value=self._make_completed_process(output)):
+            self.assertEqual(utils._getJavaMajorVersion("java"), 25)
+
+    def test_parses_old_java_8_version_string(self):
+        output = 'java version "1.8.0_392"'
+        with patch("subprocess.run", return_value=self._make_completed_process(output)):
+            self.assertEqual(utils._getJavaMajorVersion("java"), 8)
+
+    def test_returns_none_when_subprocess_raises(self):
+        with patch("subprocess.run", side_effect=FileNotFoundError):
+            self.assertIsNone(utils._getJavaMajorVersion("/nonexistent/java"))
+
+    def test_returns_none_on_unrecognised_output(self):
+        with patch("subprocess.run", return_value=self._make_completed_process("not java output")):
+            self.assertIsNone(utils._getJavaMajorVersion("java"))
+
+
+# ---------------------------------------------------------------------------
+# getMcVersion / saveMcVersion
+# ---------------------------------------------------------------------------
+
+class GetMcVersionTests(unittest.TestCase):
+    def test_returns_none_when_file_missing(self):
+        with patch("utils.os.path.isfile", return_value=False):
+            self.assertIsNone(utils.getMcVersion("/fake/server"))
+
+    def test_returns_version_from_metadata_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            meta = {"mc_version": "1.21.4"}
+            import json as _json
+            with open(os.path.join(tmpdir, "mineguardian.json"), "w") as f:
+                _json.dump(meta, f)
+            result = utils.getMcVersion(tmpdir)
+        self.assertEqual(result, "1.21.4")
+
+    def test_returns_none_on_invalid_json(self):
+        with patch("utils.os.path.isfile", return_value=True), \
+             patch("builtins.open", mock_open(read_data="bad json{")):
+            result = utils.getMcVersion("/fake/server")
+        self.assertIsNone(result)
+
+
+class SaveMcVersionTests(unittest.TestCase):
+    def _mock_abspath_for_tmpdir(self, tmpdir):
+        """Return a side-effect for os.path.abspath that maps 'servers' → tmpdir/servers.
+
+        Captures the real ``os.path.abspath`` before the patch is applied to
+        avoid infinite recursion when the fallback calls the function.
+        """
+        servers_dir = os.path.join(tmpdir, "servers")
+        _real_abspath = os.path.abspath  # saved before patch is activated
+
+        def mock_abspath(p):
+            if p == "servers":
+                return servers_dir
+            return _real_abspath(p)
+
+        return mock_abspath
+
+    def test_writes_metadata_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            server_dir = os.path.join(tmpdir, "servers", "test-server")
+            os.makedirs(server_dir)
+
+            with patch("utils.os.path.abspath",
+                       side_effect=self._mock_abspath_for_tmpdir(tmpdir)):
+                utils.saveMcVersion(server_dir, "1.18.2")
+
+            meta_path = os.path.join(server_dir, "mineguardian.json")
+            self.assertTrue(os.path.isfile(meta_path))
+            import json as _json
+            with open(meta_path) as f:
+                data = _json.load(f)
+            self.assertEqual(data["mc_version"], "1.18.2")
+
+    def test_does_not_raise_on_write_error(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            server_dir = os.path.join(tmpdir, "servers", "test-server")
+            os.makedirs(server_dir)
+            mock_fn = self._mock_abspath_for_tmpdir(tmpdir)
+
+            with patch("utils.os.path.abspath", side_effect=mock_fn), \
+                 patch("builtins.open", side_effect=OSError("disk full")):
+                utils.saveMcVersion(server_dir, "1.21")  # Should not raise
+
+    def test_refuses_write_outside_servers_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            mock_fn = self._mock_abspath_for_tmpdir(tmpdir)
+            with patch("utils.os.path.abspath", side_effect=mock_fn), \
+                 patch("builtins.open") as mock_open_fn:
+                utils.saveMcVersion("/tmp/evil/path", "1.21")
+            mock_open_fn.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

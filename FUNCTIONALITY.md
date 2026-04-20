@@ -26,6 +26,7 @@ must honour.  Tests should be written (or verified) against this specification.
 8. [services/auth.py — Authentication API](#8-servicesauthpy--authentication-api)
 9. [services/dbHandler.py — Database Handler API](#9-servicesdbhandlerpy--database-handler-api)
 10. [services/servers.py — Server Management API](#10-servicesserverspy--server-management-api)
+11. [api.py — SocketIO Event Contract](#11-apipy--socketio-event-contract)
 
 ---
 
@@ -52,6 +53,7 @@ Defines integer-valued enumerations used as permission IDs throughout the system
 | GetServerInfo             | 3     |
 | StartServer               | 4     |
 | StopServer                | 5     |
+| ViewServer                | 6     |
 
 ---
 
@@ -232,7 +234,7 @@ They are pure database operations with no side effects outside the database.
   - No server with `currentServerName` owned by the user exists.
   - A server with `newServerName` already exists under the same user.
 
-#### `doseServerExist(serverId: int) -> bool`
+#### `doesServerExist(serverId: int) -> bool`
 - **Purpose:** Check whether a server with the given primary-key ID exists.
 - **Input:** `serverId` (int).
 - **Output:** `True` if found; `False` otherwise.
@@ -249,9 +251,20 @@ They are pure database operations with no side effects outside the database.
   - The user does not exist.
   - No server with that name owned by the user exists.
 
+#### `getServerName(serverId: int) -> str`
+- **Purpose:** Look up a server name by numeric server ID.
+- **Input:** `serverId` (int).
+- **Output:** Server name if found; `''` if missing.
+
+
 ---
 
 ### ServersUsersPermsRepository
+
+> **Owner-bypass model:** A server's owner is treated as having every `ServersPermissions`
+> implicitly — no permission row is needed in `ServersUsersPerms`.  This means:
+> - Adding a new permission enum value automatically works for all owners without any migration.
+> - `ServersUsersPerms` rows are only required for *delegated* (non-owner) access.
 
 #### `addPerm(userId: int, serverId: int, targetUserId: int, permId: int) -> bool`
 - **Purpose:** Grant a permission on a server to a target user.
@@ -272,19 +285,33 @@ They are pure database operations with no side effects outside the database.
   - No matching permission row exists for the target user.
 
 #### `getPerms(userId: int, serverId: int) -> list[int]`
-- **Purpose:** Return all permission IDs held by a user on a server.
+- **Purpose:** Return all *explicitly stored* permission IDs held by a user on a server.
 - **Input:** `userId` (int); `serverId` (int).
 - **Output:** A list of integer permission IDs (may be empty).
 - **Behaviour:** Returns `[]` if the user or server does not exist.
+- **Note:** Does **not** reflect the implicit owner bypass — use `doseUserHavePerm` to
+  check effective access.
 
 #### `doseUserHavePerm(userId: int, serverId: int, permId: int) -> bool`
-- **Purpose:** Check whether a user holds a specific permission on a server.
+- **Purpose:** Check whether a user effectively holds a specific permission on a server.
 - **Input:** `userId` (int); `serverId` (int); `permId` (int).
-- **Output:** `True` if the user has the permission; `False` otherwise.
+- **Output:** `True` if the user has the permission (explicitly or via ownership); `False` otherwise.
 - **Behaviour:**
   - Returns `False` if the user does not exist.
   - Returns `False` if the server does not exist.
-  - Returns `False` if `getPerms` returns an empty list.
+  - Returns `True` immediately if `userId` is the server's owner (**owner bypass**).
+  - Otherwise checks `getPerms` for an explicit row.
+
+#### `getServersWithUserPerm(userId: int, permId: int) -> list[int]`
+- **Purpose:** Return all server IDs where the user effectively holds a specific permission.
+- **Input:** `userId` (int); `permId` (int, must be valid `ServersPermissions`).
+- **Output:** List of server IDs (possibly empty).
+- **Behaviour:**
+  - Returns `[]` for missing users or invalid permission IDs.
+  - Always includes every server owned by `userId` (**owner bypass**).
+  - Also includes servers where an explicit `ServersUsersPerms` row grants `permId` to `userId`.
+  - The combined result contains no duplicate IDs.
+
 
 ---
 
@@ -503,10 +530,11 @@ Module-level globals:
 
 ### ServerSession
 
-#### `__init__(name, command, working_dir=None)`
+#### `__init__(id, name, command, working_dir=None)`
 - **Purpose:** Initialise a server session and reserve TCP ports.
-- **Inputs:** `name` (str); `command` (str or list); `working_dir` (str, path to the server folder).
+- **Inputs:** `id` (int); `name` (str); `command` (str or list); `working_dir` (str, path to the server folder).
 - **Behaviour:**
+  - Raises `KeyError` if `ServersRepository.doesServerExist(id)` is `False`.
   - If `command` is a `str`, splits it into a list via `str.split()`.
   - Calls `getNewPort` and `assignNewPort` to reserve a server port (`self.port`) and an RCON port (`self.rcon_port`).
   - Initial state: `_running = False`, `process = None`, `listeners = []`, `status_listeners = []`, `log_history = []`, `max_history = 100`.
@@ -575,7 +603,7 @@ Module-level globals:
 #### `get_process_info() -> dict`
 - **Purpose:** Return a snapshot of the server's current state.
 - **Output:** Dict with keys:
-  - `server_id` (str) — the server name.
+  - `server_id` (int) — database server ID.
   - `is_running` (bool).
   - `pid` (int) — `0` when not running.
   - `uptime_seconds` (float) — `0.0` when not running.
@@ -646,50 +674,70 @@ Module-level globals:
 
 ## 7. services/server_services.py — Server Service Helpers
 
-#### `get_all_servers() -> list[dict]`
-- **Purpose:** Return a list of all locally installed servers with their metadata.
-- **Output:** A list of dicts, one per directory found in `servers/`. Each dict contains:
-  - `server_id` (str) — directory name.
-  - `id` (int) — sequential 1-based index.
-  - `isRunning` (bool) — whether a running `ServerSession` exists for this server.
-  - `max_memory_mb` (int) — from `getMaxMemoryMB`.
-  - `online_players` (dict) — `{"max": <int>}`.
+#### `getAllServers(userId: int) -> list[int]`
+- **Purpose:** Return server IDs visible to a user.
+- **Input:** `userId` (int).
+- **Output:** List of server IDs where the user has effective `ViewServer` access —
+  this includes servers the user *owns* (via the owner bypass) as well as any servers
+  where an explicit `ViewServer` row has been granted.
 
-#### `get_server_instance(serverName: str) -> ServerSession`
+#### `get_server_instance(serverId: int) -> ServerSession`
 - **Purpose:** Retrieve (or create) the `ServerSession` for a server, ready to start.
-- **Input:** `serverName` (str).
+- **Input:** `serverId` (int).
 - **Output:** A `ServerSession` instance.
 - **Raises `ValueError`** if the server is already running (i.e. a session exists and `is_running()` is `True`).
 - **Behaviour:**
+  - Resolves `serverName` from `ServersRepository.getServerName(serverId)`.
   - Returns the existing session if it exists but is not running.
-  - Calls `utils.setupServerInstance` to create a new session if none exists.
+  - Calls `utils.setupServerInstance(path, serverName, serverId)` to create a new session if none exists.
 
-#### `stop_server(serverName: str)`
+#### `stop_server(serverId: int)`
 - **Purpose:** Stop a running server.
-- **Input:** `serverName` (str).
+- **Input:** `serverId` (int).
 - **Output:** `None` (delegates to `ServerSession.stop()`).
-- **Raises `ValueError`** if no session exists for `serverName`.
+- **Raises `ValueError`** if no session exists for the resolved server name.
 
 ---
 
 ## 8. services/auth.py — Authentication API
 
 ### `POST /login`
-- **Purpose:** Authenticate a user and return a JWT access token.
+- **Purpose:** Authenticate a user and set a JWT access token cookie.
 - **Request body:** `{ "user_id": "<username>", "password": "<plaintext>" }`
 - **Responses:**
   | Status | Condition | Body |
   |--------|-----------|------|
-  | 200 | Credentials valid | `{ "access_token": "<JWT>" }` |
+  | 200 | Credentials valid | Empty response body; JWT is sent in a `Set-Cookie` header as `accessToken` |
   | 400 | Missing `user_id` or `password` | `{ "message": "Missing user_id or password" }` |
   | 401 | Invalid credentials | `{ "message": "Invalid credentials" }` |
-- **Extras:** Uses `UserRepository.verify` for credential check; uses `UserRepository.getUserId` to embed the user's numeric ID in the JWT identity claim.
+- **Extras:** Uses `UserRepository.verify` for credential check; uses `UserRepository.getUserId` to embed the user's numeric ID in the JWT identity claim; cookie attributes are `HttpOnly` and use `SameSite=None` when `Secure=True` (default/production), or `SameSite=Lax` when `FLASK_ENV=development` (`Secure=False`) for local HTTP development.
+
+### `GET /isSessionValid`
+- **Purpose:** Validate that the caller has a usable JWT cookie and that the token identity still points to an existing user.
+- **Auth required:** Yes (JWT in `accessToken` cookie).
+- **Responses:**
+  | Status | Condition | Body |
+  |--------|-----------|------|
+  | 200 | Token is valid and identity user exists | `{ "status": true }` |
+  | 401 | Token missing/invalid for auth context, token identity is not a valid integer user ID, or user no longer exists | `{ "status": false }` *(identity/user checks)* |
+  | 422 | Token is malformed/unparseable | framework JWT error payload |
+- **Extras:** Identity is expected to be a numeric user ID encoded in the JWT. If conversion to `int` fails, the endpoint returns `401` with `status=false`.
 
 ---
 
 ## 9. services/dbHandler.py — Database Handler API
 
-All protected endpoints require a valid JWT (`Authorization: Bearer <token>`).
+All protected endpoints require a valid JWT stored in the `accessToken` cookie.
+The application is configured with `JWT_TOKEN_LOCATION = ["cookies"]` and
+`JWT_ACCESS_COOKIE_NAME = "accessToken"`, so clients must call `POST /login`
+first and include the resulting cookie on subsequent requests.  CSRF protection
+for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
+
+> **Testing note:** The Flask test client automatically persists cookies across
+> requests.  Tests authenticate by calling `POST /login` once (with patched
+> repositories) and then issue further requests without explicit headers — the
+> `accessToken` cookie is sent automatically.  To simulate an unauthenticated
+> request in tests, use a fresh `app.test_client()` that has no stored cookies.
 
 ### `POST /user`
 - **Purpose:** Create a new user account.
@@ -775,36 +823,48 @@ All protected endpoints require a valid JWT (`Authorization: Bearer <token>`).
 
 ## 10. services/servers.py — Server Management API
 
-### `GET /servers`
-- **Auth required:** No.
-- **Purpose:** List all installed servers.
-- **Response:** `200 { "servers": [{ "server_id", "id", "isRunning", "max_memory_mb", "online_players" }, ...] }`.
+> **Permission model:** All protected routes use `ServersUsersPermsRepository.doseUserHavePerm`,
+> which applies the **owner bypass**: the server owner is implicitly granted every permission.
+> Non-owners require an explicit row in `ServersUsersPerms`.
 
-### `GET /servers/<serverName>`
-- **Auth required:** Optional JWT.
+### `GET /servers`
+- **Auth required:** Yes (JWT cookie).
+- **Purpose:** List servers visible to the authenticated user — includes servers the user
+  *owns* (owner bypass) and servers where `ViewServer` has been explicitly granted.
+- **Response:** `200 { "servers": [{ "name", "server_id", "isRunning", "max_memory_mb", "online_players" }, ...] }`.
+
+### `GET /servers/<serverId>`
+- **Auth required:** Yes.
 - **Purpose:** Return live or cached info about a specific server.
+- **Path params:** `serverId` must be an integer.
 - **Responses:**
   | Status | Condition | Body |
   |--------|-----------|------|
-  | 200 | Found | `{ "name", "is_running", "pid", "uptime_seconds", "max_memory_mb", "online_players" }` |
-  | 403 | JWT present and user lacks `GetServerInfo` permission | — |
-  | 404 | Server name not found | — |
+  | 200 | Found | `{ "server_id", "is_running", "pid", "uptime_seconds", "max_memory_mb", "max_players" }` |
+  | 400 | Invalid `serverId` | — |
+  | 403 | User lacks `GetServerInfo` permission (owner is always allowed) | — |
+  | 404 | Server id not found | — |
 - **Extras:** If the server has a running `ServerSession`, values come from `serverInstance.get_process_info()`; otherwise defaults are used.
 
-### `POST /servers/<serverName>/start`
-- **Auth required:** No (TODO: should require StartServer perm).
-- **Responses:** `200 { "message": "..." }` | `400` if server is already running (`ValueError`).
+### `POST /servers/<serverId>/start`
+- **Auth required:** Yes.
+- **Path params:** `serverId` must be an integer.
+- **Responses:** `200 { "message": "..." }` | `400` on invalid `serverId` or if server is already running (`ValueError`) | `403` without `StartServer` permission (owner always allowed) | `404` if server id does not exist.
 
-### `POST /servers/<serverName>/stop`
-- **Auth required:** No (TODO: should require StopServer perm).
-- **Responses:** `200 { "message": "..." }` | `400` if no instance exists (`ValueError`).
+### `POST /servers/<serverId>/stop`
+- **Auth required:** Yes.
+- **Path params:** `serverId` must be an integer.
+- **Responses:** `200 { "message": "..." }` | `400` on invalid `serverId` or if no instance exists (`ValueError`) | `403` without `StopServer` permission (owner always allowed) | `404` if server id does not exist.
 
-### `GET /servers/<serverName>/stats`
-- **Auth required:** No.
+### `GET /servers/<serverId>/stats`
+- **Auth required:** Yes.
+- **Path params:** `serverId` must be an integer.
 - **Responses:**
   | Status | Condition |
   |--------|-----------|
   | 200 | Server is running; stats returned |
+  | 400 | Invalid `serverId` |
+  | 403 | User lacks `GetServerInfo` permission (owner always allowed) |
   | 404 | Server not found or not running |
   | 500 | Internal error collecting stats |
 
@@ -820,16 +880,54 @@ All protected endpoints require a valid JWT (`Authorization: Bearer <token>`).
   | 400 | Install error | — |
   | 500 | DB registration failed | — |
 
-### `DELETE /servers/<serverName>/uninstall`
+### `DELETE /servers/<serverId>/uninstall`
 - **Auth required:** Yes.
-- **Responses:** `200 { "status": true, "message": "..." }` | `400` on install error | `404` on DB removal failure.
-- **Extras:** Only the server owner (or a user with `RemovePermissionFromServer`) can uninstall.
+- **Path params:** `serverId` must be an integer.
+- **Responses:** `200 { "status": true, "message": "..." }` | `400` on invalid `serverId` or uninstall failure | `403` when user lacks `UninstallServer` permission (owner is implicitly allowed) | `404` when server id does not exist or DB removal fails.
 
-### `GET /manage/<software>/getAvailableVersions`
-- **Auth required:** No.
-- **Response:** `200 { "versions": ["latest", ...] }` | `400 { "message": "<error>" }`.
+---
 
-### `GET /servers/globalStats`
-- **Auth required:** No.
-- **Response:** `200` — aggregated stats dict (see `getGlobalStats`).
-- **Extras:** Returns `500` on unexpected exception.
+## 11. api.py — SocketIO Event Contract
+
+The websocket contract is **sid-bound**:
+- `connect` is the only event that accepts `auth.serverId`.
+- On successful connect, backend binds `sid -> {user_id, server_id, server_name}` in `_sid_server_context`.
+- Subsequent `system` and `console` events derive target server from sid-bound context (no per-message `auth.serverId`).
+- `disconnect` clears sid-bound context and removes the socket from the server room.
+
+### Socket Event: `connect`
+- **Auth required:** Yes (`@jwt_required()`, JWT cookie).
+- **Input auth payload:** `{ "serverId": <int> }`.
+- **Server actions on success:**
+  - validates server existence and `ViewServer` permission,
+  - creates or reuses `ServerSession`,
+  - registers stream listeners,
+  - stores sid context,
+  - joins room `server_name`,
+  - emits `system`, replayed `console` history, current `status`, and current `resources`.
+- **Failure:** emits `error` and rejects connect (`return False`).
+
+### Socket Event: `system`
+- **Auth required:** Yes.
+- **Input payload:** `{ "message": "..." }`.
+- **Server behavior:** validates sid context + permission and emits a system echo message.
+
+### Socket Event: `console`
+- **Auth required:** Yes.
+- **Input payload:** `{ "message": "..." }` (non-empty string required).
+- **Server behavior:** validates sid context + permission, sends command via `ServerSession.send_command`, and emits `console_ack`.
+
+### Socket Event: `console_ack`
+- **Purpose:** explicit command delivery acknowledgement.
+- **Payload shape:** `{ "ok": <bool>, "code": <str>, "message": <str> }`.
+- **Codes:**
+  - `SENT` — command forwarded.
+  - `INVALID_SERVER` — sid not bound / unauthorized context.
+  - `INVALID_MESSAGE` — message missing or blank.
+  - `SERVER_OFFLINE` — target server session not running.
+  - `DISPATCH_FAILED` — command could not be written to process stdin.
+
+### Socket Event: `disconnect`
+- **Auth payload:** none.
+- **Server behavior:** removes sid context, leaves room using stored `server_name`, logs disconnect context.
+

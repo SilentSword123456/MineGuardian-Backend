@@ -20,12 +20,16 @@ class EndpointMapApiTests(unittest.TestCase):
 		self.assertEqual(manage_add_server_post.get('security'), [{'BearerAuth': []}])
 		self.assertIn('Requires JWT Bearer token', manage_add_server_post.get('description', ''))
 
-		remove_server_delete = spec['paths']['/servers/{serverName}/uninstall']['delete']
+		remove_server_delete = spec['paths']['/servers/{serverId}/uninstall']['delete']
 		self.assertEqual(remove_server_delete.get('security'), [{'BearerAuth': []}])
 		self.assertIn('Requires JWT Bearer token', remove_server_delete.get('description', ''))
 
 		create_user_post = spec['paths']['/user']['post']
 		self.assertNotIn('security', create_user_post)
+
+		is_session_valid_get = spec['paths']['/isSessionValid']['get']
+		self.assertEqual(is_session_valid_get.get('security'), [{'BearerAuth': []}])
+		self.assertIn('Requires JWT Bearer token', is_session_valid_get.get('description', ''))
 
 	def test_current_routes_are_registered(self):
 		routes = {}
@@ -35,12 +39,13 @@ class EndpointMapApiTests(unittest.TestCase):
 		expected_routes = {
 			'/health': {'GET'},
 			'/login': {'POST'},
+			'/isSessionValid': {'GET'},
 			'/servers': {'GET'},
-			'/servers/<serverName>': {'GET'},
-			'/servers/<serverName>/start': {'POST'},
-			'/servers/<serverName>/stop': {'POST'},
-			'/servers/<serverName>/stats': {'GET'},
-			'/servers/<serverName>/uninstall': {'DELETE'},
+			'/servers/<serverId>': {'GET'},
+			'/servers/<serverId>/start': {'POST'},
+			'/servers/<serverId>/stop': {'POST'},
+			'/servers/<serverId>/stats': {'GET'},
+			'/servers/<serverId>/uninstall': {'DELETE'},
 			'/servers/globalStats': {'GET'},
 			'/manage/addServer': {'POST'},
 			'/manage/<software>/getAvailableVersions': {'GET'},

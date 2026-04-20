@@ -8,9 +8,10 @@ from flask import Flask
 
 # `services.servers` imports `api` at import time, so provide a tiny stub first.
 api_stub = types.ModuleType('api')
-api_stub.register_socketio_listener = lambda *args, **kwargs: None
+api_stub.register_socketio_listeners = lambda *args, **kwargs: None
 api_stub.socketio = types.SimpleNamespace(emit=lambda *args, **kwargs: None)
-sys.modules['api'] = api_stub
+if 'api' not in sys.modules:
+    sys.modules['api'] = api_stub
 
 import services.servers as servers_module
 
@@ -46,36 +47,36 @@ class AddServerTests(ServersAPITestCase):
 
 
 class RemoveServerTests(ServersAPITestCase):
-    @patch('services.servers.ServersRepository.getServerId')
+    @patch('services.servers.ServersRepository.doesServerExist', return_value=True)
+    @patch('services.servers.ServersRepository.getServerName', return_value='demo')
     @patch('services.servers.ServersUsersPermsRepository.doseUserHavePerm')
     @patch('services.servers.manageLocalServers.uninstallMinecraftServer')
     @patch('services.servers.ServersRepository.removeServer')
     @patch('services.servers.get_jwt_identity', return_value=3)
-    def test_remove_server_short_circuits_without_permission(self, mock_identity, mock_remove, mock_uninstall, mock_has_perm, mock_get_server_id):
-        mock_get_server_id.return_value = 12
+    def test_remove_server_returns_403_without_permission(self, mock_identity, mock_remove, mock_uninstall, mock_has_perm, mock_get_server_name, mock_exists):
         mock_has_perm.return_value = False
 
-        with self._call_in_request_context('delete', '/servers/demo/uninstall'):
-            response = inspect.unwrap(servers_module.remove_server)('demo')
+        with self._call_in_request_context('delete', '/servers/12/uninstall'):
+            with self.assertRaises(Exception) as ctx:
+                inspect.unwrap(servers_module.remove_server)('12')
 
+        self.assertIn('HTTPError', type(ctx.exception).__name__)
         self.assertFalse(mock_uninstall.called)
         self.assertFalse(mock_remove.called)
-        self.assertEqual(mock_get_server_id.call_count, 1)
-        self.assertFalse(response)
 
-    @patch('services.servers.ServersRepository.getServerId')
+    @patch('services.servers.ServersRepository.doesServerExist', return_value=True)
+    @patch('services.servers.ServersRepository.getServerName', return_value='demo')
     @patch('services.servers.ServersUsersPermsRepository.doseUserHavePerm')
     @patch('services.servers.manageLocalServers.uninstallMinecraftServer')
     @patch('services.servers.ServersRepository.removeServer')
     @patch('services.servers.get_jwt_identity', return_value=3)
-    def test_remove_server_uninstalls_and_removes_when_permitted(self, mock_identity, mock_remove, mock_uninstall, mock_has_perm, mock_get_server_id):
-        mock_get_server_id.return_value = 12
+    def test_remove_server_uninstalls_and_removes_when_permitted(self, mock_identity, mock_remove, mock_uninstall, mock_has_perm, mock_get_server_name, mock_exists):
         mock_has_perm.return_value = True
         mock_uninstall.return_value = {'status': 'ok'}
         mock_remove.return_value = True
 
-        with self._call_in_request_context('delete', '/servers/demo/uninstall'):
-            response = inspect.unwrap(servers_module.remove_server)('demo')
+        with self._call_in_request_context('delete', '/servers/12/uninstall'):
+            response = inspect.unwrap(servers_module.remove_server)('12')
 
         self.assertEqual(response[1], 200)
         self.assertTrue(response[0]['status'])

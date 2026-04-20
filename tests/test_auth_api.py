@@ -2,6 +2,8 @@ import json
 import unittest
 from unittest.mock import patch
 
+from flask_jwt_extended import create_access_token
+
 from api import app
 from services import auth
 
@@ -19,10 +21,32 @@ class AuthApiTests(unittest.TestCase):
         data = None if payload is None else json.dumps(payload)
         return self.client.open(path, method=method, data=data, content_type='application/json')
 
+    def get_access_token_cookie(self, response):
+        """Extract the accessToken value from the Set-Cookie header, or None."""
+        for cookie in response.headers.getlist('Set-Cookie'):
+            if cookie.startswith('accessToken='):
+                return cookie.split(';')[0].split('=', 1)[1]
+        return None
+
+    def get_access_token_set_cookie_header(self, response):
+        for cookie in response.headers.getlist('Set-Cookie'):
+            if cookie.startswith('accessToken='):
+                return cookie
+        return None
+
+    def request_with_access_token(self, path, token):
+        # Flask/Werkzeug test clients read cookies from the cookie jar, not raw Cookie header.
+        try:
+            self.client.set_cookie('accessToken', token)
+        except TypeError:
+            # Backward-compatible signature used by older Flask/Werkzeug versions.
+            self.client.set_cookie('localhost', 'accessToken', token)
+        return self.client.get(path)
+
     # Login endpoint tests
 
     def test_login_with_valid_credentials(self):
-        """Test successful login returns access token"""
+        """Test successful login sets accessToken cookie"""
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True) as verify_mock, \
              patch.object(auth.repositories.UserRepository, 'getUserId', return_value=1) as get_user_id_mock:
             response = self.request_json('POST', '/login', {
@@ -31,9 +55,9 @@ class AuthApiTests(unittest.TestCase):
             })
 
         self.assertEqual(response.status_code, 200)
-        response_data = response.get_json()
-        self.assertIn('access_token', response_data)
-        self.assertIsNotNone(response_data['access_token'])
+        token = self.get_access_token_cookie(response)
+        self.assertIsNotNone(token)
+        self.assertNotEqual(token, '')
         verify_mock.assert_called_once_with('testuser', 'testpass')
         get_user_id_mock.assert_called_once_with('testuser')
 
@@ -97,7 +121,7 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(response.get_json(), {'message': 'Missing user_id or password'})
 
     def test_login_calls_get_user_id_for_verified_user(self):
-        """Verified login should resolve user id and return an access token."""
+        """Verified login should resolve user id and set accessToken cookie."""
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True) as verify_mock, \
              patch.object(auth.repositories.UserRepository, 'getUserId', return_value=42) as get_user_id_mock:
             response = self.request_json('POST', '/login', {
@@ -106,7 +130,7 @@ class AuthApiTests(unittest.TestCase):
             })
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn('access_token', response.get_json())
+        self.assertIsNotNone(self.get_access_token_cookie(response))
         verify_mock.assert_called_once_with('steve', 'testpass')
         get_user_id_mock.assert_called_once_with('steve')
 
@@ -123,7 +147,7 @@ class AuthApiTests(unittest.TestCase):
         verify_mock.assert_called_once_with('', 'testpass')
 
     def test_login_with_empty_string_password(self):
-        """Test login with empty string password"""
+        """Test login with empty string password sets accessToken cookie"""
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
              patch.object(auth.repositories.UserRepository, 'getUserId', return_value=2):
             response = self.request_json('POST', '/login', {
@@ -132,9 +156,10 @@ class AuthApiTests(unittest.TestCase):
             })
 
         self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(self.get_access_token_cookie(response))
 
     def test_login_with_special_characters_in_username(self):
-        """Test login with special characters in user_id"""
+        """Test login with special characters in user_id sets accessToken cookie"""
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True) as verify_mock, \
              patch.object(auth.repositories.UserRepository, 'getUserId', return_value=3) as get_user_id_mock:
             response = self.request_json('POST', '/login', {
@@ -143,11 +168,12 @@ class AuthApiTests(unittest.TestCase):
             })
 
         self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(self.get_access_token_cookie(response))
         verify_mock.assert_called_once_with('test@user.com', 'testpass')
         get_user_id_mock.assert_called_once_with('test@user.com')
 
     def test_multiple_login_attempts_with_different_users(self):
-        """Test multiple successful logins issue different tokens."""
+        """Test multiple successful logins set different accessToken cookies."""
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
              patch.object(auth.repositories.UserRepository, 'getUserId', side_effect=[11, 12]):
             response1 = self.request_json('POST', '/login', {
@@ -159,14 +185,115 @@ class AuthApiTests(unittest.TestCase):
                 'password': 'pass2'
             })
 
-        token1 = response1.get_json()['access_token']
-        token2 = response2.get_json()['access_token']
+        token1 = self.get_access_token_cookie(response1)
+        token2 = self.get_access_token_cookie(response2)
 
+        self.assertIsNotNone(token1)
+        self.assertIsNotNone(token2)
         # Tokens should be different
         self.assertNotEqual(token1, token2)
+
+    def test_login_cookie_supports_cross_site_requests(self):
+        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
+             patch.object(auth.repositories.UserRepository, 'getUserId', return_value=55):
+            response = self.request_json('POST', '/login', {
+                'user_id': 'cross-site-user',
+                'password': 'pass'
+            })
+
+        set_cookie = self.get_access_token_set_cookie_header(response)
+        self.assertIsNotNone(set_cookie)
+        self.assertIn('HttpOnly', set_cookie)
+        self.assertIn('Secure', set_cookie)
+        self.assertIn('SameSite=None', set_cookie)
+
+    def test_login_allows_frontend_silentlab_origin(self):
+        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
+             patch.object(auth.repositories.UserRepository, 'getUserId', return_value=12):
+            response = self.client.post(
+                '/login',
+                data=json.dumps({'user_id': 'testuser', 'password': 'testpass'}),
+                content_type='application/json',
+                headers={'Origin': 'https://frontend.silentlab.work'}
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.headers.get('Access-Control-Allow-Origin'),
+            'https://frontend.silentlab.work'
+        )
+        self.assertEqual(response.headers.get('Access-Control-Allow-Credentials'), 'true')
+
+    def test_login_allows_workers_preview_origin(self):
+        origin = 'https://preview-mineguardianui.andrei925-dumitru.workers.dev'
+        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
+             patch.object(auth.repositories.UserRepository, 'getUserId', return_value=13):
+            response = self.client.post(
+                '/login',
+                data=json.dumps({'user_id': 'testuser', 'password': 'testpass'}),
+                content_type='application/json',
+                headers={'Origin': origin}
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get('Access-Control-Allow-Origin'), origin)
+        self.assertEqual(response.headers.get('Access-Control-Allow-Credentials'), 'true')
+
+    def test_login_disallows_unauthorized_origin(self):
+        with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
+              patch.object(auth.repositories.UserRepository, 'getUserId', return_value=14):
+            origin = 'https://example.com'
+            response = self.client.post(
+                '/login',
+                data=json.dumps({'user_id': 'testuser', 'password': 'testpass'}),
+                content_type='application/json',
+                headers={'Origin': origin}
+            )
+
+        self.assertEqual(response.status_code, 200)
+        # Unauthorized origin should NOT be in the Access-Control-Allow-Origin header
+        self.assertNotEqual(response.headers.get('Access-Control-Allow-Origin'), origin)
+
+    # Session validation endpoint tests
+
+    def test_is_session_valid_returns_true_for_existing_user(self):
+        token = create_access_token(identity='42')
+        with patch.object(auth.UserRepository, 'doseUserExist', return_value=True) as user_exists_mock:
+            response = self.request_with_access_token('/isSessionValid', token)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {'status': True})
+        user_exists_mock.assert_called_once_with(42)
+
+    def test_is_session_valid_returns_false_when_user_does_not_exist(self):
+        token = create_access_token(identity='99')
+        with patch.object(auth.UserRepository, 'doseUserExist', return_value=False) as user_exists_mock:
+            response = self.request_with_access_token('/isSessionValid', token)
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.get_json(), {'status': False})
+        user_exists_mock.assert_called_once_with(99)
+
+    def test_is_session_valid_returns_false_when_identity_is_not_numeric(self):
+        token = create_access_token(identity='not-an-int')
+        with patch.object(auth.UserRepository, 'doseUserExist') as user_exists_mock:
+            response = self.request_with_access_token('/isSessionValid', token)
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.get_json(), {'status': False})
+        user_exists_mock.assert_not_called()
+
+    def test_is_session_valid_requires_auth_cookie(self):
+        response = self.client.get('/isSessionValid')
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_is_session_valid_rejects_malformed_token(self):
+        response = self.request_with_access_token('/isSessionValid', 'not.a.jwt')
+
+        self.assertEqual(response.status_code, 422)
 
 
 
 if __name__ == '__main__':
     unittest.main()
-

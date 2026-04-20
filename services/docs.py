@@ -1,49 +1,65 @@
 DOCS = {
     'list_servers': {
-        'summary': 'List all discovered servers',
-        'description': 'Returns all configured local Minecraft servers.',
+        'summary': 'List visible servers for the authenticated user',
+        'description': 'Requires JWT Bearer token. Returns server records where the user has ViewServer permission.',
+        'security': [{'BearerAuth': []}],
         'responses': {
-            200: 'List of available servers returned successfully.'
+            200: 'List of available servers returned successfully.',
+            401: 'Missing or invalid JWT token.'
         }
     },
     'get_general_server_info': {
-        'summary': 'Get server details by server name',
-        'description': 'Returns runtime process details if running, otherwise stored metadata.',
+        'summary': 'Get server details by server ID',
+        'description': 'Requires JWT Bearer token. Path parameter `serverId` must be an integer. Returns runtime process details if running, otherwise stored metadata.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Server details returned successfully.',
+            400: 'Invalid serverId.',
+            403: 'User lacks GetServerInfo permission.',
             404: 'Server not found.'
         }
     },
     'start_server': {
         'summary': 'Start a server',
-        'description': 'Starts a server process and registers its socket listener.',
+        'description': 'Requires JWT Bearer token and StartServer permission. Path parameter `serverId` must be an integer. Starts a server process and registers its socket listener.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Server started successfully.',
-            400: 'Missing or invalid server server_id.'
+            400: 'Invalid serverId or server cannot be started (already running).',
+            403: 'User lacks StartServer permission.',
+            404: 'Server not found.'
         }
     },
     'stop_server': {
         'summary': 'Stop a server',
-        'description': 'Stops a running server process for the given server server_id.',
+        'description': 'Requires JWT Bearer token and StopServer permission. Path parameter `serverId` must be an integer. Stops a running server process for the given server ID.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Server stopped successfully.',
-            400: 'Missing or invalid server server_id.'
+            400: 'Invalid serverId or server cannot be stopped (no instance found).',
+            403: 'User lacks StopServer permission.',
+            404: 'Server not found.'
         }
     },
     'get_server_stats': {
         'summary': 'Get server runtime stats',
-        'description': 'Returns cached or live resource metrics for a running server, including max memory in MB.',
+        'description': 'Requires JWT Bearer token and GetServerInfo permission. Path parameter `serverId` must be an integer. Returns cached or live resource metrics for a running server, including max memory in MB.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Server statistics returned successfully.',
+            400: 'Invalid serverId.',
+            403: 'User lacks GetServerInfo permission.',
             404: 'Server is not running.',
             500: 'Stats retrieval failed.'
         }
     },
     'get_global_stats': {
         'summary': 'Get aggregated runtime stats for all running servers',
-        'description': 'Returns combined CPU, memory, capacity, and player metrics for all currently running server sessions.',
+        'description': 'Requires JWT Bearer token. Returns combined CPU, memory, capacity, and player metrics only for running sessions where the user has ViewServer permission.',
+        'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Global statistics returned successfully.',
+            401: 'Missing or invalid JWT token.',
             500: 'Global stats retrieval failed.'
         }
     },
@@ -69,14 +85,14 @@ DOCS = {
     },
     'remove_server': {
         'summary': 'Uninstall a server',
-        'description': 'Requires JWT Bearer token. Uninstalls and removes the selected server from local storage and unregisters it for the authenticated user.',
+        'description': 'Requires JWT Bearer token and UninstallServer permission. Path parameter `serverId` must be an integer. Uninstalls the selected server and removes its record for the authenticated user.',
         'security': [{'BearerAuth': []}],
         'responses': {
             200: 'Server uninstalled and removed successfully.',
-            400: 'Missing server server name or uninstall failed.',
+            400: 'Invalid serverId or uninstall failed.',
             401: 'Missing or invalid JWT token.',
-            422: 'JWT token is malformed or cannot be processed.',
-            404: 'Server uninstall succeeded but database record could not be removed.'
+            403: 'User lacks UninstallServer permission.',
+            404: 'Server not found or database record could not be removed.'
         }
     },
     'create_user': {
@@ -101,11 +117,21 @@ DOCS = {
     },
     'login': {
         'summary': 'Authenticate a user',
-        'description': 'Validates a `user_id` and password pair and returns a JWT access token on success.',
+        'description': 'Validates a `user_id` and password pair and sets the JWT access token in an `accessToken` HttpOnly cookie on success.',
         'responses': {
-            200: 'Access token returned successfully.',
+            200: 'Authentication successful. JWT is returned in `Set-Cookie: accessToken=...`.',
             400: 'Missing `user_id` or password.',
             401: 'Invalid credentials.'
+        }
+    },
+    'is_session_valid': {
+        'summary': 'Validate the current JWT session',
+        'description': 'Requires JWT Bearer token in the `accessToken` cookie. Returns `status=true` when the token identity maps to an existing user, otherwise returns `status=false` with 401.',
+        'security': [{'BearerAuth': []}],
+        'responses': {
+            200: 'Session is valid for an existing user.',
+            401: 'Missing/invalid token or token identity no longer maps to an existing user.',
+            422: 'JWT token is malformed or cannot be processed.'
         }
     },
     'add_favorite_server': {
