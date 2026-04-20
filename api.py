@@ -6,6 +6,7 @@ import time
 import logging
 import weakref
 import eventlet
+from flask.cli import load_dotenv
 from flask_cors import CORS
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import serverSessionsManager
@@ -18,6 +19,7 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from services.servers import servers_bp
 from services.auth import jwt, auth_blueprint
 from Database.perms import ServersPermissions
+load_dotenv()
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 logging.basicConfig(
@@ -54,7 +56,7 @@ _ALLOWED_WEB_ORIGINS = [
 
 # Accept from all if not in production, else only from allowed origins
 _IS_PRODUCTION = os.environ.get("FLASK_ENV", "production") == "production"
-_CORS_ORIGINS = _ALLOWED_WEB_ORIGINS if _IS_PRODUCTION else "*"
+_CORS_ORIGINS = _ALLOWED_WEB_ORIGINS if _IS_PRODUCTION else "http://localhost:5173"
 
 CORS(app, supports_credentials=True, origins=_CORS_ORIGINS)
 
