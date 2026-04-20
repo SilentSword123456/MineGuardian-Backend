@@ -73,19 +73,21 @@ class ServerSession:
             except Exception as e:
                 print(f"Error in status listener callback: {e}")
 
-    def _broadcast(self, line):
-        self._updateHistory(line)
+    def _broadcast(self, line, source="server"):
+        entry = self._updateHistory(line, source)
 
         for listener in self.listeners:
             try:
-                listener(line)
+                listener(entry)
             except Exception as e:
                 print(f"Error in listener callback: {e}")
 
-    def _updateHistory(self, line):
-        self.log_history.append(line)
+    def _updateHistory(self, line, source="server"):
+        entry = {"line": line, "source": source}
+        self.log_history.append(entry)
         if len(self.log_history) > self.max_history:
             self.log_history.pop(0)
+        return entry
 
     def start(self):
         if self.running:
@@ -212,7 +214,7 @@ class ServerSession:
                     self._rcon = None
                     return None
 
-    def send_command(self, command):
+    def send_command(self, command, source="server"):
         if not self.running or not self.process:
             print(f"Can't send command - server not running")
             return False
@@ -224,7 +226,7 @@ class ServerSession:
             # Use tpool to avoid blocking the hub on Windows when writing to pipe
             eventlet.tpool.execute(self.process.stdin.write, command + "\n")
             eventlet.tpool.execute(self.process.stdin.flush)
-            self._updateHistory(f"> {command}") # TODO: after adding auth and authorisation, we can mark commands from the user differently in the history
+            self._broadcast(f"> {command}", source=source)
             print(f"Sent command: {command}")
             return True
         except Exception as e:
@@ -240,8 +242,8 @@ class ServerSession:
         print(f"\n========== ATTACHED TO '{self.name}' ==========")
         print("Type commands below. Type 'detach' or 'exit' to exit.\n")
 
-        def display_callback(line):
-            print(f"[SERVER + {self.name}] {line}")
+        def display_callback(entry):
+            print(f"[SERVER + {self.name}] [{entry['source']}] {entry['line']}")
 
         self.add_listener(display_callback)
 
