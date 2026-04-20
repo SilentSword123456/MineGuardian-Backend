@@ -4,7 +4,6 @@ import os
 import re
 import time
 import logging
-import weakref
 import eventlet
 from flask.cli import load_dotenv
 from flask_cors import CORS
@@ -76,7 +75,7 @@ generateDB(app)
 # ─── Listener registry ────────────────────────────────────────────────────────
 # Using a WeakSet so entries are automatically removed when a server instance
 # is garbage-collected, with no monkey-patching required.
-_listener_registered: weakref.WeakSet = weakref.WeakSet()
+_listener_registered: set = set()
 # Bind each socket connection to one validated server context.
 _sid_server_context: dict[str, dict[str, int | str]] = {}
 
@@ -236,7 +235,7 @@ def handle_connect(auth=None):
         )
         emit("system", {"data": f"Connected to server {server_name}"})
 
-        for entry in server_instance.log_history:
+        for entry in list(server_instance.log_history):
             emit("console", entry)
 
         is_running = server_instance.running

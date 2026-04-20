@@ -81,7 +81,7 @@ class ServerSession:
 
     def _broadcast(self, line, source="server"):
         entry = self._updateHistory(line, source)
-
+        print(f"[DEBUG] _broadcast firing {len(self.listeners)} listener(s)")
         for listener in self.listeners:
             try:
                 listener(entry)
@@ -249,7 +249,7 @@ class ServerSession:
             # Use tpool to avoid blocking the hub on Windows when writing to pipe
             eventlet.tpool.execute(self.process.stdin.write, command + "\n")
             eventlet.tpool.execute(self.process.stdin.flush)
-            self._broadcast(f"> {command}", source=source)
+            self._updateHistory(command, source)
             print(f"Sent command: {command}")
             return True
         except Exception as e:
