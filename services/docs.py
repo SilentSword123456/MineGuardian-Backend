@@ -265,6 +265,30 @@ DOCS = {
             401: 'Missing or invalid JWT token.',
             422: 'JWT token is malformed or cannot be processed.'
         }
+    },
+    'add_user_permission_for_server': {
+        'summary': 'Add a user permission for a server',
+        'description': 'Requires JWT Bearer token and AddPermissionToServer permission. Grants a permission on a server to a target user.',
+        'security': [{'BearerAuth': []}],
+        'responses': {
+            200: 'User permission added successfully.',
+            400: 'Bad request.',
+            401: 'Missing or invalid JWT token.',
+            403: 'Forbidden when the user does not have permission to add permissions.',
+            422: 'JWT token is malformed or cannot be processed.'
+        }
+    },
+    'remove_user_permission_for_server': {
+        'summary': 'Remove a user permission for a server',
+        'description': 'Requires JWT Bearer token and RemovePermissionFromServer permission. Revokes a permission on a server from a target user.',
+        'security': [{'BearerAuth': []}],
+        'responses': {
+            200: 'User permission removed successfully.',
+            400: 'Bad request.',
+            401: 'Missing or invalid JWT token.',
+            403: 'Forbidden when the user does not have permission to remove permissions.',
+            422: 'JWT token is malformed or cannot be processed.'
+        }
     }
 }
 

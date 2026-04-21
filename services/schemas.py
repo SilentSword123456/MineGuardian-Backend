@@ -107,6 +107,12 @@ class LoginOutputSchema(Schema):
     pass
 
 
+class UserPermReqSchema(Schema):
+    user_id = Integer(required=True)
+    server_id = Integer(required=True)
+    perm_id = Integer(required=True)
+
+
 class ServerIdRequestSchema(Schema):
     server_id = Integer(required=True)
 

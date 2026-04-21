@@ -819,6 +819,16 @@ for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
 - **Request body:** `{ "rule": <int>, "approved": <bool> }`
 - **Responses:** `200 { "status": true/false }` | `400` if `rule` missing or not an integer.
 
+### `POST /userPermission`
+- **Auth required:** Yes.
+- **Request body:** `{ "user_id": <int>, "server_id": <int>, "perm_id": <int> }`
+- **Responses:** `200 { "status": true/false }` | `400` if fields missing or not integers.
+
+### `DELETE /userPermission`
+- **Auth required:** Yes.
+- **Request body:** `{ "user_id": <int>, "server_id": <int>, "perm_id": <int> }`
+- **Responses:** `200 { "status": true/false }` | `400` if fields missing or not integers.
+
 ---
 
 ## 10. services/servers.py — Server Management API

@@ -1,3 +1,4 @@
+import Database.repositories
 from Database.repositories import ServersRepository
 
 serverInstances = {}
@@ -84,6 +85,8 @@ class ServerSession:
         print(f"[DEBUG] _broadcast firing {len(self.listeners)} listener(s)")
         for listener in self.listeners:
             try:
+                if entry["source"] != "server":
+                    entry["source"] = Database.repositories.UserRepository.getUsername(entry["source"])
                 listener(entry)
             except Exception as e:
                 print(f"Error in listener callback: {e}")
@@ -249,7 +252,7 @@ class ServerSession:
             # Use tpool to avoid blocking the hub on Windows when writing to pipe
             eventlet.tpool.execute(self.process.stdin.write, command + "\n")
             eventlet.tpool.execute(self.process.stdin.flush)
-            self._updateHistory(command, source)
+            self._broadcast(command, source)
             print(f"Sent command: {command}")
             return True
         except Exception as e:

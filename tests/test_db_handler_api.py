@@ -224,6 +224,34 @@ class DbHandlerApiTests(unittest.TestCase):
         response = self.request_json('DELETE', '/favoriteServers', {'server_id': 'not-a-number'})
         self.assert_bad_request(response)
 
+    def test_add_user_permission_for_server(self):
+        """POST /userPermission should call ServersUsersPermsRepository.addPerm."""
+        with patch.object(db_handler.ServersUsersPermsRepository, 'addPerm', return_value=True) as add_perm:
+            response = self.request_json('POST', '/userPermission', {'user_id': 2, 'server_id': 1, 'perm_id': 1})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {'status': True})
+        add_perm.assert_called_once_with(1, 1, 2, 1)
+
+    def test_remove_user_permission_for_server(self):
+        """DELETE /userPermission should call ServersUsersPermsRepository.removePerm."""
+        with patch.object(db_handler.ServersUsersPermsRepository, 'removePerm', return_value=True) as remove_perm:
+            response = self.request_json('DELETE', '/userPermission', {'user_id': 2, 'server_id': 1, 'perm_id': 1})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {'status': True})
+        remove_perm.assert_called_once_with(1, 1, 2, 1)
+
+    def test_add_user_permission_missing_fields_rejected(self):
+        """POST /userPermission with missing fields should return 400."""
+        response = self.request_json('POST', '/userPermission', {'user_id': 2})
+        self.assert_bad_request(response)
+
+    def test_remove_user_permission_invalid_types_rejected(self):
+        """DELETE /userPermission with non-integer fields should return 400."""
+        response = self.request_json('DELETE', '/userPermission', {'user_id': 'abc', 'server_id': 1, 'perm_id': 1})
+        self.assert_bad_request(response)
+
 
 if __name__ == '__main__':
     unittest.main()
