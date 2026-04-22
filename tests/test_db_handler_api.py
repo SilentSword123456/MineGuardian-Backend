@@ -224,6 +224,11 @@ class DbHandlerApiTests(unittest.TestCase):
         response = self.request_json('DELETE', '/favoriteServers', {'server_id': 'not-a-number'})
         self.assert_bad_request(response)
 
+    def assert_validation_error(self, response):
+        self.assertEqual(response.status_code, 422)
+        data = response.get_json()
+        self.assertEqual(data.get('message'), 'Validation error')
+
     def test_add_user_permission_for_server(self):
         """POST /userPermission should call ServersUsersPermsRepository.addPerm."""
         with patch.object(db_handler.ServersUsersPermsRepository, 'addPerm', return_value=True) as add_perm:
@@ -243,14 +248,28 @@ class DbHandlerApiTests(unittest.TestCase):
         remove_perm.assert_called_once_with(1, 1, 2, 1)
 
     def test_add_user_permission_missing_fields_rejected(self):
-        """POST /userPermission with missing fields should return 400."""
+        """POST /userPermission with missing fields should return 422."""
         response = self.request_json('POST', '/userPermission', {'user_id': 2})
-        self.assert_bad_request(response, 'Missing required fields: user_id, server_id, and perm_id')
+        self.assert_validation_error(response)
 
     def test_remove_user_permission_invalid_types_rejected(self):
-        """DELETE /userPermission with non-integer fields should return 400."""
+        """DELETE /userPermission with non-integer fields should return 422."""
         response = self.request_json('DELETE', '/userPermission', {'user_id': 'abc', 'server_id': 1, 'perm_id': 1})
-        self.assert_bad_request(response, 'Fields user_id, server_id, and perm_id must be integers')
+        self.assert_validation_error(response)
+
+    def test_add_user_permission_repository_failure_returns_401(self):
+        """POST /userPermission should return 401 if addPerm returns False."""
+        with patch.object(db_handler.ServersUsersPermsRepository, 'addPerm', return_value=False):
+            response = self.request_json('POST', '/userPermission', {'user_id': 2, 'server_id': 1, 'perm_id': 1})
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.get_json()['error'], 'Failed to add permission to the records.')
+
+    def test_remove_user_permission_repository_failure_returns_401(self):
+        """DELETE /userPermission should return 401 if removePerm returns False."""
+        with patch.object(db_handler.ServersUsersPermsRepository, 'removePerm', return_value=False):
+            response = self.request_json('DELETE', '/userPermission', {'user_id': 2, 'server_id': 1, 'perm_id': 1})
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.get_json()['error'], 'Failed to remove permission from the records.')
 
     def test_get_default_servers_permissions(self):
         """GET /getDefaultServersPermissions should return all server permissions mapping."""

@@ -273,7 +273,9 @@ They are pure database operations with no side effects outside the database.
   - Either `userId` or `targetUserId` does not exist.
   - The server does not exist.
   - `userId` is neither the server owner **nor** holds `AddPermissionToServer` on the server.
+  - `targetUserId` is the server owner (owners have all permissions implicitly).
   - `permId` is not a valid `ServersPermissions` value.
+  - The permission `permId` is already granted to `targetUserId` on the server.
 
 #### `removePerm(userId: int, serverId: int, targetUserId: int, permId: int) -> bool`
 - **Purpose:** Revoke a permission on a server from a target user.
@@ -824,15 +826,15 @@ for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
 - **Request body:** `{ "user_id": <int>, "server_id": <int>, "perm_id": <int> }`
 - **Responses:**
   - `200 { "status": true }` on success.
-  - `400` if fields are missing or not integers, with a descriptive error message.
-  - `401` if the permission could not be added (e.g., requester lacks `AddPermissionToServer` permission, target user/server does not exist, or permission already granted).
+  - `422` if fields are missing or not integers (Validation error).
+  - `401` if the permission could not be added (e.g., requester lacks `AddPermissionToServer` permission, target user/server does not exist, target is owner, or permission already granted).
 
 ### `DELETE /userPermission`
 - **Auth required:** Yes.
 - **Request body:** `{ "user_id": <int>, "server_id": <int>, "perm_id": <int> }`
 - **Responses:**
   - `200 { "status": true }` on success.
-  - `400` if fields are missing or not integers, with a descriptive error message.
+  - `422` if fields are missing or not integers (Validation error).
   - `401` if the permission could not be removed (e.g., requester lacks `RemovePermissionFromServer` permission, or the permission was not assigned).
 
 ### `GET /getDefaultServersPermissions`

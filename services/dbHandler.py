@@ -279,27 +279,14 @@ def changeSetting(request_data=None):
 
 @db_blueprint.route('/userPermission', methods=['POST'])
 @db_blueprint.doc(**DOCS['add_user_permission_for_server'])
-@db_blueprint.input(UserPermReqSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.input(UserPermReqSchema, location='json', arg_name='request_data')
 @db_blueprint.output(StatusOutputSchema, status_code=200)
 @jwt_required()
-def addUserPermissionForServer(request_data=None):
-    if request_data is None:
-        return {'error': 'Missing request body'}, 400
-
+def addUserPermissionForServer(request_data):
     userId = int(get_jwt_identity())
     target_user_id = request_data.get('user_id')
     server_id = request_data.get('server_id')
     perm_id = request_data.get('perm_id')
-
-    if target_user_id is None or server_id is None or perm_id is None:
-        return {'error': 'Missing required fields: user_id, server_id, and perm_id'}, 400
-
-    try:
-        target_user_id = int(target_user_id)
-        server_id = int(server_id)
-        perm_id = int(perm_id)
-    except (ValueError, TypeError):
-        return {'error': 'Fields user_id, server_id, and perm_id must be integers'}, 400
 
     result = ServersUsersPermsRepository.addPerm(userId, server_id, target_user_id, perm_id)
     if not result:
@@ -309,27 +296,14 @@ def addUserPermissionForServer(request_data=None):
 
 @db_blueprint.route('/userPermission', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['remove_user_permission_for_server'])
-@db_blueprint.input(UserPermReqSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.input(UserPermReqSchema, location='json', arg_name='request_data')
 @db_blueprint.output(StatusOutputSchema, status_code=200)
 @jwt_required()
-def removeUserPermissionForServer(request_data=None):
-    if request_data is None:
-        return {'error': 'Missing request body'}, 400
-
+def removeUserPermissionForServer(request_data):
     userId = int(get_jwt_identity())
     target_user_id = request_data.get('user_id')
     server_id = request_data.get('server_id')
     perm_id = request_data.get('perm_id')
-
-    if target_user_id is None or server_id is None or perm_id is None:
-        return {'error': 'Missing required fields: user_id, server_id, and perm_id'}, 400
-
-    try:
-        target_user_id = int(target_user_id)
-        server_id = int(server_id)
-        perm_id = int(perm_id)
-    except (ValueError, TypeError):
-        return {'error': 'Fields user_id, server_id, and perm_id must be integers'}, 400
 
     result = ServersUsersPermsRepository.removePerm(userId, server_id, target_user_id, perm_id)
     if not result:

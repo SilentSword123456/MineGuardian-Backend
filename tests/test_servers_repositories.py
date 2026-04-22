@@ -361,7 +361,55 @@ class ServersRepositoryTests(RepositoryTestCase):
         self.assertEqual(ServersRepository.getServerName(999999), '')
 
 
+
 class ServersUsersPermsRepositoryTests(RepositoryTestCase):
+    def test_add_perm_rejects_if_target_is_owner(self):
+        owner_id = self._seed_user('perms-owner-target-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        target_user_id = owner_id
+        server_id = self._seed_server(owner_id, 'perm-owner-target-server')
+        
+        # Another user tries to add perm to owner (even if they have AddPermissionToServer)
+        other_user_id = self._seed_user('perms-other', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        self._seed_server_perm(server_id, other_user_id, ServersPermissions.AddPermissionToServer.value)
+        
+        self.assertFalse(ServersUsersPermsRepository.addPerm(other_user_id, server_id, target_user_id, ServersPermissions.ViewServer.value))
+
+    def test_add_perm_rejects_if_already_exists(self):
+        owner_id = self._seed_user('perms-exists-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        target_user_id = self._seed_user('perms-exists-target', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_id = self._seed_server(owner_id, 'perm-exists-server')
+        self._seed_server_perm(server_id, target_user_id, ServersPermissions.ViewServer.value)
+
+        self.assertFalse(ServersUsersPermsRepository.addPerm(owner_id, server_id, target_user_id, ServersPermissions.ViewServer.value))
+
+    def test_add_perm_rejects_if_requester_lacks_permission(self):
+        owner_id = self._seed_user('perms-no-grant-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        requester_id = self._seed_user('perms-no-grant-requester', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        target_user_id = self._seed_user('perms-no-grant-target', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_id = self._seed_server(owner_id, 'perm-no-grant-server')
+
+        # Requester has ViewServer but not AddPermissionToServer
+        self._seed_server_perm(server_id, requester_id, ServersPermissions.ViewServer.value)
+
+        self.assertFalse(ServersUsersPermsRepository.addPerm(requester_id, server_id, target_user_id, ServersPermissions.ViewServer.value))
+
+    def test_remove_perm_rejects_if_requester_lacks_permission(self):
+        owner_id = self._seed_user('perms-no-rem-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        requester_id = self._seed_user('perms-no-rem-requester', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        target_user_id = self._seed_user('perms-no-rem-target', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_id = self._seed_server(owner_id, 'perm-no-rem-server')
+
+        self._seed_server_perm(server_id, target_user_id, ServersPermissions.ViewServer.value)
+        # Requester has ViewServer but not RemovePermissionFromServer
+        self._seed_server_perm(server_id, requester_id, ServersPermissions.ViewServer.value)
+
+        self.assertFalse(ServersUsersPermsRepository.removePerm(requester_id, server_id, target_user_id, ServersPermissions.ViewServer.value))
+
+    def test_dose_user_have_perm_returns_true_for_owner(self):
+        owner_id = self._seed_user('perm-owner-check', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
+        server_id = self._seed_server(owner_id, 'perm-owner-check-server')
+
+        self.assertTrue(ServersUsersPermsRepository.doseUserHavePerm(owner_id, server_id, ServersPermissions.ViewServer.value))
     def test_get_perms_returns_permission_ids_for_user_and_server(self):
         owner_id = self._seed_user('perms-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
         server_id = self._seed_server(owner_id, 'perm-server')
