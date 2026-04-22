@@ -822,12 +822,18 @@ for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
 ### `POST /userPermission`
 - **Auth required:** Yes.
 - **Request body:** `{ "user_id": <int>, "server_id": <int>, "perm_id": <int> }`
-- **Responses:** `200 { "status": true/false }` | `400` if fields missing or not integers.
+- **Responses:**
+  - `200 { "status": true }` on success.
+  - `400` if fields are missing or not integers, with a descriptive error message.
+  - `401` if the permission could not be added (e.g., requester lacks `AddPermissionToServer` permission, target user/server does not exist, or permission already granted).
 
 ### `DELETE /userPermission`
 - **Auth required:** Yes.
 - **Request body:** `{ "user_id": <int>, "server_id": <int>, "perm_id": <int> }`
-- **Responses:** `200 { "status": true/false }` | `400` if fields missing or not integers.
+- **Responses:**
+  - `200 { "status": true }` on success.
+  - `400` if fields are missing or not integers, with a descriptive error message.
+  - `401` if the permission could not be removed (e.g., requester lacks `RemovePermissionFromServer` permission, or the permission was not assigned).
 
 ### `GET /getDefaultServersPermissions`
 - **Auth required:** No.

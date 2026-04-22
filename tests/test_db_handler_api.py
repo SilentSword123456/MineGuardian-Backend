@@ -27,9 +27,9 @@ class DbHandlerApiTests(unittest.TestCase):
         client = self.client if use_auth else app.test_client()
         return client.open(path, method=method, data=data, content_type='application/json')
 
-    def assert_bad_request(self, response):
+    def assert_bad_request(self, response, message='bad request'):
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json(), {'error': 'bad request'})
+        self.assertEqual(response.get_json()['error'], message)
 
     def test_create_user(self):
         with patch.object(db_handler.UserRepository, 'createUser', return_value=True) as create_user:
@@ -245,12 +245,12 @@ class DbHandlerApiTests(unittest.TestCase):
     def test_add_user_permission_missing_fields_rejected(self):
         """POST /userPermission with missing fields should return 400."""
         response = self.request_json('POST', '/userPermission', {'user_id': 2})
-        self.assert_bad_request(response)
+        self.assert_bad_request(response, 'Missing required fields: user_id, server_id, and perm_id')
 
     def test_remove_user_permission_invalid_types_rejected(self):
         """DELETE /userPermission with non-integer fields should return 400."""
         response = self.request_json('DELETE', '/userPermission', {'user_id': 'abc', 'server_id': 1, 'perm_id': 1})
-        self.assert_bad_request(response)
+        self.assert_bad_request(response, 'Fields user_id, server_id, and perm_id must be integers')
 
     def test_get_default_servers_permissions(self):
         """GET /getDefaultServersPermissions should return all server permissions mapping."""

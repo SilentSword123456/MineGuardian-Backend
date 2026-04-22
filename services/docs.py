@@ -272,9 +272,8 @@ DOCS = {
         'security': [{'BearerAuth': []}],
         'responses': {
             200: 'User permission added successfully.',
-            400: 'Bad request.',
-            401: 'Missing or invalid JWT token.',
-            403: 'Forbidden when the user does not have permission to add permissions.',
+            400: 'Bad request or missing/invalid parameters.',
+            401: 'Unauthorized - missing/invalid JWT token or insufficient permissions to add the requested permission.',
             422: 'JWT token is malformed or cannot be processed.'
         }
     },
@@ -284,9 +283,8 @@ DOCS = {
         'security': [{'BearerAuth': []}],
         'responses': {
             200: 'User permission removed successfully.',
-            400: 'Bad request.',
-            401: 'Missing or invalid JWT token.',
-            403: 'Forbidden when the user does not have permission to remove permissions.',
+            400: 'Bad request or missing/invalid parameters.',
+            401: 'Unauthorized - missing/invalid JWT token or insufficient permissions to remove the requested permission.',
             422: 'JWT token is malformed or cannot be processed.'
         }
     },

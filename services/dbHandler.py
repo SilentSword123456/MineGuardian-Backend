@@ -284,7 +284,7 @@ def changeSetting(request_data=None):
 @jwt_required()
 def addUserPermissionForServer(request_data=None):
     if request_data is None:
-        return {'error': 'bad request'}, 400
+        return {'error': 'Missing request body'}, 400
 
     userId = int(get_jwt_identity())
     target_user_id = request_data.get('user_id')
@@ -292,16 +292,20 @@ def addUserPermissionForServer(request_data=None):
     perm_id = request_data.get('perm_id')
 
     if target_user_id is None or server_id is None or perm_id is None:
-        return {'error': 'bad request'}, 400
+        return {'error': 'Missing required fields: user_id, server_id, and perm_id'}, 400
 
     try:
         target_user_id = int(target_user_id)
         server_id = int(server_id)
         perm_id = int(perm_id)
     except (ValueError, TypeError):
-        return {'error': 'bad request'}, 400
+        return {'error': 'Fields user_id, server_id, and perm_id must be integers'}, 400
 
-    return {'status': ServersUsersPermsRepository.addPerm(userId, server_id, target_user_id, perm_id)}, 200
+    result = ServersUsersPermsRepository.addPerm(userId, server_id, target_user_id, perm_id)
+    if not result:
+        return {'error': 'Failed to add permission to the records.'}, 401
+
+    return {'status': True}, 200
 
 @db_blueprint.route('/userPermission', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['remove_user_permission_for_server'])
@@ -310,7 +314,7 @@ def addUserPermissionForServer(request_data=None):
 @jwt_required()
 def removeUserPermissionForServer(request_data=None):
     if request_data is None:
-        return {'error': 'bad request'}, 400
+        return {'error': 'Missing request body'}, 400
 
     userId = int(get_jwt_identity())
     target_user_id = request_data.get('user_id')
@@ -318,16 +322,20 @@ def removeUserPermissionForServer(request_data=None):
     perm_id = request_data.get('perm_id')
 
     if target_user_id is None or server_id is None or perm_id is None:
-        return {'error': 'bad request'}, 400
+        return {'error': 'Missing required fields: user_id, server_id, and perm_id'}, 400
 
     try:
         target_user_id = int(target_user_id)
         server_id = int(server_id)
         perm_id = int(perm_id)
     except (ValueError, TypeError):
-        return {'error': 'bad request'}, 400
+        return {'error': 'Fields user_id, server_id, and perm_id must be integers'}, 400
 
-    return {'status': ServersUsersPermsRepository.removePerm(userId, server_id, target_user_id, perm_id)}, 200
+    result = ServersUsersPermsRepository.removePerm(userId, server_id, target_user_id, perm_id)
+    if not result:
+        return {'error': 'Failed to remove permission from the records.'}, 401
+
+    return {'status': True}, 200
 
 @db_blueprint.route('/getDefaultServersPermissions', methods=['GET'])
 @db_blueprint.doc(**DOCS['get_default_servers_permissions'])
@@ -353,3 +361,4 @@ def getUsersWithPermsOnServer(server_id):
     perms = ServersUsersPermsRepository.getUsersWithPermsOnServer(server_id)
     logger.debug("getUsersWithPermsOnServer: Permissions fetched successfully server_id=%s count=%d", server_id, len(perms))
     return {'permissions': perms}, 200
+

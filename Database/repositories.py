@@ -279,7 +279,9 @@ class ServersUsersPermsRepository():
             return False
         if not ServersRepository.doesServerExist(serverId):
             return False
-        if ServersRepository.getServerOwner(serverId) != userId and not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.AddPermissionToServer.value):
+        if (ServersRepository.getServerOwner(serverId) != userId and not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.AddPermissionToServer.value)):
+            return False
+        if ServersRepository.getServerOwner(serverId) == targetUserId:
             return False
         try:
             ServersPermissions(permId)
