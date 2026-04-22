@@ -1,11 +1,10 @@
 import Database.repositories
 from Database.repositories import ServersRepository
-
-serverInstances = {}
-usedPorts = set()
-
-import eventlet
-import eventlet.tpool
+import gevent
+import gevent.pool
+from gevent.lock import Semaphore
+from gevent.threadpool import ThreadPool
+_tpool = ThreadPool(10)
 import os
 import shutil
 import subprocess
@@ -13,6 +12,9 @@ import time
 import psutil
 import utils
 from rcon import RconClient, RconError, RconAuthError
+
+serverInstances = {}
+usedPorts = set()
 
 class ServerSession:
     def __init__(self, id, name, command, working_dir=None):
@@ -28,7 +30,7 @@ class ServerSession:
         self.listeners = []
         self.status_listeners = []
         self.log_history = []
-        self.max_history = 100
+        self.max_history = 500
         self._running = False
         self.output_thread = None
         self.monitor_thread = None
@@ -40,8 +42,8 @@ class ServerSession:
         self.max_memory_mb = None
         self.max_players = None
         self._rcon: RconClient | None = None
-        self._rcon_lock = eventlet.semaphore.Semaphore()
-        self._stats_lock = eventlet.semaphore.Semaphore()
+        self._rcon_lock = Semaphore()
+        self._stats_lock = Semaphore()
         self.id = id
 
     @property
@@ -134,9 +136,6 @@ class ServerSession:
                 return False
 
         try:
-            # We must use eventlet.patcher.original('subprocess') if we want the real one, 
-            # but we want the green one. 
-            # On Windows, subprocess + pipes + eventlet can be tricky.
             self.process = subprocess.Popen(
                 self.command,
                 stdin=subprocess.PIPE,
@@ -157,9 +156,9 @@ class ServerSession:
 
             self.running = True
 
-            self.output_thread = eventlet.spawn(self._read_output)
+            self.output_thread = gevent.spawn(self._read_output)
             # Watch process liveness independently from stdout to ensure stop/crash broadcasts.
-            self.monitor_thread = eventlet.spawn(self._monitor_process_exit, self.process)
+            self.monitor_thread = gevent.spawn(self._monitor_process_exit, self.process)
 
             print(f"Server '{self.name}' started!")
             print(f"Process ID: {self.process.pid}")
@@ -173,12 +172,12 @@ class ServerSession:
         try:
             while True:
                 # Use tpool to avoid blocking the eventlet hub on Windows
-                line = eventlet.tpool.execute(self.process.stdout.readline)
+                line = self.process.stdout.readline()
                 if not line:
                     break
                 stripped_line = line.rstrip()
                 self._broadcast(stripped_line)
-                eventlet.sleep(0) # Yield for context switching
+                gevent.sleep(0)
         except Exception as e:
             self._broadcast(f"[ERROR: {e}]")
         finally:
@@ -188,8 +187,7 @@ class ServerSession:
     def _monitor_process_exit(self, proc):
         """Wait for process exit and sync/broadcast running=False immediately."""
         try:
-            # wait() can block; run it in tpool so the eventlet hub stays responsive.
-            eventlet.tpool.execute(proc.wait)
+            proc.wait()
         except Exception as e:
             print(f"Process monitor error for '{self.name}': {e}")
         finally:
@@ -263,8 +261,8 @@ class ServerSession:
 
         try:
             # Use tpool to avoid blocking the hub on Windows when writing to pipe
-            eventlet.tpool.execute(self.process.stdin.write, command + "\n")
-            eventlet.tpool.execute(self.process.stdin.flush)
+            self.process.stdin.write(command + "\n")
+            self.process.stdin.flush()
             self._broadcast("> " + command, source)
             print(f"Sent command: {command}")
             return True

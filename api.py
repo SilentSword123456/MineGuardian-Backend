@@ -1,15 +1,13 @@
+from gevent import monkey, sleep
+monkey.patch_all()
 from flask import jsonify, request, g
 from apiflask import APIFlask, abort
 from flask.cli import load_dotenv
 import os
-
-# Load environment variables as early as possible
 load_dotenv()
-
 import re
 import time
 import logging
-import eventlet
 from flask_cors import CORS
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import serverSessionsManager
@@ -70,7 +68,7 @@ CORS(app, supports_credentials=True, origins=_CORS_ORIGINS)
 socketio = SocketIO(
     app,
     cors_allowed_origins=_CORS_ORIGINS,
-    async_mode="eventlet",
+    async_mode="gevent",
 )
 
 app.register_blueprint(servers_bp)
@@ -98,11 +96,11 @@ def register_socketio_listeners(server_name: str, server_instance) -> None:
 
     def console_listener(entry: dict) -> None:
         socketio.emit("console", entry, to=server_name)
-        eventlet.sleep(0)
+        sleep(0)
 
     def status_listener(is_running: bool) -> None:
         socketio.emit("status", {"running": is_running}, to=server_name)
-        eventlet.sleep(0)
+        sleep(0)
 
     server_instance.add_listener(console_listener)
     server_instance.add_status_listener(status_listener)

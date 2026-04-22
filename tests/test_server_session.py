@@ -13,9 +13,9 @@ from unittest.mock import MagicMock, patch
 def _make_session(server_id=1, name="test-server", command="java -jar server.jar"):
     """Return a ServerSession with all side-effectful setup patched out."""
     with patch("utils.getNewPort", side_effect=[25565, 25575]), \
-         patch("utils.assignNewPort", side_effect=[25565, 25575]), \
-         patch("utils.getConfig", return_value={"rconPassword": "secret"}), \
-         patch("serverSessionsManager.ServersRepository.doesServerExist", return_value=True):
+            patch("utils.assignNewPort", side_effect=[25565, 25575]), \
+            patch("utils.getConfig", return_value={"rconPassword": "secret"}), \
+            patch("serverSessionsManager.ServersRepository.doesServerExist", return_value=True):
         import serverSessionsManager
         session = serverSessionsManager.ServerSession(server_id, name, command, working_dir="/fake/servers/test")
     return session
@@ -32,8 +32,8 @@ class ServerSessionInitTests(unittest.TestCase):
 
     def test_command_list_is_stored_as_is(self):
         with patch("utils.getNewPort", side_effect=[25565, 25575]), \
-             patch("utils.assignNewPort", side_effect=[25565, 25575]), \
-             patch("serverSessionsManager.ServersRepository.doesServerExist", return_value=True):
+                patch("utils.assignNewPort", side_effect=[25565, 25575]), \
+                patch("serverSessionsManager.ServersRepository.doesServerExist", return_value=True):
             import serverSessionsManager
             s = serverSessionsManager.ServerSession(1, "s", ["java", "-jar", "server.jar"], working_dir="/fake/servers/s")
         self.assertEqual(s.command, ["java", "-jar", "server.jar"])
@@ -267,13 +267,13 @@ class SendCommandTests(unittest.TestCase):
         mock_proc = MagicMock()
         mock_proc.poll.return_value = None
         self.session.process = mock_proc
-        
+
         cb = MagicMock()
         self.session.add_listener(cb)
-        
-        with patch("eventlet.tpool.execute"):
+
+        with patch("gevent.threadpool.ThreadPool.spawn"):
             self.session.send_command("list", source="admin")
-            
+
         cb.assert_called_once_with({"line": "> list", "source": "admin"})
         self.assertIn({"line": "> list", "source": "admin"}, self.session.log_history)
 
@@ -290,7 +290,7 @@ class GetProcessInfoTests(unittest.TestCase):
         self.session._running = False
         self.session.process = None
         with patch("utils.getMaxMemoryMB", return_value=1024), \
-             patch("utils.getMaxPlayers", return_value=20):
+                patch("utils.getMaxPlayers", return_value=20):
             info = self.session.get_process_info()
         self.assertFalse(info["is_running"])
         self.assertEqual(info["pid"], 0)
@@ -302,7 +302,7 @@ class GetProcessInfoTests(unittest.TestCase):
         s._running = False
         s.process = None
         with patch("utils.getMaxMemoryMB", return_value=512), \
-             patch("utils.getMaxPlayers", return_value=10):
+                patch("utils.getMaxPlayers", return_value=10):
             info = s.get_process_info()
         self.assertEqual(info["server_id"], 55)
 
@@ -367,9 +367,9 @@ class StartJavaVersionCheckTests(unittest.TestCase):
     def test_returns_false_when_required_java_not_installed(self):
         """start() must return False when the server needs Java 21 but only Java 17 is present."""
         with patch("shutil.which", return_value="/usr/bin/java"), \
-             patch("utils.getMcVersion", return_value="1.21.4"), \
-             patch("utils.getRequiredJavaVersion", return_value=21), \
-             patch("utils.getInstalledJavaMajorVersions", return_value={17}):
+                patch("utils.getMcVersion", return_value="1.21.4"), \
+                patch("utils.getRequiredJavaVersion", return_value=21), \
+                patch("utils.getInstalledJavaMajorVersions", return_value={17}):
             result = self.session.start()
         self.assertFalse(result)
 
@@ -382,11 +382,11 @@ class StartJavaVersionCheckTests(unittest.TestCase):
     def test_proceeds_when_sufficient_java_installed(self):
         """start() should attempt to launch the process when Java is sufficient."""
         with patch("shutil.which", return_value="/usr/bin/java"), \
-             patch("utils.getMcVersion", return_value="1.21.4"), \
-             patch("utils.getRequiredJavaVersion", return_value=21), \
-             patch("utils.getInstalledJavaMajorVersions", return_value={21}), \
-             patch("subprocess.Popen") as mock_popen, \
-             patch("eventlet.spawn"):
+                patch("utils.getMcVersion", return_value="1.21.4"), \
+                patch("utils.getRequiredJavaVersion", return_value=21), \
+                patch("utils.getInstalledJavaMajorVersions", return_value={21}), \
+                patch("subprocess.Popen") as mock_popen, \
+                patch("gevent.spawn"):
             mock_proc = MagicMock()
             mock_proc.pid = 9999
             mock_popen.return_value = mock_proc
@@ -397,11 +397,11 @@ class StartJavaVersionCheckTests(unittest.TestCase):
     def test_proceeds_when_higher_java_installed(self):
         """Java 25 satisfies a server that requires Java 21."""
         with patch("shutil.which", return_value="/usr/bin/java"), \
-             patch("utils.getMcVersion", return_value="1.21.4"), \
-             patch("utils.getRequiredJavaVersion", return_value=21), \
-             patch("utils.getInstalledJavaMajorVersions", return_value={25}), \
-             patch("subprocess.Popen") as mock_popen, \
-             patch("eventlet.spawn"):
+                patch("utils.getMcVersion", return_value="1.21.4"), \
+                patch("utils.getRequiredJavaVersion", return_value=21), \
+                patch("utils.getInstalledJavaMajorVersions", return_value={25}), \
+                patch("subprocess.Popen") as mock_popen, \
+                patch("gevent.spawn"):
             mock_proc = MagicMock()
             mock_proc.pid = 9999
             mock_popen.return_value = mock_proc
@@ -412,9 +412,9 @@ class StartJavaVersionCheckTests(unittest.TestCase):
     def test_skips_java_version_check_when_no_metadata(self):
         """If mineguardian.json is absent, start() skips the version check."""
         with patch("shutil.which", return_value="/usr/bin/java"), \
-             patch("utils.getMcVersion", return_value=None), \
-             patch("subprocess.Popen") as mock_popen, \
-             patch("eventlet.spawn"):
+                patch("utils.getMcVersion", return_value=None), \
+                patch("subprocess.Popen") as mock_popen, \
+                patch("gevent.spawn"):
             mock_proc = MagicMock()
             mock_proc.pid = 9999
             mock_popen.return_value = mock_proc

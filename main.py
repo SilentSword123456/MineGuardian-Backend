@@ -1,14 +1,11 @@
-import eventlet
-eventlet.monkey_patch(all=True)
-
+from gevent import monkey
+monkey.patch_all(all=True)
 import warnings
 # Suppress the DeprecationWarning from eventlet and other benign warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-
 import os
 import questionary
 import serverSessionsManager
-import manageLocalServers
 import utils
 import api
 from utils import displayTitle
@@ -41,7 +38,7 @@ def main_menu():
             break
 
 def start_server(host=None,port=None,debug=None):
-    questionary.print("\nStart API Server\n", style="bold fg:cyan")
+    questionary.print("\nStart API Server\n", style="bold fg:green")
 
     if(host is None):
         host = questionary.text("Host:", default="0.0.0.0").ask()
@@ -88,5 +85,7 @@ if __name__ == '__main__':
     if(utils.getConfig()["autoStartApiServer"]):
         start_server(**utils.getConfig()["defaultApiServerConfig"])
 
-    main_menu()
+
+    #main_menu()
+    questionary.print("\nSomething went wrong with the config file. Check main.py, the if __name__==\"__main__\": statement.", style="fg:red")
 
