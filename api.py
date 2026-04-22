@@ -1,11 +1,15 @@
 from flask import jsonify, request, g
 from apiflask import APIFlask, abort
+from flask.cli import load_dotenv
 import os
+
+# Load environment variables as early as possible
+load_dotenv()
+
 import re
 import time
 import logging
 import eventlet
-from flask.cli import load_dotenv
 from flask_cors import CORS
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import serverSessionsManager
@@ -55,7 +59,11 @@ _ALLOWED_WEB_ORIGINS = [
 
 # Accept from all if not in production, else only from allowed origins
 _IS_PRODUCTION = os.environ.get("FLASK_ENV", "production") == "production"
-_CORS_ORIGINS = _ALLOWED_WEB_ORIGINS if _IS_PRODUCTION else "http://localhost:5173"
+_CORS_ORIGINS = _ALLOWED_WEB_ORIGINS
+if not _IS_PRODUCTION:
+    # Always include localhost in development, but keep the production ones 
+    # to allow testing them locally.
+    _CORS_ORIGINS = ["http://localhost:5173"] + _ALLOWED_WEB_ORIGINS
 
 CORS(app, supports_credentials=True, origins=_CORS_ORIGINS)
 

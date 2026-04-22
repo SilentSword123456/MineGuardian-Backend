@@ -82,11 +82,24 @@ class ServerSession:
 
     def _broadcast(self, line, source="server"):
         entry = self._updateHistory(line, source)
+
+        # If source is a numeric ID (as string or int), resolve to username.
+        # Otherwise, keep as-is (e.g. "server", "admin", "custom").
+        if source != "server":
+            is_numeric = False
+            if isinstance(source, int):
+                is_numeric = True
+            elif isinstance(source, str) and source.isdigit():
+                is_numeric = True
+
+            if is_numeric:
+                username = Database.repositories.UserRepository.getUsername(int(source))
+                if username:
+                    entry["source"] = username
+
         print(f"[DEBUG] _broadcast firing {len(self.listeners)} listener(s)")
         for listener in self.listeners:
             try:
-                if entry["source"] != "server":
-                    entry["source"] = Database.repositories.UserRepository.getUsername(entry["source"])
                 listener(entry)
             except Exception as e:
                 print(f"Error in listener callback: {e}")
@@ -252,7 +265,7 @@ class ServerSession:
             # Use tpool to avoid blocking the hub on Windows when writing to pipe
             eventlet.tpool.execute(self.process.stdin.write, command + "\n")
             eventlet.tpool.execute(self.process.stdin.flush)
-            self._broadcast(command, source)
+            self._broadcast("> " + command, source)
             print(f"Sent command: {command}")
             return True
         except Exception as e:

@@ -195,7 +195,9 @@ class AuthApiTests(unittest.TestCase):
 
     def test_login_cookie_supports_cross_site_requests(self):
         with patch.object(auth.repositories.UserRepository, 'verify', return_value=True), \
-             patch.object(auth.repositories.UserRepository, 'getUserId', return_value=55):
+             patch.object(auth.repositories.UserRepository, 'getUserId', return_value=55), \
+             patch('services.auth._secure_cookies', True), \
+             patch('services.auth._cookie_samesite', 'None'):
             response = self.request_json('POST', '/login', {
                 'user_id': 'cross-site-user',
                 'password': 'pass'
