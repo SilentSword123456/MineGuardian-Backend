@@ -4,9 +4,12 @@ Flask-Cors==6.0.2
 Flask-JWT-Extended==4.7.1
 Flask-SQLAlchemy==3.1.1
 Flask-SocketIO==5.6.1
-eventlet==0.41.0
+gevent==24.11.1
+gevent-websocket==0.10.1
 marshmallow==4.3.0
 psutil==7.2.2
 questionary==2.1.1
 requests==2.33.1
 python-dotenv==1.0.1
+pytest==8.3.5
+pytest-gevent==1.1
