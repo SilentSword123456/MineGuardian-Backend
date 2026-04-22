@@ -289,6 +289,24 @@ DOCS = {
             403: 'Forbidden when the user does not have permission to remove permissions.',
             422: 'JWT token is malformed or cannot be processed.'
         }
+    },
+    'get_default_servers_permissions': {
+        'summary': 'Get default server permissions',
+        'description': 'Returns a mapping of permission names to their integer values.',
+        'responses': {
+            200: 'Default server permissions returned successfully.'
+        }
+    },
+    'get_users_with_perms_on_server': {
+        'summary': 'Get all users with permissions on a server',
+        'description': 'Requires JWT Bearer token and ViewServer permission (or server ownership). Path parameter `serverId` must be an integer. Returns a dictionary mapping user IDs to their assigned permissions for the specified server.',
+        'security': [{'BearerAuth': []}],
+        'responses': {
+            200: 'User permissions dictionary returned successfully.',
+            400: 'Invalid serverId.',
+            401: 'Missing or invalid JWT token or unauthorized to view permissions.',
+            422: 'JWT token is malformed or cannot be processed.'
+        }
     }
 }
 

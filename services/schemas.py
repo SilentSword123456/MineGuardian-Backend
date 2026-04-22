@@ -1,5 +1,5 @@
 from apiflask.schemas import Schema
-from marshmallow.fields import Boolean, Float, Integer, List, Nested, String
+from marshmallow.fields import Boolean, Dict, Float, Integer, List, Nested, String
 
 
 class ServerListItemSchema(Schema):
@@ -142,5 +142,20 @@ class SettingRequestSchema(Schema):
 
 class RuleRequestSchema(Schema):
     rule = Integer(required=True)
+
+
+class DefaultPermissionsOutputSchema(Schema):
+    AddPermissionToServer = Integer()
+    RemovePermissionFromServer = Integer()
+    GetServerInfo = Integer()
+    StartServer = Integer()
+    StopServer = Integer()
+    ViewServer = Integer()
+    UninstallServer = Integer()
+
+
+class UserServerPermsOutputSchema(Schema):
+    permissions = Dict(keys=Integer(), values=List(Integer()))
+    error = String()
 
 

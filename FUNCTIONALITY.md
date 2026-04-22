@@ -829,6 +829,15 @@ for cookie-based JWT is disabled (`JWT_COOKIE_CSRF_PROTECT = False`).
 - **Request body:** `{ "user_id": <int>, "server_id": <int>, "perm_id": <int> }`
 - **Responses:** `200 { "status": true/false }` | `400` if fields missing or not integers.
 
+### `GET /getDefaultServersPermissions`
+- **Auth required:** No.
+- **Responses:** `200 { "AddPermissionToServer": 1, "RemovePermissionFromServer": 2, ... }` — a mapping of all `ServersPermissions` enum names to their values.
+
+### `GET /servers/<serverId>/permissions`
+- **Auth required:** Yes.
+- **Path parameters:** `serverId` must be an integer.
+- **Responses:** `200 { "permissions": { "<userId>": [<permId>, ...], ... } }` — a mapping of user IDs to their list of assigned permissions on the specified server. Requires `ViewServer` or server ownership.
+
 ---
 
 ## 10. services/servers.py — Server Management API

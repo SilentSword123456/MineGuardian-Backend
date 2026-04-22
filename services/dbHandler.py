@@ -1,6 +1,9 @@
+import logging
 from apiflask import APIBlueprint
 from flask_jwt_extended import jwt_required, get_jwt_identity
-
+from Database.repositories import ServersRepository, ServersUsersPermsRepository
+from Database.perms import ServersPermissions
+import Database.perms
 from Database.repositories import *
 from services.docs import DOCS
 from services.schemas import (
@@ -18,9 +21,12 @@ from services.schemas import (
     UserIdRequestSchema,
     UserPermReqSchema,
     StatusOutputSchema,
+    DefaultPermissionsOutputSchema,
+    UserServerPermsOutputSchema,
 )
 
 db_blueprint = APIBlueprint('database', __name__)
+logger = logging.getLogger(__name__)
 
 @db_blueprint.route('/user', methods=['POST'])
 @db_blueprint.doc(**DOCS['create_user'])
@@ -323,3 +329,27 @@ def removeUserPermissionForServer(request_data=None):
 
     return {'status': ServersUsersPermsRepository.removePerm(userId, server_id, target_user_id, perm_id)}, 200
 
+@db_blueprint.route('/getDefaultServersPermissions', methods=['GET'])
+@db_blueprint.doc(**DOCS['get_default_servers_permissions'])
+@db_blueprint.output(DefaultPermissionsOutputSchema, status_code=200)
+def getDefaultServersPermissions():
+    permsList = Database.perms.ServersPermissions
+    permsDict = {perm.name: perm.value for perm in permsList}
+    return permsDict, 200
+
+@db_blueprint.route('/servers/<int:server_id>/permissions', methods=['GET'])
+@db_blueprint.doc(**DOCS['get_users_with_perms_on_server'])
+@db_blueprint.output(UserServerPermsOutputSchema, status_code=200)
+@jwt_required()
+def getUsersWithPermsOnServer(server_id):
+    userId = int(get_jwt_identity())
+    
+    logger.info("getUsersWithPermsOnServer: Fetching permissions server_id=%s userId=%s", server_id, userId)
+
+    if ServersRepository.getServerOwner(server_id) != userId and not ServersUsersPermsRepository.doseUserHavePerm(userId, server_id, ServersPermissions.ViewServer.value):
+        logger.warning("getUsersWithPermsOnServer: Unauthorized access attempt server_id=%s userId=%s", server_id, userId)
+        return {'error': 'Unauthorized', 'permissions': {}}, 401
+
+    perms = ServersUsersPermsRepository.getUsersWithPermsOnServer(server_id)
+    logger.debug("getUsersWithPermsOnServer: Permissions fetched successfully server_id=%s count=%d", server_id, len(perms))
+    return {'permissions': perms}, 200

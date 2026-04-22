@@ -252,6 +252,42 @@ class DbHandlerApiTests(unittest.TestCase):
         response = self.request_json('DELETE', '/userPermission', {'user_id': 'abc', 'server_id': 1, 'perm_id': 1})
         self.assert_bad_request(response)
 
+    def test_get_default_servers_permissions(self):
+        """GET /getDefaultServersPermissions should return all server permissions mapping."""
+        response = app.test_client().get('/getDefaultServersPermissions')
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertIn('AddPermissionToServer', data)
+        self.assertEqual(data['AddPermissionToServer'], 1)
+        self.assertIn('ViewServer', data)
+        self.assertEqual(data['ViewServer'], 6)
+
+    def test_get_users_with_perms_on_server(self):
+        """GET /servers/1/permissions should call ServersUsersPermsRepository.getUsersWithPermsOnServer."""
+        mock_perms = {2: [1]}
+        with patch('services.dbHandler.ServersRepository.getServerOwner', return_value=1), \
+             patch('services.dbHandler.ServersUsersPermsRepository.getUsersWithPermsOnServer', return_value=mock_perms) as get_perms:
+            response = self.request_json('GET', '/servers/1/permissions')
+
+        self.assertEqual(response.status_code, 200)
+        # Marshmallow/APIFlask might convert keys to strings in JSON
+        self.assertEqual(response.get_json(), {'permissions': {'2': [1]}})
+        get_perms.assert_called_once_with(1)
+
+    def test_get_users_with_perms_on_server_unauthorized(self):
+        """GET /servers/1/permissions should return 401 if user is not authorized."""
+        with patch('services.dbHandler.ServersRepository.getServerOwner', return_value=2), \
+             patch('services.dbHandler.ServersUsersPermsRepository.doseUserHavePerm', return_value=False):
+            response = self.request_json('GET', '/servers/1/permissions')
+        
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.get_json()['error'], 'Unauthorized')
+
+    def test_get_users_with_perms_on_server_invalid_id_rejected(self):
+        """GET /servers/abc/permissions with invalid server_id should return 404 (not matched)."""
+        response = self.request_json('GET', '/servers/abc/permissions')
+        self.assertEqual(response.status_code, 404)
+
 
 if __name__ == '__main__':
     unittest.main()

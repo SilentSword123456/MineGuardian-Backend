@@ -285,6 +285,8 @@ class ServersUsersPermsRepository():
             ServersPermissions(permId)
         except ValueError:
             return False
+        if db.session.query(ServersUsersPerms).filter(ServersUsersPerms.user_id==targetUserId, ServersUsersPerms.server_id==serverId, ServersUsersPerms.perm_id==permId).first() is not None:
+            return False
 
         db.session.add(ServersUsersPerms(user_id=targetUserId, server_id=serverId, perm_id=permId))
         db.session.commit()
@@ -359,3 +361,19 @@ class ServersUsersPermsRepository():
         ).all()
 
         return [row.server_id for row in rows]
+    
+    @staticmethod
+    def getUsersWithPermsOnServer(serverId: int) -> dict[int, list[int]]:
+        if not ServersRepository.doesServerExist(serverId):
+            return {}
+
+        rows = db.session.query(ServersUsersPerms).filter(
+            ServersUsersPerms.server_id == serverId,
+        ).all()
+
+        result = {}
+        for row in rows:
+            if row.user_id not in result:
+                result[row.user_id] = []
+            result[row.user_id].append(row.perm_id)
+        return result
