@@ -89,8 +89,15 @@ class PlayerPrivilegesOutputSchema(Schema):
 
 
 class UserCreateRequestSchema(Schema):
+    email = String(required=True)
+    firstName = String(required=True)
     username = String(required=True)
     password = String(required=True)
+
+
+class SendVerificationTokenRequestSchema(Schema):
+    email = String(load_default=None)
+    username = String(load_default=None)
 
 
 class UserIdRequestSchema(Schema):
@@ -157,5 +164,3 @@ class DefaultPermissionsOutputSchema(Schema):
 class UserServerPermsOutputSchema(Schema):
     permissions = Dict(keys=Integer(), values=List(Integer()))
     error = String()
-
-

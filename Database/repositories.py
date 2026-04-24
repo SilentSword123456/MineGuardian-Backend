@@ -1,5 +1,3 @@
-import os
-import redis
 from itsdangerous import URLSafeTimedSerializer
 from werkzeug.security import generate_password_hash, check_password_hash
 import services.email
@@ -7,23 +5,18 @@ from Database.perms import SettingsPermissions, PlayersPermissions, ServersPermi
 from Database.database import *
 from utils import getConfig
 
-r = redis.Redis(
-    host=os.environ.get("REDIS_HOST", "localhost"),
-    port=int(os.environ.get("REDIS_PORT", 6379)),
-    decode_responses=True
-)
-
 s = URLSafeTimedSerializer(getConfig()["flaskConfig"]["SECRET_KEY"])
 
 
 class UserRepository():
     @staticmethod
-    def createUser(email:str, username: str, password: str) -> bool:
+    def createUser(email:str, username: str, password: str, firstName: str) -> bool:
         if (db.session.query(User).filter(User.username == username).first()
-                or db.session.query(User).filter(User.email == email).first() is not None):
+                or db.session.query(User).filter(User.email == email).first()
+                or db.session.query(User).filter(User.first_name == firstName).first()is not None):
             return False
         hashPassword = generate_password_hash(password)
-        db.session.add(User(email = email, username=username, password=hashPassword))
+        db.session.add(User(email = email, username=username, password=hashPassword, first_name=firstName))
         db.session.commit()
         user = db.session.query(User).filter(User.email == email).first()
         # Send verification email immediately after account creation
@@ -45,6 +38,8 @@ class UserRepository():
             (User.username == identifier) | (User.email == identifier)
         ).first()
         if user is None:
+            return False
+        if user.is_verified is not True:
             return False
         return check_password_hash(user.password, password)
 
@@ -115,7 +110,7 @@ class UserRepository():
             return False
         token = UserRepository.createVerificationToken(userId)
         user = db.session.query(User).filter(User.id == userId).first()
-        result = services.email.send_verification_email(user.email, token)
+        result = services.email.send_verification_email(user.email, token, user.first_name)
         return result
 
 class FavoriteServersRepository():

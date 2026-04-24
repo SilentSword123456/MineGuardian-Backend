@@ -32,7 +32,7 @@ def login(request_data=None):
 
     authorized = repositories.UserRepository.verify(username, password)
     if not authorized:
-        return make_response({'message': 'Invalid credentials'}, 401)
+        return make_response({'message': 'Invalid credentials or not verified'}, 401)
 
     userId = repositories.UserRepository.getUserId(username)
     access_token = create_access_token(identity=str(userId))

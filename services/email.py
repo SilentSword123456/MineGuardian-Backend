@@ -4,18 +4,30 @@ import resend
 resend.api_key = os.environ.get("RESEND_API_KEY", "")
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
-def send_verification_email(to_email: str, token: str):
-    if os.environ.get("FLASK_ENV") == "development":
-        print(f"[DEV] Verification token for {to_email}: {token}")
-        return True
+
+# noinspection PyTypeChecker
+def send_verification_email(to_email: str, token: str, first_name: str=""):
+    #if os.environ.get("FLASK_ENV") == "development":
+    #    print(f"[DEV] Verification token for {to_email}: {token}")
+    #    return True
+
 
     resend.Emails.send({
         "from": "noreply@silentlab.work",
-        "to": to_email,
-        "subject": "Verify your MineGuardian account",
-        "html": f"<p>Click <a href='{FRONTEND_URL}/verify?token={token}'>here</a> to verify your account. Expires in 24 hours.</p>"
+        "to": [to_email],
+        "subject": "Verify your MineGuardian email",
+        "template": {
+            "id": "email-verification",
+            "variables": {
+                "company_name": "MineGuardian",
+                "company_address": "silentlab.work",
+                "first_name": first_name,
+                "verification_url": f"{FRONTEND_URL}/verifyEmail?token={token}",
+            }
+        }
     })
     return True
+
 
 def send_password_reset_email(to_email: str, token: str):
     if os.environ.get("FLASK_ENV") == "development":

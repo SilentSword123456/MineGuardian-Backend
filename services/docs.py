@@ -97,10 +97,26 @@ DOCS = {
     },
     'create_user': {
         'summary': 'Create a user',
-        'description': 'Creates a new database user record from a `username` and password payload.',
+        'description': 'Creates a new database user record from an `email`, `username`, and `password` payload.',
         'responses': {
             200: 'User created successfully.',
-            400: 'Bad request.'
+            400: 'Bad request — missing email, username, or password.'
+        }
+    },
+    'send_verification_token': {
+        'summary': 'Send an email verification token',
+        'description': 'Sends a verification token to the email address associated with the given `email` or `username`. Always returns 200 to avoid leaking whether an account exists.',
+        'responses': {
+            200: 'Verification token sent (or silently skipped if account not found).',
+            400: 'Bad request — neither email nor username provided.'
+        }
+    },
+    'verify_email': {
+        'summary': 'Verify an email address', #TODO to add more like details, its too short (the description)
+        'description': 'Validates the `token`.',
+        'responses': {
+            200: 'Email verified successfully.',
+            400: 'Missing, invalid, or expired token.'
         }
     },
     'remove_user': {
@@ -307,4 +323,3 @@ DOCS = {
         }
     }
 }
-

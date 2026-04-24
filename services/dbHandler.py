@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 @db_blueprint.route('/user', methods=['POST'])
 @db_blueprint.doc(**DOCS['create_user'])
-@limiter.limit("5 per hour")
+@limiter.limit("5 per minute")
 @db_blueprint.input(UserCreateRequestSchema, location='json', arg_name='request_data', validation=False)
 @db_blueprint.output(StatusOutputSchema, status_code=200)
 def createUser(request_data=None):
@@ -41,13 +41,15 @@ def createUser(request_data=None):
 
     email = request_data.get('email')
     username = request_data.get('username')
+    firstName = request_data.get('first_name')
     password = request_data.get('password')
-    if email is None or username is None or password is None:
+    if email is None or username is None or firstName is None or password is None:
         return {'error': 'bad request'}, 400
 
-    return {'status': UserRepository.createUser(email, username, password)}, 200
+    return {'status': UserRepository.createUser(email, username, password, firstName)}, 200
 
 @db_blueprint.route('/sendVerificationToken', methods=['POST'])
+@db_blueprint.doc(**DOCS['send_verification_token'])
 @limiter.limit("3 per hour")
 @db_blueprint.input(UserCreateRequestSchema, location='json', arg_name='request_data', validation=False)
 @db_blueprint.output(StatusOutputSchema, status_code=200)
@@ -67,7 +69,8 @@ def sendVerificationToken(request_data=None):
 
     return {'status': UserRepository.sendVerificationToken(userId)}, 200
 
-@db_blueprint.route('/verifyEmail', methods=['GET'])
+@db_blueprint.route('/verifyEmail', methods=['POST'])
+@db_blueprint.doc(**DOCS['verify_email'])
 @limiter.limit("10 per minute")
 @db_blueprint.output(StatusOutputSchema, status_code=200)
 def verifyEmail():

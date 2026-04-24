@@ -198,6 +198,7 @@ def _resolve_server(auth_payload: dict) -> tuple[int, str] | tuple[None, None]:
 # ─── REST ────────────────────────────────────────────────────────────────────
 
 @app.route("/health")
+@limiter.limit("3 per 5 seconds")
 def health():
     return jsonify({"status": "ok", "timestamp": time.time()}), 200
 
