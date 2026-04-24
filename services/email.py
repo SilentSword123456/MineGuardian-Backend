@@ -17,7 +17,7 @@ def send_verification_email(to_email: str, token: str, first_name: str=""):
         "to": [to_email],
         "subject": "Verify your MineGuardian email",
         "template": {
-            "id": "email-verification",
+            "id": "email-verification-copy",
             "variables": {
                 "company_name": "MineGuardian",
                 "company_address": "silentlab.work",
