@@ -409,7 +409,7 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
         owner_id = self._seed_user('perm-owner-check', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
         server_id = self._seed_server(owner_id, 'perm-owner-check-server')
 
-        self.assertTrue(ServersUsersPermsRepository.doseUserHavePerm(owner_id, server_id, ServersPermissions.ViewServer.value))
+        self.assertTrue(ServersUsersPermsRepository.doesUserHavePerm(owner_id, server_id, ServersPermissions.ViewServer.value))
     def test_get_perms_returns_permission_ids_for_user_and_server(self):
         owner_id = self._seed_user('perms-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
         server_id = self._seed_server(owner_id, 'perm-server')
@@ -479,25 +479,25 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
 
         self._seed_server_perm(server_id, target_user_id, ServersPermissions.RemovePermissionFromServer.value)
 
-        self.assertTrue(ServersUsersPermsRepository.doseUserHavePerm(target_user_id, server_id, ServersPermissions.RemovePermissionFromServer.value))
+        self.assertTrue(ServersUsersPermsRepository.doesUserHavePerm(target_user_id, server_id, ServersPermissions.RemovePermissionFromServer.value))
 
     def test_dose_user_have_perm_returns_false_when_user_does_not_have_permission(self):
         owner_id = self._seed_user('perm-no-check-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
         target_user_id = self._seed_user('perm-no-check-target', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
         server_id = self._seed_server(owner_id, 'perm-no-check-server')
 
-        self.assertFalse(ServersUsersPermsRepository.doseUserHavePerm(target_user_id, server_id, ServersPermissions.RemovePermissionFromServer.value))
+        self.assertFalse(ServersUsersPermsRepository.doesUserHavePerm(target_user_id, server_id, ServersPermissions.RemovePermissionFromServer.value))
 
     def test_dose_user_have_perm_returns_false_for_missing_user(self):
         owner_id = self._seed_user('perm-missing-user-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
         server_id = self._seed_server(owner_id, 'perm-missing-user-server')
 
-        self.assertFalse(ServersUsersPermsRepository.doseUserHavePerm(999999, server_id, ServersPermissions.RemovePermissionFromServer.value))
+        self.assertFalse(ServersUsersPermsRepository.doesUserHavePerm(999999, server_id, ServersPermissions.RemovePermissionFromServer.value))
 
     def test_dose_user_have_perm_returns_false_for_missing_server(self):
         user_id = self._seed_user('perm-missing-server-user', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
 
-        self.assertFalse(ServersUsersPermsRepository.doseUserHavePerm(user_id, 999999, ServersPermissions.RemovePermissionFromServer.value))
+        self.assertFalse(ServersUsersPermsRepository.doesUserHavePerm(user_id, 999999, ServersPermissions.RemovePermissionFromServer.value))
 
     def test_dose_user_have_perm_returns_false_when_user_has_different_permission(self):
         owner_id = self._seed_user('perm-different-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
@@ -506,8 +506,8 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
 
         self._seed_server_perm(server_id, target_user_id, ServersPermissions.AddPermissionToServer.value)
 
-        self.assertFalse(ServersUsersPermsRepository.doseUserHavePerm(target_user_id, server_id, ServersPermissions.RemovePermissionFromServer.value))
-        self.assertTrue(ServersUsersPermsRepository.doseUserHavePerm(target_user_id, server_id, ServersPermissions.AddPermissionToServer.value))
+        self.assertFalse(ServersUsersPermsRepository.doesUserHavePerm(target_user_id, server_id, ServersPermissions.RemovePermissionFromServer.value))
+        self.assertTrue(ServersUsersPermsRepository.doesUserHavePerm(target_user_id, server_id, ServersPermissions.AddPermissionToServer.value))
 
     def test_dose_user_have_perm_with_multiple_permissions(self):
         owner_id = self._seed_user('perm-multi-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
@@ -517,8 +517,8 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
         self._seed_server_perm(server_id, target_user_id, ServersPermissions.AddPermissionToServer.value)
         self._seed_server_perm(server_id, target_user_id, ServersPermissions.RemovePermissionFromServer.value)
 
-        self.assertTrue(ServersUsersPermsRepository.doseUserHavePerm(target_user_id, server_id, ServersPermissions.AddPermissionToServer.value))
-        self.assertTrue(ServersUsersPermsRepository.doseUserHavePerm(target_user_id, server_id, ServersPermissions.RemovePermissionFromServer.value))
+        self.assertTrue(ServersUsersPermsRepository.doesUserHavePerm(target_user_id, server_id, ServersPermissions.AddPermissionToServer.value))
+        self.assertTrue(ServersUsersPermsRepository.doesUserHavePerm(target_user_id, server_id, ServersPermissions.RemovePermissionFromServer.value))
 
     def test_get_servers_with_user_perm_returns_matching_server_ids(self):
         owner_id = self._seed_user('perm-view-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
@@ -544,7 +544,7 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
 
         for perm in ServersPermissions:
             self.assertTrue(
-                ServersUsersPermsRepository.doseUserHavePerm(owner_id, server_id, perm.value),
+                ServersUsersPermsRepository.doesUserHavePerm(owner_id, server_id, perm.value),
                 msg=f"Owner should have implicit access to {perm.name}",
             )
 
@@ -555,12 +555,12 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
         server_id = self._seed_server(owner_id, 'owner-explicit-server')
 
         self.assertFalse(
-            ServersUsersPermsRepository.doseUserHavePerm(non_owner_id, server_id, ServersPermissions.ViewServer.value)
+            ServersUsersPermsRepository.doesUserHavePerm(non_owner_id, server_id, ServersPermissions.ViewServer.value)
         )
 
         self._seed_server_perm(server_id, non_owner_id, ServersPermissions.ViewServer.value)
         self.assertTrue(
-            ServersUsersPermsRepository.doseUserHavePerm(non_owner_id, server_id, ServersPermissions.ViewServer.value)
+            ServersUsersPermsRepository.doesUserHavePerm(non_owner_id, server_id, ServersPermissions.ViewServer.value)
         )
 
     def test_get_servers_with_user_perm_does_not_include_owned_servers_without_explicit_row(self):

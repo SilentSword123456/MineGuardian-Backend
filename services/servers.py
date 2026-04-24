@@ -69,7 +69,7 @@ def getGeneralServerInfo(serverId):
      if not ServersRepository.doesServerExist(serverId):
          abort(404, message='Server not found')
 
-     if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.GetServerInfo.value):
+     if not ServersUsersPermsRepository.doesUserHavePerm(userId, serverId, ServersPermissions.GetServerInfo.value):
          abort(403, message='You dont have the permission to do this!')
 
      serverName = ServersRepository.getServerName(serverId)
@@ -99,7 +99,7 @@ def start_minecraft_server(serverId):
     serverId = _parse_server_id(serverId)
     if not ServersRepository.doesServerExist(serverId):
         abort(404, message='Server not found')
-    if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.StartServer.value):
+    if not ServersUsersPermsRepository.doesUserHavePerm(userId, serverId, ServersPermissions.StartServer.value):
         abort(403, message='You dont have the permission to do this!')
 
     serverName = ServersRepository.getServerName(serverId)
@@ -124,7 +124,7 @@ def stop_minecraft_server(serverId):
     serverId = _parse_server_id(serverId)
     if not ServersRepository.doesServerExist(serverId):
         abort(404, message='Server not found')
-    if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.StopServer.value):
+    if not ServersUsersPermsRepository.doesUserHavePerm(userId, serverId, ServersPermissions.StopServer.value):
         abort(403, message='You dont have the permission to do this!')
 
     serverName = ServersRepository.getServerName(serverId)
@@ -145,7 +145,7 @@ def get_server_stats_endpoint(serverId):
     serverId = _parse_server_id(serverId)
     if not ServersRepository.doesServerExist(serverId):
         abort(404, message='Server not found')
-    if not ServersUsersPermsRepository.doseUserHavePerm(userId, serverId, ServersPermissions.GetServerInfo.value):
+    if not ServersUsersPermsRepository.doesUserHavePerm(userId, serverId, ServersPermissions.GetServerInfo.value):
         abort(403, message='You dont have the permission to do this!')
 
     serverName = ServersRepository.getServerName(serverId)
@@ -202,7 +202,7 @@ def remove_server(serverId):
     if not ServersRepository.doesServerExist(serverId):
         abort(404, message='Server not found')
 
-    if not ServersUsersPermsRepository.doseUserHavePerm(userId,serverId, ServersPermissions.UninstallServer.value):
+    if not ServersUsersPermsRepository.doesUserHavePerm(userId, serverId, ServersPermissions.UninstallServer.value):
         abort(403, message='You dont have the permission to do this!')
 
     serverName = ServersRepository.getServerName(serverId)

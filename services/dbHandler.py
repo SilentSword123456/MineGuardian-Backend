@@ -340,7 +340,7 @@ def getUsersWithPermsOnServer(server_id):
     
     logger.info("getUsersWithPermsOnServer: Fetching permissions server_id=%s userId=%s", server_id, userId)
 
-    if ServersRepository.getServerOwner(server_id) != userId and not ServersUsersPermsRepository.doseUserHavePerm(userId, server_id, ServersPermissions.ViewServer.value):
+    if ServersRepository.getServerOwner(server_id) != userId and not ServersUsersPermsRepository.doesUserHavePerm(userId, server_id, ServersPermissions.ViewServer.value):
         logger.warning("getUsersWithPermsOnServer: Unauthorized access attempt server_id=%s userId=%s", server_id, userId)
         return {'error': 'Unauthorized', 'permissions': {}}, 401
 

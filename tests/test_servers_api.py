@@ -49,7 +49,7 @@ class AddServerTests(ServersAPITestCase):
 class RemoveServerTests(ServersAPITestCase):
     @patch('services.servers.ServersRepository.doesServerExist', return_value=True)
     @patch('services.servers.ServersRepository.getServerName', return_value='demo')
-    @patch('services.servers.ServersUsersPermsRepository.doseUserHavePerm')
+    @patch('services.servers.ServersUsersPermsRepository.doesUserHavePerm')
     @patch('services.servers.manageLocalServers.uninstallMinecraftServer')
     @patch('services.servers.ServersRepository.removeServer')
     @patch('services.servers.get_jwt_identity', return_value=3)
@@ -66,7 +66,7 @@ class RemoveServerTests(ServersAPITestCase):
 
     @patch('services.servers.ServersRepository.doesServerExist', return_value=True)
     @patch('services.servers.ServersRepository.getServerName', return_value='demo')
-    @patch('services.servers.ServersUsersPermsRepository.doseUserHavePerm')
+    @patch('services.servers.ServersUsersPermsRepository.doesUserHavePerm')
     @patch('services.servers.manageLocalServers.uninstallMinecraftServer')
     @patch('services.servers.ServersRepository.removeServer')
     @patch('services.servers.get_jwt_identity', return_value=3)
