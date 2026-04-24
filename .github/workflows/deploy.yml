@@ -21,7 +21,7 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
       - name: Run tests
-        run: pytest tests/ -v --tb=long
+        run: pytest tests
   push-image:
     needs: test
     runs-on: ubuntu-latest
