@@ -67,7 +67,7 @@ class ServerRoutesTests(unittest.TestCase):
     def test_general_server_info_when_not_running(self):
         self._login()
         with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
-             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doesUserHavePerm', return_value=True), \
              patch.object(servers_module.ServersRepository, 'getServerName', return_value='myCoolServer'), \
              patch.object(servers_module.serverSessionsManager, 'serverInstances', {}), \
              patch.object(servers_module.utils, 'getMaxMemoryMB', return_value=1024), \
@@ -87,7 +87,7 @@ class ServerRoutesTests(unittest.TestCase):
     def test_general_server_info_returns_403_without_permission(self):
         self._login()
         with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
-             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=False):
+             patch.object(servers_module.ServersUsersPermsRepository, 'doesUserHavePerm', return_value=False):
             response = self.client.get('/servers/9')
         self.assertEqual(response.status_code, 403)
 
@@ -102,7 +102,7 @@ class ServerRoutesTests(unittest.TestCase):
             'max_players': 15,
         })
         with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
-             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doesUserHavePerm', return_value=True), \
              patch.object(servers_module.ServersRepository, 'getServerName', return_value='myCoolServer'), \
              patch.object(servers_module.serverSessionsManager, 'serverInstances', {'myCoolServer': server_instance}):
             response = self.client.get('/servers/9')
@@ -120,7 +120,7 @@ class ServerRoutesTests(unittest.TestCase):
             'online_players': {'online': 1, 'max': 20, 'players': ['Steve']},
         }
         with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
-             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doesUserHavePerm', return_value=True), \
              patch.object(servers_module.ServersRepository, 'getServerName', return_value='myCoolServer'), \
              patch.object(servers_module.serverSessionsManager, 'serverInstances', {'myCoolServer': server_instance}), \
              patch.object(servers_module.utils, 'getServerStats', return_value=stats):
@@ -133,7 +133,7 @@ class ServerRoutesTests(unittest.TestCase):
         self._login()
         server_instance = Mock()
         with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
-             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doesUserHavePerm', return_value=True), \
              patch.object(servers_module.ServersRepository, 'getServerName', return_value='myCoolServer'), \
              patch.object(servers_module, 'get_server_instance', return_value=server_instance) as get_server_instance, \
              patch.object(servers_module.api, 'register_socketio_listeners') as register_listener:
@@ -147,7 +147,7 @@ class ServerRoutesTests(unittest.TestCase):
     def test_stop_server_endpoint_calls_stop_service(self):
         self._login()
         with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
-             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doesUserHavePerm', return_value=True), \
              patch.object(servers_module.ServersRepository, 'getServerName', return_value='myCoolServer'), \
              patch.object(servers_module, 'stop_server') as stop_server:
             response = self.client.post('/servers/9/stop')
@@ -180,7 +180,7 @@ class ServerRoutesTests(unittest.TestCase):
         self._login()
         with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
              patch.object(servers_module.ServersRepository, 'getServerName', return_value='myCoolServer'), \
-             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doesUserHavePerm', return_value=True), \
              patch.object(servers_module.manageLocalServers, 'uninstallMinecraftServer', return_value=True) as uninstall_server, \
              patch.object(servers_module.ServersRepository, 'removeServer', return_value=True):
             response = self.client.delete('/servers/9/uninstall')
@@ -227,7 +227,7 @@ class ServerRoutesTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Owner-bypass route tests
 # All protected endpoints must succeed for the server owner even when
-# doseUserHavePerm has no explicit row (owner bypass is applied in the repo).
+# doesUserHavePerm has no explicit row (owner bypass is applied in the repo).
 # ---------------------------------------------------------------------------
 
 class OwnerBypassRoutesTests(unittest.TestCase):
@@ -265,10 +265,10 @@ class OwnerBypassRoutesTests(unittest.TestCase):
     def test_get_server_info_owner_bypass(self):
         """GET /servers/<id> succeeds for the owner without an explicit GetServerInfo row."""
         self._login()
-        # Simulate doseUserHavePerm returning True because the logged-in user
+        # Simulate doesUserHavePerm returning True because the logged-in user
         # (id=7) is the server owner — the repository applies the bypass.
         with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
-             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doesUserHavePerm', return_value=True), \
              patch.object(servers_module.ServersRepository, 'getServerName', return_value='ownerServer'), \
              patch.object(servers_module.serverSessionsManager, 'serverInstances', {}), \
              patch.object(servers_module.utils, 'getMaxMemoryMB', return_value=512), \
@@ -281,7 +281,7 @@ class OwnerBypassRoutesTests(unittest.TestCase):
         self._login()
         server_instance = Mock()
         with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
-             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doesUserHavePerm', return_value=True), \
              patch.object(servers_module.ServersRepository, 'getServerName', return_value='ownerServer'), \
              patch.object(servers_module, 'get_server_instance', return_value=server_instance), \
              patch.object(servers_module.api, 'register_socketio_listeners'):
@@ -292,7 +292,7 @@ class OwnerBypassRoutesTests(unittest.TestCase):
         """POST /servers/<id>/stop succeeds for the owner without an explicit StopServer row."""
         self._login()
         with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
-             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doesUserHavePerm', return_value=True), \
              patch.object(servers_module.ServersRepository, 'getServerName', return_value='ownerServer'), \
              patch.object(servers_module, 'stop_server'):
             response = self.client.post('/servers/9/stop')
@@ -309,7 +309,7 @@ class OwnerBypassRoutesTests(unittest.TestCase):
             'online_players': {'online': 0, 'max': 10, 'players': []},
         }
         with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
-             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doesUserHavePerm', return_value=True), \
              patch.object(servers_module.ServersRepository, 'getServerName', return_value='ownerServer'), \
              patch.object(servers_module.serverSessionsManager, 'serverInstances', {'ownerServer': server_instance}), \
              patch.object(servers_module.utils, 'getServerStats', return_value=stats):
@@ -321,7 +321,7 @@ class OwnerBypassRoutesTests(unittest.TestCase):
         self._login()
         with patch.object(servers_module.ServersRepository, 'doesServerExist', return_value=True), \
              patch.object(servers_module.ServersRepository, 'getServerName', return_value='ownerServer'), \
-             patch.object(servers_module.ServersUsersPermsRepository, 'doseUserHavePerm', return_value=True), \
+             patch.object(servers_module.ServersUsersPermsRepository, 'doesUserHavePerm', return_value=True), \
              patch.object(servers_module.manageLocalServers, 'uninstallMinecraftServer', return_value=True), \
              patch.object(servers_module.ServersRepository, 'removeServer', return_value=True):
             response = self.client.delete('/servers/9/uninstall')

@@ -10,7 +10,7 @@ class DbHandlerApiTests(unittest.TestCase):
     def setUp(self):
         self.client = app.test_client()
         with patch.object(db_handler.UserRepository, 'verify', return_value=True), \
-             patch.object(db_handler.UserRepository, 'getUserId', return_value=1):
+                patch.object(db_handler.UserRepository, 'getUserId', return_value=1):
             login_response = self.client.open(
                 '/login',
                 method='POST',
@@ -33,15 +33,15 @@ class DbHandlerApiTests(unittest.TestCase):
 
     def test_create_user(self):
         with patch.object(db_handler.UserRepository, 'createUser', return_value=True) as create_user:
-            response = self.request_json('POST', '/user', {'username': 'test', 'password': 'test'}, use_auth=False)
+            response = self.request_json('POST', '/user', {'email': 'test@example.com', 'username': 'test', 'password': 'test'}, use_auth=False)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'status': True})
-        create_user.assert_called_once_with('test', 'test')
+        create_user.assert_called_once_with('test@example.com', 'test', 'test')
 
     def test_remove_user(self):
         with patch.object(db_handler.UserRepository, 'getUsername', return_value='test') as get_username, \
-             patch.object(db_handler.UserRepository, 'removeUser', return_value=True) as remove_user:
+                patch.object(db_handler.UserRepository, 'removeUser', return_value=True) as remove_user:
             response = self.request_json('DELETE', '/user', {'username': 'test'})
 
         self.assertEqual(response.status_code, 200)
@@ -172,7 +172,7 @@ class DbHandlerApiTests(unittest.TestCase):
     def test_create_user_does_not_require_auth(self):
         """POST /user should succeed without a JWT token."""
         with patch.object(db_handler.UserRepository, 'createUser', return_value=True):
-            response = self.request_json('POST', '/user', {'username': 'noauth', 'password': 'pw'}, use_auth=False)
+            response = self.request_json('POST', '/user', {'email': 'noauth@example.com', 'username': 'noauth', 'password': 'pw'}, use_auth=False)
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.get_json()['status'])
 
@@ -285,7 +285,7 @@ class DbHandlerApiTests(unittest.TestCase):
         """GET /servers/1/permissions should call ServersUsersPermsRepository.getUsersWithPermsOnServer."""
         mock_perms = {2: [1]}
         with patch('services.dbHandler.ServersRepository.getServerOwner', return_value=1), \
-             patch('services.dbHandler.ServersUsersPermsRepository.getUsersWithPermsOnServer', return_value=mock_perms) as get_perms:
+                patch('services.dbHandler.ServersUsersPermsRepository.getUsersWithPermsOnServer', return_value=mock_perms) as get_perms:
             response = self.request_json('GET', '/servers/1/permissions')
 
         self.assertEqual(response.status_code, 200)
@@ -296,9 +296,9 @@ class DbHandlerApiTests(unittest.TestCase):
     def test_get_users_with_perms_on_server_unauthorized(self):
         """GET /servers/1/permissions should return 401 if user is not authorized."""
         with patch('services.dbHandler.ServersRepository.getServerOwner', return_value=2), \
-             patch('services.dbHandler.ServersUsersPermsRepository.doseUserHavePerm', return_value=False):
+                patch('services.dbHandler.ServersUsersPermsRepository.doesUserHavePerm', return_value=False):
             response = self.request_json('GET', '/servers/1/permissions')
-        
+
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.get_json()['error'], 'Unauthorized')
 
@@ -310,4 +310,3 @@ class DbHandlerApiTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

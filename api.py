@@ -10,17 +10,13 @@ import time
 import logging
 from flask_cors import CORS
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import serverSessionsManager
 import utils
 from Database.database import db, generateDB
-from Database.repositories import ServersRepository, ServersUsersPermsRepository
-from services.dbHandler import db_blueprint
 from utils import getConfig
 from flask_socketio import SocketIO, emit, join_room, leave_room
-from services.servers import servers_bp
-from services.auth import jwt, auth_blueprint
-from Database.perms import ServersPermissions
-load_dotenv()
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 logging.basicConfig(
@@ -32,6 +28,19 @@ logger = logging.getLogger(__name__)
 
 app = APIFlask(__name__)
 app.config.update(getConfig()["flaskConfig"])
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri=f"redis://{os.environ.get('REDIS_HOST', 'localhost')}:{os.environ.get('REDIS_PORT', 6379)}",
+)
+
+from Database.repositories import ServersRepository, ServersUsersPermsRepository
+from services.dbHandler import db_blueprint
+from services.servers import servers_bp
+from services.auth import jwt, auth_blueprint
+from Database.perms import ServersPermissions
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///mineguardian.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["JWT_SECRET_KEY"] = getConfig()["jwtSecretKey"]
@@ -208,7 +217,7 @@ def handle_connect(auth=None):
         emit("error", {"data": "Invalid serverId"})
         return False
 
-    if not ServersUsersPermsRepository.doseUserHavePerm(
+    if not ServersUsersPermsRepository.doesUserHavePerm(
             user_id, server_id, ServersPermissions.ViewServer.value
     ):
         logger.warning(
@@ -304,7 +313,7 @@ def _require_server_access():
         emit("error", {"data": "Invalid socket user context"})
         return None, None, None
 
-    if not ServersUsersPermsRepository.doseUserHavePerm(
+    if not ServersUsersPermsRepository.doesUserHavePerm(
             user_id, server_id, ServersPermissions.ViewServer.value
     ):
         logger.warning(

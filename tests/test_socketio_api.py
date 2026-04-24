@@ -14,7 +14,7 @@ class SocketIOSidContextTests(unittest.TestCase):
 
     @patch("api.emit")
     @patch("api.get_jwt_identity", return_value=7)
-    @patch("api.ServersUsersPermsRepository.doseUserHavePerm", return_value=True)
+    @patch("api.ServersUsersPermsRepository.doesUserHavePerm", return_value=True)
     def test_console_uses_sid_bound_server_context(self, _perm, _identity, emit_mock):
         sid = "sid-1"
         api._sid_server_context[sid] = {
@@ -53,7 +53,7 @@ class SocketIOSidContextTests(unittest.TestCase):
     @patch("api.join_room")
     @patch("api.register_socketio_listeners")
     @patch("api.utils.getServerStats", return_value={"cpu_usage_percent": 0.0})
-    @patch("api.ServersUsersPermsRepository.doseUserHavePerm", return_value=True)
+    @patch("api.ServersUsersPermsRepository.doesUserHavePerm", return_value=True)
     @patch("api.ServersRepository.getServerName", return_value="TestServer")
     @patch("api.ServersRepository.doesServerExist", return_value=True)
     @patch("services.auth.repositories.UserRepository.getUserId", return_value=7)

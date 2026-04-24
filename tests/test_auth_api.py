@@ -260,7 +260,7 @@ class AuthApiTests(unittest.TestCase):
 
     def test_is_session_valid_returns_true_for_existing_user(self):
         token = create_access_token(identity='42')
-        with patch.object(auth.UserRepository, 'doseUserExist', return_value=True) as user_exists_mock:
+        with patch.object(auth.UserRepository, 'doesUserExist', return_value=True) as user_exists_mock:
             response = self.request_with_access_token('/isSessionValid', token)
 
         self.assertEqual(response.status_code, 200)
@@ -269,7 +269,7 @@ class AuthApiTests(unittest.TestCase):
 
     def test_is_session_valid_returns_false_when_user_does_not_exist(self):
         token = create_access_token(identity='99')
-        with patch.object(auth.UserRepository, 'doseUserExist', return_value=False) as user_exists_mock:
+        with patch.object(auth.UserRepository, 'doesUserExist', return_value=False) as user_exists_mock:
             response = self.request_with_access_token('/isSessionValid', token)
 
         self.assertEqual(response.status_code, 401)
@@ -278,7 +278,7 @@ class AuthApiTests(unittest.TestCase):
 
     def test_is_session_valid_returns_false_when_identity_is_not_numeric(self):
         token = create_access_token(identity='not-an-int')
-        with patch.object(auth.UserRepository, 'doseUserExist') as user_exists_mock:
+        with patch.object(auth.UserRepository, 'doesUserExist') as user_exists_mock:
             response = self.request_with_access_token('/isSessionValid', token)
 
         self.assertEqual(response.status_code, 401)

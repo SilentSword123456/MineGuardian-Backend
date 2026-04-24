@@ -2,6 +2,7 @@ import os
 from apiflask import APIBlueprint
 from flask import make_response
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from api import limiter
 from Database import repositories
 from Database.repositories import UserRepository
 from services.docs import DOCS
@@ -15,6 +16,7 @@ _secure_cookies = os.environ.get('FLASK_ENV', 'production') != 'development'
 _cookie_samesite = "None" if _secure_cookies else "Lax"
 
 @auth_blueprint.route('/login', methods=['POST'])
+@limiter.limit("10 per minute")
 @auth_blueprint.doc(**DOCS['login'])
 @auth_blueprint.input(LoginRequestSchema, location='json', arg_name='request_data', validation=False)
 @auth_blueprint.output(LoginOutputSchema, status_code=200)
@@ -56,8 +58,7 @@ def isSessionValid():
     except (TypeError, ValueError):
         return {'status': False}, 401
 
-    if not UserRepository.doseUserExist(userId):
+    if not UserRepository.doesUserExist(userId):
         return {'status': False}, 401
 
     return {'status': True}, 200
-

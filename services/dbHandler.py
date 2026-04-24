@@ -1,10 +1,12 @@
 import logging
 from apiflask import APIBlueprint
+from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from Database.repositories import ServersRepository, ServersUsersPermsRepository
 from Database.perms import ServersPermissions
 import Database.perms
 from Database.repositories import *
+from api import limiter
 from services.docs import DOCS
 from services.schemas import (
     PlayerCreateRequestSchema,
@@ -30,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 @db_blueprint.route('/user', methods=['POST'])
 @db_blueprint.doc(**DOCS['create_user'])
+@limiter.limit("5 per hour")
 @db_blueprint.input(UserCreateRequestSchema, location='json', arg_name='request_data', validation=False)
 @db_blueprint.output(StatusOutputSchema, status_code=200)
 def createUser(request_data=None):
@@ -42,16 +45,41 @@ def createUser(request_data=None):
     if email is None or username is None or password is None:
         return {'error': 'bad request'}, 400
 
-
     return {'status': UserRepository.createUser(email, username, password)}, 200
 
-@db_blueprint.route('/sendVerificationToken', methods=['GET'])
+@db_blueprint.route('/sendVerificationToken', methods=['POST'])
+@limiter.limit("3 per hour")
+@db_blueprint.input(UserCreateRequestSchema, location='json', arg_name='request_data', validation=False)
+@db_blueprint.output(StatusOutputSchema, status_code=200)
 def sendVerificationToken(request_data=None):
-    email = request_data.get('email')
-    userId = UserRepository.getUserId(email)
-    if userId is None:
+    if request_data is None:
         return {'error': 'bad request'}, 400
+
+    # Accept either email or username as the identifier
+    identifier = request_data.get('email') or request_data.get('username')
+    if not identifier:
+        return {'error': 'bad request'}, 400
+
+    userId = UserRepository.getUserId(identifier)
+    if not userId:
+        # Return 200 to avoid leaking whether an account exists
+        return {'status': True}, 200
+
     return {'status': UserRepository.sendVerificationToken(userId)}, 200
+
+@db_blueprint.route('/verifyEmail', methods=['GET'])
+@limiter.limit("10 per minute")
+@db_blueprint.output(StatusOutputSchema, status_code=200)
+def verifyEmail():
+    token = request.args.get('token')
+    if not token:
+        return {'error': 'missing token'}, 400
+
+    success = UserRepository.verifyEmailToken(token)
+    if not success:
+        return {'error': 'invalid or expired token'}, 400
+
+    return {'status': True}, 200
 
 @db_blueprint.route('/user', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['remove_user'])
@@ -337,7 +365,7 @@ def getDefaultServersPermissions():
 @jwt_required()
 def getUsersWithPermsOnServer(server_id):
     userId = int(get_jwt_identity())
-    
+
     logger.info("getUsersWithPermsOnServer: Fetching permissions server_id=%s userId=%s", server_id, userId)
 
     if ServersRepository.getServerOwner(server_id) != userId and not ServersUsersPermsRepository.doesUserHavePerm(userId, server_id, ServersPermissions.ViewServer.value):
@@ -347,4 +375,3 @@ def getUsersWithPermsOnServer(server_id):
     perms = ServersUsersPermsRepository.getUsersWithPermsOnServer(server_id)
     logger.debug("getUsersWithPermsOnServer: Permissions fetched successfully server_id=%s count=%d", server_id, len(perms))
     return {'permissions': perms}, 200
-

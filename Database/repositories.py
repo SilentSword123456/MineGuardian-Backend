@@ -1,13 +1,11 @@
 import os
-import secrets
-
 import redis
-from marshmallow.fields import Boolean
+from itsdangerous import URLSafeTimedSerializer
 from werkzeug.security import generate_password_hash, check_password_hash
-
 import services.email
 from Database.perms import SettingsPermissions, PlayersPermissions, ServersPermissions
 from Database.database import *
+from utils import getConfig
 
 r = redis.Redis(
     host=os.environ.get("REDIS_HOST", "localhost"),
@@ -15,18 +13,23 @@ r = redis.Redis(
     decode_responses=True
 )
 
+s = URLSafeTimedSerializer(getConfig()["flaskConfig"]["SECRET_KEY"])
+
+
 class UserRepository():
     @staticmethod
     def createUser(email:str, username: str, password: str) -> bool:
         if (db.session.query(User).filter(User.username == username).first()
-            or db.session.query(User).filter(User.email == email).first() is not None):
+                or db.session.query(User).filter(User.email == email).first() is not None):
             return False
         hashPassword = generate_password_hash(password)
         db.session.add(User(email = email, username=username, password=hashPassword))
         db.session.commit()
         user = db.session.query(User).filter(User.email == email).first()
-        UserRepository.createVerificationToken(user.id)
+        # Send verification email immediately after account creation
+        UserRepository.sendVerificationToken(user.id)
         return True
+
     @staticmethod
     def removeUser(username: str) -> bool:
         user = db.session.query(User).filter(User.username == username).first()
@@ -37,27 +40,24 @@ class UserRepository():
         return True
 
     @staticmethod
-    def verify(username: str, password: str) -> bool:
-        user = db.session.query(User).filter(User.username == username).first()
+    def verify(identifier: str, password: str) -> bool:
+        user = db.session.query(User).filter(
+            (User.username == identifier) | (User.email == identifier)
+        ).first()
         if user is None:
             return False
         return check_password_hash(user.password, password)
 
     @staticmethod
-    def getUserId(username=None, email=None) -> int:
-        query = db.session.query(User)
-        if username:
-            user = query.filter(User.username == username).first()
-        elif email:
-            user = query.filter(User.email == email).first()
-        else:
-            return 0
-
+    def getUserId(identifier: str) -> int:
+        user = db.session.query(User).filter(
+            (User.username == identifier) | (User.email == identifier)
+        ).first()
         return user.id if user else 0
 
     @staticmethod
     def getUsername(userId: int) -> str:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return ''
         user = db.session.query(User).filter(User.id == userId).first()
         if user is None:
@@ -65,39 +65,55 @@ class UserRepository():
         return user.username
 
     @staticmethod
-    def doseUserExist(userId):
+    def doesUserExist(userId):
         user = db.session.query(User).filter(User.id == userId).first()
         if user is None:
             return False
         return True
 
     @staticmethod
-    def createVerificationToken(userId: int) -> None:
-        if not UserRepository.doseUserExist(userId):
-            return None
-        token = secrets.token_urlsafe(32)
-        r.setex(f"token:{userId}", 60 * 60 * 24, token)
-        return None
+    def createVerificationToken(userId: int) -> str:
+        if not UserRepository.doesUserExist(userId):
+            return ""
+        return s.dumps(userId, salt='email-confirm')
 
     @staticmethod
     def verifyToken(userId: int, token: str) -> bool:
-        targetToken = r.get(f"token:{userId}")
-        if not targetToken:
-            return False
-        if targetToken != token:
+        try:
+            token_userId = s.loads(token, salt='email-confirm', max_age=86400)
+        except:
             return False
 
-        r.delete(f"token:{userId}")
+        if token_userId != userId:
+            return False
+
         user = db.session.query(User).filter(User.id == userId).first()
+        if user is None:
+            return False
+        user.is_verified = True
+        db.session.commit()
+        return True
+
+    @staticmethod
+    def verifyEmailToken(token: str) -> bool:
+        try:
+            userId = s.loads(token, salt='email-confirm', max_age=86400)
+        except Exception:
+            return False
+
+        user = db.session.query(User).filter(User.id == userId).first()
+        if user is None:
+            return False
+
         user.is_verified = True
         db.session.commit()
         return True
 
     @staticmethod
     def sendVerificationToken(userId: int) -> bool:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return False
-        token = r.get(f"token:{userId}")
+        token = UserRepository.createVerificationToken(userId)
         user = db.session.query(User).filter(User.id == userId).first()
         result = services.email.send_verification_email(user.email, token)
         return result
@@ -105,7 +121,7 @@ class UserRepository():
 class FavoriteServersRepository():
     @staticmethod
     def addFavoriteServer(serverId: int, userId: int) -> bool:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return False
 
         if serverId in FavoriteServersRepository.getFavoriteServers(userId):
@@ -113,9 +129,10 @@ class FavoriteServersRepository():
         db.session.add(FavoriteServers(user_id=userId, server_id=serverId))
         db.session.commit()
         return True
+
     @staticmethod
     def removeFavoriteServer(userId: int, serverId:int) -> bool:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return False
         server = db.session.query(FavoriteServers).filter(FavoriteServers.user_id == userId, FavoriteServers.server_id == serverId).first()
         if server is None:
@@ -126,7 +143,7 @@ class FavoriteServersRepository():
 
     @staticmethod
     def getFavoriteServers(userId: int) -> list[int]:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return []
         servers = db.session.query(FavoriteServers).filter(FavoriteServers.user_id == userId).all()
         if not servers:
@@ -140,14 +157,15 @@ class FavoriteServersRepository():
 class PlayerRepository():
     @staticmethod
     def createPlayer(userId: int, name: str, uuid: str) -> bool:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return False
         db.session.add(Player(user_id=userId, name=name, uuid=uuid))
         db.session.commit()
         return True
+
     @staticmethod
     def removePlayer(userId: int, uuid:str) -> bool:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return False
         player = db.session.query(Player).filter(Player.user_id == userId, Player.uuid == uuid).first()
         if player is None:
@@ -155,9 +173,10 @@ class PlayerRepository():
         db.session.delete(player)
         db.session.commit()
         return True
+
     @staticmethod
     def getAllPlayersUUIDs(userId: int) -> list[str]:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return []
         players = db.session.query(Player).filter(Player.user_id == userId).all()
         if not players:
@@ -170,7 +189,7 @@ class PlayerRepository():
 
     @staticmethod
     def getPlayerId(userId: int, playerUUID:str) -> int:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return 0
         player = db.session.query(Player).filter(Player.user_id == userId, Player.uuid == playerUUID).first()
         if player is None:
@@ -184,7 +203,7 @@ class PlayersPrivilegesRepository():
             PlayersPermissions(privilegeId)
         except ValueError:
             return False
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return False
 
         playerId = PlayerRepository.getPlayerId(userId, playerUUID)
@@ -196,9 +215,10 @@ class PlayersPrivilegesRepository():
         db.session.add(PlayersPrivileges(player_id=playerId, privilege_id = privilegeId))
         db.session.commit()
         return True
+
     @staticmethod
     def deletePrivilege(userId: int, playerUUID: str, privilegeId: int) -> bool:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return False
 
         playerId = PlayerRepository.getPlayerId(userId, playerUUID)
@@ -212,20 +232,23 @@ class PlayersPrivilegesRepository():
             db.session.delete(privilege)
         db.session.commit()
         return True
+
     @staticmethod
-    def getPlayerPrivileges(userId: int, playerUUID:str) -> list[PlayersPrivileges]:
+    def getPlayerPrivileges(userId: int, playerUUID: str) -> list[int]:
+        if not UserRepository.doesUserExist(userId):
+            return []
+
         playerId = PlayerRepository.getPlayerId(userId, playerUUID)
         if playerId == 0:
             return []
+
         privileges = db.session.query(PlayersPrivileges).filter(PlayersPrivileges.player_id == playerId).all()
-        if not privileges:
-            return []
-        return privileges
+        return [p.privilege_id for p in privileges]
 
 class SettingsRepository():
     @staticmethod
     def addSetting(userId: int, rule, approved=False):
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return False
         try:
             SettingsPermissions(rule)
@@ -236,9 +259,10 @@ class SettingsRepository():
         db.session.add(Settings(user_id=userId, rule=rule, approved=approved))
         db.session.commit()
         return True
+
     @staticmethod
     def removeSetting(userId: int, rule):
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return False
         setting = db.session.query(Settings).filter(Settings.user_id == userId, Settings.rule == rule).first()
         if setting is None:
@@ -246,9 +270,10 @@ class SettingsRepository():
         db.session.delete(setting)
         db.session.commit()
         return True
+
     @staticmethod
     def changeSetting(userId: int, rule, approved=False):
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return False
         setting = db.session.query(Settings).filter(Settings.user_id == userId, Settings.rule == rule).first()
         if setting is None:
@@ -261,7 +286,7 @@ class SettingsRepository():
 class ServersRepository():
     @staticmethod
     def addServer(userId: int, serverName: str) -> bool:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return False
         if db.session.query(Servers).filter(Servers.owner_id == userId,Servers.name == serverName).first() is not None:
             return False
@@ -272,7 +297,7 @@ class ServersRepository():
 
     @staticmethod
     def removeServer(userId: int, serverName: str) -> bool:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return False
 
         server = db.session.query(Servers).filter(Servers.owner_id==userId, Servers.name==serverName).first()
@@ -281,9 +306,10 @@ class ServersRepository():
         db.session.delete(server)
         db.session.commit()
         return True
+
     @staticmethod
     def changeServerName(userId: int, currentServerName: str, newServerName: str) -> bool:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return False
         server = db.session.query(Servers).filter(Servers.owner_id==userId, Servers.name==currentServerName).first()
         if server is None:
@@ -311,12 +337,13 @@ class ServersRepository():
 
     @staticmethod
     def getServerId(userId: int, serverName: str) -> int:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return 0
         server = db.session.query(Servers).filter(Servers.owner_id == userId, Servers.name == serverName).first()
         if server is None:
             return 0
         return server.id
+
     @staticmethod
     def getServerName(serverId: int) -> str:
         server = db.session.query(Servers).filter(Servers.id == serverId).first()
@@ -328,7 +355,7 @@ class ServersRepository():
 class ServersUsersPermsRepository():
     @staticmethod
     def addPerm(userId: int, serverId: int, targetUserId: int, permId: int) -> bool:
-        if not UserRepository.doseUserExist(userId) or not UserRepository.doseUserExist(targetUserId):
+        if not UserRepository.doesUserExist(userId) or not UserRepository.doesUserExist(targetUserId):
             return False
         if not ServersRepository.doesServerExist(serverId):
             return False
@@ -349,7 +376,7 @@ class ServersUsersPermsRepository():
 
     @staticmethod
     def getPerms(userId: int, serverId: int) -> list[int]:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return []
         if not ServersRepository.doesServerExist(serverId):
             return []
@@ -365,7 +392,7 @@ class ServersUsersPermsRepository():
 
     @staticmethod
     def removePerm(userId: int, serverId: int, targetUserId: int, permId: int) -> bool:
-        if not UserRepository.doseUserExist(userId) or not UserRepository.doseUserExist(targetUserId):
+        if not UserRepository.doesUserExist(userId) or not UserRepository.doesUserExist(targetUserId):
             return False
         if not ServersRepository.doesServerExist(serverId):
             return False
@@ -381,7 +408,7 @@ class ServersUsersPermsRepository():
 
     @staticmethod
     def doesUserHavePerm(userId: int, serverId: int, permId: int) -> bool:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return False
         if not ServersRepository.doesServerExist(serverId):
             return False
@@ -402,7 +429,7 @@ class ServersUsersPermsRepository():
 
     @staticmethod
     def getServersWithUserPerm(userId: int, permId: int) -> list[int]:
-        if not UserRepository.doseUserExist(userId):
+        if not UserRepository.doesUserExist(userId):
             return []
 
         try:
@@ -413,7 +440,7 @@ class ServersUsersPermsRepository():
         rows = db.session.query(ServersUsersPerms).filter(
             ServersUsersPerms.user_id == userId,
             ServersUsersPerms.perm_id == permId,
-        ).all()
+            ).all()
 
         return [row.server_id for row in rows]
 
@@ -424,7 +451,7 @@ class ServersUsersPermsRepository():
 
         rows = db.session.query(ServersUsersPerms).filter(
             ServersUsersPerms.server_id == serverId,
-        ).all()
+            ).all()
 
         result = {}
         for row in rows:

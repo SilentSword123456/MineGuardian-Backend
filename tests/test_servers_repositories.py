@@ -137,15 +137,16 @@ class RepositoryTestCase(unittest.TestCase):
 class UserRepositoryTests(RepositoryTestCase):
     def test_create_user_hashes_password_and_rejects_duplicate_username(self):
         username = 'alice'
+        email = 'alice@example.com'
         password = 'secret-password'
 
-        self.assertTrue(UserRepository.createUser(username, password))
+        self.assertTrue(UserRepository.createUser(email, username, password))
         users = db.session.query(User).filter(User.username == username).all()
         self._track_ids(self.created_user_ids, users)
         self.assertEqual(len(users), 1)
         self.assertTrue(check_password_hash(users[0].password, password))
 
-        self.assertFalse(UserRepository.createUser(username, password))
+        self.assertFalse(UserRepository.createUser(email, username, password))
         users = db.session.query(User).filter(User.username == username).all()
         self._track_ids(self.created_user_ids, users)
         self.assertEqual(len(users), 1)
@@ -181,8 +182,8 @@ class UserRepositoryTests(RepositoryTestCase):
     def test_dose_user_exist_uses_numeric_id(self):
         user_id = self._seed_user('frank', generate_password_hash('pw'))
 
-        self.assertTrue(UserRepository.doseUserExist(user_id))
-        self.assertFalse(UserRepository.doseUserExist(999999))
+        self.assertTrue(UserRepository.doesUserExist(user_id))
+        self.assertFalse(UserRepository.doesUserExist(999999))
 
 
 class FavoriteServersRepositoryTests(RepositoryTestCase):
@@ -251,7 +252,7 @@ class PlayersPrivilegesRepositoryTests(RepositoryTestCase):
         privilege = db.session.query(PlayersPrivileges).filter(
             PlayersPrivileges.player_id == player_id,
             PlayersPrivileges.privilege_id == PlayersPermissions.OP.value,
-        ).first()
+            ).first()
         self.assertIsNotNone(privilege)
         self.created_player_privilege_ids.add(privilege.id)
 
@@ -278,7 +279,7 @@ class PlayersPrivilegesRepositoryTests(RepositoryTestCase):
         self._seed_player_privilege(player_id, PlayersPermissions.OP.value)
         self._seed_player_privilege(player_id, PlayersPermissions.WhitelistedByDefault.value)
         privileges = PlayersPrivilegesRepository.getPlayerPrivileges(user_id, 'uuid-1')
-        self.assertEqual(sorted([p.privilege_id for p in privileges]), [0, 1])
+        self.assertEqual(sorted(privileges), [0, 1])
 
 
 class SettingsRepositoryTests(RepositoryTestCase):
@@ -367,11 +368,11 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
         owner_id = self._seed_user('perms-owner-target-owner', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
         target_user_id = owner_id
         server_id = self._seed_server(owner_id, 'perm-owner-target-server')
-        
+
         # Another user tries to add perm to owner (even if they have AddPermissionToServer)
         other_user_id = self._seed_user('perms-other', hashlib.sha256('pw'.encode('utf-8')).hexdigest())
         self._seed_server_perm(server_id, other_user_id, ServersPermissions.AddPermissionToServer.value)
-        
+
         self.assertFalse(ServersUsersPermsRepository.addPerm(other_user_id, server_id, target_user_id, ServersPermissions.ViewServer.value))
 
     def test_add_perm_rejects_if_already_exists(self):
@@ -443,7 +444,7 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
             ServersUsersPerms.server_id == server_id,
             ServersUsersPerms.user_id == target_user_id,
             ServersUsersPerms.perm_id == ServersPermissions.RemovePermissionFromServer.value,
-        ).first()
+            ).first()
         self.assertIsNotNone(perm)
         self.created_server_perm_ids.add(perm.id)
 
@@ -586,4 +587,3 @@ class ServersUsersPermsRepositoryTests(RepositoryTestCase):
         result = ServersUsersPermsRepository.getServersWithUserPerm(user_id, ServersPermissions.ViewServer.value)
         self.assertIn(granted_server, result)
         self.assertNotIn(owned_server, result)
-
