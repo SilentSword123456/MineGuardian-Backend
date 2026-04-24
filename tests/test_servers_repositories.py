@@ -81,7 +81,7 @@ class RepositoryTestCase(unittest.TestCase):
             bucket.add(row.id)
 
     def _seed_user(self, username, password='hash'):
-        user = User(username=username, password=password)
+        user = User(username=username, password=password, first_name=username, is_verified=True)
         db.session.add(user)
         db.session.commit()
         self.created_user_ids.add(user.id)
@@ -140,13 +140,13 @@ class UserRepositoryTests(RepositoryTestCase):
         email = 'alice@example.com'
         password = 'secret-password'
 
-        self.assertTrue(UserRepository.createUser(email, username, password))
+        self.assertTrue(UserRepository.createUser(email, username, password, 'Alice'))
         users = db.session.query(User).filter(User.username == username).all()
         self._track_ids(self.created_user_ids, users)
         self.assertEqual(len(users), 1)
         self.assertTrue(check_password_hash(users[0].password, password))
 
-        self.assertFalse(UserRepository.createUser(email, username, password))
+        self.assertFalse(UserRepository.createUser(email, username, password, 'Alice'))
         users = db.session.query(User).filter(User.username == username).all()
         self._track_ids(self.created_user_ids, users)
         self.assertEqual(len(users), 1)

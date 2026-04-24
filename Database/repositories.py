@@ -11,9 +11,8 @@ s = URLSafeTimedSerializer(getConfig()["flaskConfig"]["SECRET_KEY"])
 class UserRepository():
     @staticmethod
     def createUser(email:str, username: str, password: str, firstName: str) -> bool:
-        if (db.session.query(User).filter(User.username == username).first()
-                or db.session.query(User).filter(User.email == email).first()
-                or db.session.query(User).filter(User.first_name == firstName).first()is not None):
+        if (db.session.query(User).filter(User.username == username).first() is not None
+                or db.session.query(User).filter(User.email == email).first() is not None):
             return False
         hashPassword = generate_password_hash(password)
         db.session.add(User(email = email, username=username, password=hashPassword, first_name=firstName))

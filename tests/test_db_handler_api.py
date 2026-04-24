@@ -33,11 +33,11 @@ class DbHandlerApiTests(unittest.TestCase):
 
     def test_create_user(self):
         with patch.object(db_handler.UserRepository, 'createUser', return_value=True) as create_user:
-            response = self.request_json('POST', '/user', {'email': 'test@example.com', 'username': 'test', 'password': 'test'}, use_auth=False)
+            response = self.request_json('POST', '/user', {'email': 'test@example.com', 'username': 'test', 'password': 'test', 'first_name': 'Test'}, use_auth=False)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'status': True})
-        create_user.assert_called_once_with('test@example.com', 'test', 'test')
+        create_user.assert_called_once_with('test@example.com', 'test', 'test', 'Test')
 
     def test_remove_user(self):
         with patch.object(db_handler.UserRepository, 'getUsername', return_value='test') as get_username, \
@@ -172,7 +172,7 @@ class DbHandlerApiTests(unittest.TestCase):
     def test_create_user_does_not_require_auth(self):
         """POST /user should succeed without a JWT token."""
         with patch.object(db_handler.UserRepository, 'createUser', return_value=True):
-            response = self.request_json('POST', '/user', {'email': 'noauth@example.com', 'username': 'noauth', 'password': 'pw'}, use_auth=False)
+            response = self.request_json('POST', '/user', {'email': 'noauth@example.com', 'username': 'noauth', 'password': 'pw', 'first_name': 'NoAuth'}, use_auth=False)
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.get_json()['status'])
 

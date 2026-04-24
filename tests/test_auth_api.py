@@ -71,7 +71,7 @@ class AuthApiTests(unittest.TestCase):
             })
 
         self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.get_json(), {'message': 'Invalid credentials'})
+        self.assertEqual(response.get_json(), {'message': 'Invalid credentials or not verified'})
         verify_mock.assert_called_once_with('testuser', 'wrongpass')
         get_user_id_mock.assert_not_called()
 
@@ -143,7 +143,7 @@ class AuthApiTests(unittest.TestCase):
             })
 
         self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.get_json(), {'message': 'Invalid credentials'})
+        self.assertEqual(response.get_json(), {'message': 'Invalid credentials or not verified'})
         verify_mock.assert_called_once_with('', 'testpass')
 
     def test_login_with_empty_string_password(self):
