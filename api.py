@@ -33,7 +33,7 @@ limiter = Limiter(
     key_func=get_remote_address,
     app=app,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri=f"redis://{os.environ.get('REDIS_HOST', 'localhost')}:{os.environ.get('REDIS_PORT', 6379)}",
+    storage_uri="memory://",
 )
 
 from Database.repositories import ServersRepository, ServersUsersPermsRepository
