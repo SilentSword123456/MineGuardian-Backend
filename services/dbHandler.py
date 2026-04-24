@@ -36,10 +36,22 @@ def createUser(request_data=None):
     if request_data is None:
         return {'error': 'bad request'}, 400
 
+    email = request_data.get('email')
     username = request_data.get('username')
     password = request_data.get('password')
+    if email is None or username is None or password is None:
+        return {'error': 'bad request'}, 400
 
-    return {'status': UserRepository.createUser(username, password)}, 200
+
+    return {'status': UserRepository.createUser(email, username, password)}, 200
+
+@db_blueprint.route('/sendVerificationToken', methods=['GET'])
+def sendVerificationToken(request_data=None):
+    email = request_data.get('email')
+    userId = UserRepository.getUserId(email)
+    if userId is None:
+        return {'error': 'bad request'}, 400
+    return {'status': UserRepository.sendVerificationToken(userId)}, 200
 
 @db_blueprint.route('/user', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['remove_user'])

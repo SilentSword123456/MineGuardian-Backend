@@ -11,9 +11,6 @@ jwt = JWTManager()
 
 auth_blueprint = APIBlueprint('auth', __name__)
 
-# Cookies are only secure (HTTPS-only) outside of development.
-# Set FLASK_ENV=development in your environment (or a local .env file) to
-# allow cookies over plain HTTP during local development.
 _secure_cookies = os.environ.get('FLASK_ENV', 'production') != 'development'
 _cookie_samesite = "None" if _secure_cookies else "Lax"
 

@@ -1,15 +1,31 @@
+import os
+import secrets
+
+import redis
+from marshmallow.fields import Boolean
 from werkzeug.security import generate_password_hash, check_password_hash
+
+import services.email
 from Database.perms import SettingsPermissions, PlayersPermissions, ServersPermissions
 from Database.database import *
 
+r = redis.Redis(
+    host=os.environ.get("REDIS_HOST", "localhost"),
+    port=int(os.environ.get("REDIS_PORT", 6379)),
+    decode_responses=True
+)
+
 class UserRepository():
     @staticmethod
-    def createUser(username: str, password: str) -> bool:
-        if db.session.query(User).filter(User.username == username).first() is not None:
+    def createUser(email:str, username: str, password: str) -> bool:
+        if (db.session.query(User).filter(User.username == username).first()
+            or db.session.query(User).filter(User.email == email).first() is not None):
             return False
         hashPassword = generate_password_hash(password)
-        db.session.add(User(username=username, password=hashPassword))
+        db.session.add(User(email = email, username=username, password=hashPassword))
         db.session.commit()
+        user = db.session.query(User).filter(User.email == email).first()
+        UserRepository.createVerificationToken(user.id)
         return True
     @staticmethod
     def removeUser(username: str) -> bool:
@@ -27,11 +43,17 @@ class UserRepository():
             return False
         return check_password_hash(user.password, password)
 
-    def getUserId(username: str) -> int:
-        user = db.session.query(User).filter(User.username == username).first()
-        if user is None:
+    @staticmethod
+    def getUserId(username=None, email=None) -> int:
+        query = db.session.query(User)
+        if username:
+            user = query.filter(User.username == username).first()
+        elif email:
+            user = query.filter(User.email == email).first()
+        else:
             return 0
-        return user.id
+
+        return user.id if user else 0
 
     @staticmethod
     def getUsername(userId: int) -> str:
@@ -48,6 +70,37 @@ class UserRepository():
         if user is None:
             return False
         return True
+
+    @staticmethod
+    def createVerificationToken(userId: int) -> None:
+        if not UserRepository.doseUserExist(userId):
+            return None
+        token = secrets.token_urlsafe(32)
+        r.setex(f"token:{userId}", 60 * 60 * 24, token)
+        return None
+
+    @staticmethod
+    def verifyToken(userId: int, token: str) -> bool:
+        targetToken = r.get(f"token:{userId}")
+        if not targetToken:
+            return False
+        if targetToken != token:
+            return False
+
+        r.delete(f"token:{userId}")
+        user = db.session.query(User).filter(User.id == userId).first()
+        user.is_verified = True
+        db.session.commit()
+        return True
+
+    @staticmethod
+    def sendVerificationToken(userId: int) -> bool:
+        if not UserRepository.doseUserExist(userId):
+            return False
+        token = r.get(f"token:{userId}")
+        user = db.session.query(User).filter(User.id == userId).first()
+        result = services.email.send_verification_email(user.email, token)
+        return result
 
 class FavoriteServersRepository():
     @staticmethod
@@ -139,7 +192,7 @@ class PlayersPrivilegesRepository():
             return False
         if db.session.query(PlayersPrivileges).filter(PlayersPrivileges.player_id == playerId,PlayersPrivileges.privilege_id == privilegeId).first() is not None:
             return False
-        
+
         db.session.add(PlayersPrivileges(player_id=playerId, privilege_id = privilegeId))
         db.session.commit()
         return True
@@ -237,7 +290,7 @@ class ServersRepository():
             return False
         if db.session.query(Servers).filter(Servers.owner_id == userId,Servers.name == newServerName).first() is not None:
             return False
-        
+
         server.name = newServerName
         db.session.commit()
         return True
@@ -363,7 +416,7 @@ class ServersUsersPermsRepository():
         ).all()
 
         return [row.server_id for row in rows]
-    
+
     @staticmethod
     def getUsersWithPermsOnServer(serverId: int) -> dict[int, list[int]]:
         if not ServersRepository.doesServerExist(serverId):

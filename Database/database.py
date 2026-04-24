@@ -6,7 +6,9 @@ db = SQLAlchemy()
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String)
+    email = db.Column(db.String, unique=True)
     password = db.Column(db.String(225))
+    is_verified = db.Column(db.Boolean, default=False)
 
 
 class FavoriteServers(db.Model):
