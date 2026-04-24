@@ -4,11 +4,50 @@ import warnings
 # Suppress the DeprecationWarning from eventlet and other benign warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 import os
+import socket
+import subprocess
 import questionary
 import serverSessionsManager
 import utils
 import api
 from utils import displayTitle
+
+
+def ensure_redis_running():
+    """Start a Redis Docker container for local dev if Redis isn't reachable."""
+    host = os.environ.get("REDIS_HOST", "localhost")
+    port = int(os.environ.get("REDIS_PORT", 6379))
+
+    # Check if Redis is already reachable
+    try:
+        with socket.create_connection((host, port), timeout=1):
+            return  # Already up, nothing to do
+    except OSError:
+        pass
+
+    questionary.print("[redis] Redis not detected, starting Docker container...", style="fg:yellow")
+    try:
+        subprocess.run(
+            [
+                "docker", "run", "-d",
+                "--name", "mineguardian-redis-dev",
+                "--restart", "unless-stopped",
+                "-p", f"{port}:{port}",
+                "redis:7-alpine",
+            ],
+            check=True,
+            capture_output=True,
+        )
+        questionary.print("[redis] Redis container started.", style="fg:green")
+    except subprocess.CalledProcessError as e:
+        stderr = e.stderr.decode().strip()
+        if "already in use" in stderr or "already exists" in stderr:
+            # Container exists but was stopped — just restart it
+            subprocess.run(["docker", "start", "mineguardian-redis-dev"], check=True, capture_output=True)
+            questionary.print("[redis] Redis container restarted.", style="fg:green")
+        else:
+            questionary.print(f"[redis] Failed to start Redis: {stderr}", style="fg:red")
+            questionary.print("[redis] Start Redis manually: docker run -d -p 6379:6379 redis:7-alpine", style="fg:yellow")
 
 
 def main_menu():
@@ -82,10 +121,11 @@ if __name__ == '__main__':
     if(utils.getConfig() is None):
         questionary.print("Configuration error. Please fix your config.json file and restart the application.", style="fg:red")
 
+    ensure_redis_running()
+
     if(utils.getConfig()["autoStartApiServer"]):
         start_server(**utils.getConfig()["defaultApiServerConfig"])
 
 
     #main_menu()
     questionary.print("\nSomething went wrong with the config file. Check main.py, the if __name__==\"__main__\": statement.", style="fg:red")
-
