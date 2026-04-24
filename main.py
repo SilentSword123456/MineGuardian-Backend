@@ -121,7 +121,7 @@ if __name__ == '__main__':
     if(utils.getConfig() is None):
         questionary.print("Configuration error. Please fix your config.json file and restart the application.", style="fg:red")
 
-    ensure_redis_running()
+    #ensure_redis_running()
 
     if(utils.getConfig()["autoStartApiServer"]):
         start_server(**utils.getConfig()["defaultApiServerConfig"])
