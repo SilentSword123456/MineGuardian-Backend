@@ -10,6 +10,6 @@
         "port": 5000,
         "debug": true
     },
-    "rconPassword": "j",
+    "rconPassword": "",
     "jwtSecretKey": ""
 }
