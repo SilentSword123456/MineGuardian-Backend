@@ -1,6 +1,6 @@
 from itsdangerous import URLSafeTimedSerializer
 from werkzeug.security import generate_password_hash, check_password_hash
-import services.email
+import services.emailService
 from Database.perms import SettingsPermissions, PlayersPermissions, ServersPermissions
 from Database.database import *
 from utils import getConfig
@@ -109,7 +109,7 @@ class UserRepository():
             return False
         token = UserRepository.createVerificationToken(userId)
         user = db.session.query(User).filter(User.id == userId).first()
-        result = services.email.send_verification_email(user.email, token, user.first_name)
+        result = services.emailService.send_verification_email(user.email, token, user.first_name)
         return result
 
 class FavoriteServersRepository():

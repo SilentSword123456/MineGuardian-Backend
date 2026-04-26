@@ -7,9 +7,9 @@ FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
 # noinspection PyTypeChecker
 def send_verification_email(to_email: str, token: str, first_name: str=""):
-    #if os.environ.get("FLASK_ENV") == "development":
-    #    print(f"[DEV] Verification token for {to_email}: {token}")
-    #    return True
+    if os.environ.get("FLASK_ENV") == "development":
+        print(f"[DEV] Verification token for {to_email}: {token}")
+        return True
 
 
     resend.Emails.send({

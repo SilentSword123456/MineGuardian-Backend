@@ -12,5 +12,7 @@ def disable_rate_limiting():
 
 @pytest.fixture(autouse=True)
 def mock_email(autouse=True):
-    with patch('services.email.resend.Emails.send') as mock:
+    # the email helper lives in services/emailService.py (module name: services.emailService)
+    # patch the resend.Emails.send used by that module
+    with patch('services.emailService.resend.Emails.send') as mock:
         yield mock
