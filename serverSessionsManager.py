@@ -459,4 +459,5 @@ class ServerSession:
             "uptime_seconds": uptime_seconds,
             "max_memory_mb": max_memory_mb,
             "max_players": max_players,
+            'server_port': self.port
         }

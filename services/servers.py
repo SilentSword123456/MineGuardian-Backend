@@ -84,6 +84,7 @@ def getGeneralServerInfo(serverId):
              'uptime_seconds': 0.0,
              'max_memory_mb': utils.getMaxMemoryMB(os.path.join(api.DIR, "servers", serverName)),
              'max_players': utils.getMaxPlayers(os.path.join(api.DIR, "servers", serverName)),
+             'server_port': 0
          }
 
      return info, 200

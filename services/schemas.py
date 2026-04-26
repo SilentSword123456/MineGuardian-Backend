@@ -21,6 +21,7 @@ class GeneralServerInfoOutputSchema(Schema):
     uptime_seconds = Float(required=True)
     max_memory_mb = Integer(required=True)
     max_players = Integer(required=True)
+    server_port = Integer(required=True)
 
 
 class GeneralOnlinePlayersOutputSchema(Schema):

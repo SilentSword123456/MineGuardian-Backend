@@ -1,3 +1,6 @@
+from gevent import monkey
+monkey.patch_all(all=True)
+import api
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 import os
@@ -145,9 +148,6 @@ def setup_playit():
 
 
 def start_server(host=None, port=None, debug=None):
-    from gevent import monkey
-    monkey.patch_all(all=True)
-    import api
 
     questionary.print(f"\nStarting server on {host}:{port}", style="fg:green")
     questionary.print("Press Ctrl+C to stop\n", style="fg:yellow")
