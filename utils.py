@@ -9,6 +9,7 @@ import requests
 import json
 import time
 import serverSessionsManager
+from Database.repositories import ServersRepository
 
 # ---------------------------------------------------------------------------
 # Minecraft → Java version helpers
@@ -421,6 +422,8 @@ def createRunScript(path, serverVersion) -> str | None:
     if os.name != "nt":
         os.chmod(filePath, 0o755)
 
+    print(f"Launch script created at {filePath} with the command \"'{command}'\".")
+
     return command
 
 
@@ -522,14 +525,13 @@ def getLaunchCommand(path):
         return None
 
 def setupServerInstance(path, serverName, serverId):
-    launchCommand = getLaunchCommand(path) or createRunScript(path)
-    if launchCommand is None:
-        print(f"Failed to get/create launch script for server '{serverName}'.")
-        return None
-
-
     if not serverId:
         print(f"Failed to resolve server id for '{serverName}'.")
+        return None
+
+    launchCommand = getLaunchCommand(path) or createRunScript(path, ServersRepository.getServerVersion(serverId))
+    if launchCommand is None:
+        print(f"Failed to get/create launch script for server '{serverName}'.")
         return None
 
     server = serverSessionsManager.ServerSession(serverId, serverName, launchCommand, os.path.abspath(path))
