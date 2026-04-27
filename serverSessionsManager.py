@@ -122,19 +122,6 @@ class ServerSession:
             print(f"Failed to start server '{self.name}': Java is not installed or not on PATH. Please install a Java Runtime Environment (JRE) and ensure 'java' is accessible.")
             return False
 
-        mcVersion = utils.getMcVersion(self.working_dir) if self.working_dir else None
-        if mcVersion:
-            requiredJava = utils.getRequiredJavaVersion(mcVersion)
-            installedVersions = utils.getInstalledJavaMajorVersions()
-            if not any(v >= requiredJava for v in installedVersions):
-                print(
-                    f"Failed to start server '{self.name}': Minecraft {mcVersion} requires "
-                    f"Java {requiredJava} or newer, but no suitable Java installation was found "
-                    f"(found: {sorted(installedVersions) if installedVersions else 'none'}). "
-                    f"Please install Java {requiredJava}+."
-                )
-                return False
-
         try:
             self.process = subprocess.Popen(
                 self.command,

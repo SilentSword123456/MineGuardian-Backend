@@ -8,7 +8,6 @@ from utils import (
     getRequiredJavaVersion,
     getInstalledJavaMajorVersions,
 )
-from Database.repositories import ServersRepository
 import requests
 
 def installMinecraftServer(serverSoftware=None, serverVersion=None, serverName=None, acceptEula=False):

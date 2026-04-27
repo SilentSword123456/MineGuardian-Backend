@@ -25,7 +25,40 @@ def getInstalledJavaMajorVersions() -> set[int]:
     config = getConfig()
     if not config:
         return set()
-    return {int(v) for v in config.get("javaRuntimes", {}).keys()}
+    return {
+        int(v)
+        for v, path in config.get("javaRuntimes", {}).items()
+        if path and validateJavaRuntime(path, int(v))
+    }
+
+def validateJavaRuntime(javaPath: str, expectedMajorVersion: int) -> bool:
+    import subprocess, shutil
+
+    if not javaPath or not javaPath.strip():
+        return False
+
+    # Check if it's on PATH or a valid file path
+    resolved = shutil.which(javaPath)
+    if resolved is None and not os.path.isfile(javaPath):
+        return False
+
+    try:
+        result = subprocess.run(
+            [javaPath, "-version"],
+            capture_output=True, text=True, timeout=5
+        )
+        output = result.stderr or result.stdout
+        match = re.search(r'version "(\d+)(?:\.(\d+))?', output)
+        if not match:
+            return False
+
+        major = int(match.group(1))
+        if major == 1:
+            major = int(match.group(2))
+
+        return major == expectedMajorVersion
+    except Exception:
+        return False
 
 
 
@@ -257,24 +290,21 @@ def getGlobalStats(serverInstances=None):
 
     return global_stats
 
-def getJavaVersionForMC(serverVersion: str) -> int:
-    try:
-        parts = serverVersion.strip().split(".")
-        minor = int(parts[1]) if len(parts) > 1 else 0
-    except (ValueError, IndexError):
-        return 21
-    if minor >= 21: return 21
-    if minor >= 17: return 17
-    if minor >= 12: return 11
-    return 8
-
 def getJavaPathForVersion(serverVersion: str) -> str:
     config = getConfig()
     if config is None:
         return "java"
+
     runtimes = config.get("javaRuntimes", {})
-    requiredVersion = getJavaVersionForMC(serverVersion)
-    return runtimes.get(str(requiredVersion), "java")
+    requiredVersion = getRequiredJavaVersion(serverVersion)
+
+    for v in sorted(int(k) for k in runtimes.keys()):
+        if v >= requiredVersion:
+            path = runtimes.get(str(v), "")
+            if validateJavaRuntime(path, v):
+                return path
+
+    return "java"
 
 def createRunScript(path, serverVersion) -> str | None:
     config = getConfig()
@@ -286,7 +316,7 @@ def createRunScript(path, serverVersion) -> str | None:
         return None
 
     javaPath = getJavaPathForVersion(serverVersion)
-    command = f'"{javaPath}" {arguments}'
+    command = f'{javaPath} {arguments}'
 
     fileName = ""
     if(os.name == "nt"):  # Windows
