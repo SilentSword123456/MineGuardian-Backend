@@ -120,7 +120,7 @@ The project uses a `config.json` file for settings:
 
 ```json
 {
-    "startMinecraftServerCommand": "java -Xmx1024M -Xms1024M -jar server.jar nogui",
+    "startMcServerArguments": "-Xmx1024M -Xms1024M -jar server.jar nogui",
     "flaskConfig": {
         "SECRET_KEY": "your-secret-key",
         "SOCKETIO_CORS_ALLOWED_ORIGINS": "*"
@@ -134,7 +134,7 @@ The project uses a `config.json` file for settings:
 }
 ```
 
-- `startMinecraftServerCommand`: The command used to launch the Minecraft `.jar` file.
+- `startMcServerArguments`: The command used to launch the Minecraft `.jar` file.
 - `flaskConfig`: Standard Flask and SocketIO configurations.
 - `autoStartApiServer`: If set to `true`, the API server will start automatically when `main.py` is launched.
 - `defaultApiServerConfig`: Default settings (host, port, debug) used when the API server starts automatically.

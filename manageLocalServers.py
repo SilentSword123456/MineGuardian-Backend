@@ -75,7 +75,7 @@ def installMinecraftServer(serverSoftware=None, serverVersion=None, serverName=N
     # Persist the Minecraft version so the start-up check can use it later.
     saveMcVersion(downloadPath, serverVersion)
 
-    createRunScript(downloadPath)
+    createRunScript(downloadPath, serverVersion)
 
     if not acceptEula:
         print(f"You must accept the EULA to run the Minecraft server. Installation aborted. You can always edit the file manually found at {downloadPath}/eula.txt")

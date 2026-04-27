@@ -372,14 +372,36 @@ def getGlobalStats(serverInstances=None):
 
     return global_stats
 
-def createRunScript(path) -> str | None:
+def getJavaVersionForMC(serverVersion: str) -> int:
+    try:
+        parts = serverVersion.strip().split(".")
+        minor = int(parts[1]) if len(parts) > 1 else 0
+    except (ValueError, IndexError):
+        return 21
+    if minor >= 21: return 21
+    if minor >= 17: return 17
+    if minor >= 12: return 11
+    return 8
+
+def getJavaPathForVersion(serverVersion: str) -> str:
+    config = getConfig()
+    if config is None:
+        return "java"
+    runtimes = config.get("javaRuntimes", {})
+    requiredVersion = getJavaVersionForMC(serverVersion)
+    return runtimes.get(str(requiredVersion), "java")
+
+def createRunScript(path, serverVersion) -> str | None:
     config = getConfig()
     if config is None:
         return None
-    command = config.get("startMinecraftServerCommand")
-    if not command:
-        print("'startMinecraftServerCommand' not set in config.")
+    arguments = config.get("startMcServerArguments")
+    if not arguments:
+        print("'startMcServerArguments' not set in config.")
         return None
+
+    javaPath = getJavaPathForVersion(serverVersion)
+    command = f'"{javaPath}" {arguments}'
 
     fileName = ""
     if(os.name == "nt"):  # Windows

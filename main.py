@@ -61,9 +61,11 @@ def runSetup():
         default="1024",
         validate=lambda v: v.isdigit() and int(v) > 0 or "Enter a positive number"
     ).ask()
-    config["startMinecraftServerCommand"] = f"java -Xmx{ram}M -Xms{ram}M -jar server.jar nogui"
+    config["startMcServerArguments"] = f"-Xmx{ram}M -Xms{ram}M -jar server.jar nogui"
     utils.storeConfig(config)
     questionary.print(f"Default server RAM set to {ram}MB.", style="fg:green")
+
+    setup_java_runtimes()
 
     questionary.print("\n── API Server Auto-Start ──", style="bold fg:cyan")
     wants_autostart = questionary.confirm(
@@ -201,6 +203,59 @@ def main_menu():
             questionary.print("\nGoodbye!", style="bold fg:green")
             break
 
+def setup_java_runtimes():
+    questionary.print("\n── Java Runtimes ──", style="bold fg:cyan")
+    questionary.print(
+        "MineGuardian needs Java 21 for Minecraft 1.17–1.20 and Java 25 for 1.21+.\n"
+        "It's recommended to have both installed.\n",
+        style="fg:white"
+    )
+
+    config = utils.getConfig()
+    runtimes = config.get("javaRuntimes", {
+        "8": "java", "11": "java", "17": "java", "21": "java", "25": "java"
+    })
+
+    for java_version in ["21", "25"]:
+        current = runtimes.get(java_version, "java")
+        questionary.print(f"\nJava {java_version} (current: '{current}')", style="bold")
+
+        change = questionary.confirm(
+            f"Configure Java {java_version} path?",
+            default=True
+        ).ask()
+
+        if not change:
+            continue
+
+        while True:
+            path = questionary.text(
+                f"Path to Java {java_version} binary:",
+                default=current
+            ).ask()
+
+            path = path.strip() if path else current
+
+            # Verify it works
+            try:
+                result = subprocess.run(
+                    [path, "-version"],
+                    capture_output=True, text=True, timeout=5
+                )
+                output = result.stderr or result.stdout  # java -version prints to stderr
+                questionary.print(f"✓ Found: {output.splitlines()[0]}", style="fg:green")
+                runtimes[java_version] = path
+                break
+            except FileNotFoundError:
+                questionary.print(f"✗ Not found: '{path}'. Try again.", style="fg:red")
+            except subprocess.TimeoutExpired:
+                questionary.print(f"✗ Timed out running '{path} -version'. Try again.", style="fg:red")
+            except Exception as e:
+                questionary.print(f"✗ Error: {e}. Try again.", style="fg:red")
+
+    config["javaRuntimes"] = runtimes
+    utils.storeConfig(config)
+    questionary.print("\nJava runtimes saved.", style="fg:green")
 
 if __name__ == '__main__':
     config_ok = isConfigValid()
