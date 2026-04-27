@@ -7,8 +7,8 @@ from utils import (
     getLocalServers,
     getRequiredJavaVersion,
     getInstalledJavaMajorVersions,
-    saveMcVersion,
 )
+from Database.repositories import ServersRepository
 import requests
 
 def installMinecraftServer(serverSoftware=None, serverVersion=None, serverName=None, acceptEula=False):
@@ -71,9 +71,6 @@ def installMinecraftServer(serverSoftware=None, serverVersion=None, serverName=N
 
     downloadPath = os.path.join("servers", serverName)
     downloadFile(downloadUrl, downloadPath + "/server.jar")
-
-    # Persist the Minecraft version so the start-up check can use it later.
-    saveMcVersion(downloadPath, serverVersion)
 
     createRunScript(downloadPath, serverVersion)
 

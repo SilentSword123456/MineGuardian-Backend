@@ -2,147 +2,31 @@ from __future__ import annotations
 import os
 import re
 import secrets
-import shutil
-import subprocess
 import questionary
 import requests
 import json
 import time
 import serverSessionsManager
-from Database.repositories import ServersRepository
-
-# ---------------------------------------------------------------------------
-# Minecraft → Java version helpers
-# ---------------------------------------------------------------------------
-
-# Mapping of Minecraft version prefixes/ranges to the minimum required Java
-# major version.  Entries are checked in order so more specific prefixes must
-# come before broader ones.
-_MC_JAVA_REQUIREMENTS: list[tuple[tuple[int, ...], int]] = [
-    # MC 1.20.5+ requires Java 21
-    ((1, 20, 5), 21),
-    # MC 1.17 – 1.20.4 requires Java 17
-    ((1, 17), 17),
-    # MC 1.0 – 1.16.x requires Java 8
-    ((1, 0), 8),
-]
-
 
 def getRequiredJavaVersion(mcVersion: str) -> int:
-    """Return the minimum Java major version required by the given Minecraft version string.
-
-    Examples::
-
-        getRequiredJavaVersion("1.21.4")  # → 21
-        getRequiredJavaVersion("1.18.2")  # → 17
-        getRequiredJavaVersion("1.16.5")  # → 8
-
-    Returns 8 (the lowest known requirement) for any unrecognised version string.
-    """
-    parts = []
-    for segment in mcVersion.split("."):
-        # Strip non-numeric suffixes such as "-rc1"
-        numeric = re.match(r"(\d+)", segment)
-        if numeric:
-            parts.append(int(numeric.group(1)))
-
-    if not parts:
+    try:
+        parts = tuple(int(re.match(r"(\d+)", s).group(1)) for s in mcVersion.split(".") if re.match(r"\d", s))
+    except Exception:
         return 8
 
-    version_tuple = tuple(parts)
-
-    for threshold, java_ver in _MC_JAVA_REQUIREMENTS:
-        if version_tuple >= threshold:
-            return java_ver
-
+    if parts >= (26, 1):   return 25
+    if parts >= (1, 20, 5): return 21
+    if parts >= (1, 18):    return 17
+    if parts >= (1, 17):    return 16
     return 8
 
 
 def getInstalledJavaMajorVersions() -> set[int]:
-    """Return the set of Java major versions available on this system.
+    config = getConfig()
+    if not config:
+        return set()
+    return {int(v) for v in config.get("javaRuntimes", {}).keys()}
 
-    Checks the ``java`` executable on PATH as well as every JVM installation
-    found under ``/usr/lib/jvm`` (the standard location on Debian/Ubuntu).
-    """
-    candidates: list[str] = []
-
-    if shutil.which("java"):
-        candidates.append("java")
-
-    jvm_base = "/usr/lib/jvm"
-    if os.path.isdir(jvm_base):
-        for entry in os.listdir(jvm_base):
-            java_bin = os.path.join(jvm_base, entry, "bin", "java")
-            if os.path.isfile(java_bin) and os.access(java_bin, os.X_OK):
-                candidates.append(java_bin)
-
-    found: set[int] = set()
-    for candidate in candidates:
-        version = _getJavaMajorVersion(candidate)
-        if version is not None:
-            found.add(version)
-
-    return found
-
-
-def _getJavaMajorVersion(java_executable: str) -> int | None:
-    """Run *java_executable* ``-version`` and return the major version number."""
-    try:
-        result = subprocess.run(
-            [java_executable, "-version"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        output = result.stderr or result.stdout
-        # Output examples:
-        #   openjdk version "17.0.9" 2023-10-17
-        #   java version "1.8.0_392"          (old scheme where 1.8 == Java 8)
-        match = re.search(r'version "(\d+)(?:\.(\d+))?', output)
-        if match:
-            major = int(match.group(1))
-            if major == 1 and match.group(2):
-                # Old versioning scheme: "1.8" → Java 8
-                major = int(match.group(2))
-            return major
-    except Exception:
-        pass
-    return None
-
-
-def getMcVersion(serverPath: str) -> str | None:
-    """Read the Minecraft version stored in the server's ``mineguardian.json`` metadata file.
-
-    Returns ``None`` if the file does not exist or cannot be read.
-    """
-    meta_path = os.path.join(serverPath, "mineguardian.json")
-    if not os.path.isfile(meta_path):
-        return None
-    try:
-        with open(meta_path, "r") as f:
-            data = json.load(f)
-        return data.get("mc_version")
-    except Exception:
-        return None
-
-
-def saveMcVersion(serverPath: str, mcVersion: str) -> None:
-    """Persist the Minecraft version to ``mineguardian.json`` inside *serverPath*.
-
-    The resolved path must be located inside the ``servers/`` directory to
-    prevent accidental writes outside the expected tree.
-    """
-    abs_path = os.path.abspath(serverPath)
-    servers_dir = os.path.abspath("servers")
-    if not abs_path.startswith(servers_dir + os.sep):
-        print(f"Warning: refusing to write metadata outside servers directory: '{abs_path}'")
-        return
-    meta_path = os.path.join(abs_path, "mineguardian.json")
-    try:
-        with open(meta_path, "w") as f:
-            json.dump({"mc_version": mcVersion}, f)
-    except Exception as e:
-        print(f"Warning: could not save server metadata to '{meta_path}': {e}")
 
 
 def displayTitle():
@@ -221,7 +105,7 @@ def generateRconPassword():
     config['rconPassword'] = rconPassword
 
     storeConfig(config)
-    
+
 def getMaxPlayers(serverPath: str | None = None) -> int:
     """Resolve max-players from <serverPath>/server.properties."""
     if not serverPath:
@@ -238,10 +122,10 @@ def getMaxPlayers(serverPath: str | None = None) -> int:
             return int(server.max_players)
 
     path = os.path.join(serverPath, "server.properties")
-    
+
     if not os.path.isfile(path):
         return 20  # Default Minecraft max players
-    
+
     try:
         with open(path, "r") as f:
             for line in f:
@@ -303,7 +187,7 @@ def getServerStats(serverInstance, force=False):
                 'max_memory_mb': getMaxMemoryMB(getattr(serverInstance, 'working_dir', None)),
                 'online_players': {"max": getMaxPlayers(getattr(serverInstance, 'working_dir', None))}
             }
-        
+
         try:
             # Re-check cache after acquiring lock
             now = time.time()
@@ -529,6 +413,7 @@ def setupServerInstance(path, serverName, serverId):
         print(f"Failed to resolve server id for '{serverName}'.")
         return None
 
+    from Database.repositories import ServersRepository
     launchCommand = getLaunchCommand(path) or createRunScript(path, ServersRepository.getServerVersion(serverId))
     if launchCommand is None:
         print(f"Failed to get/create launch script for server '{serverName}'.")

@@ -27,13 +27,13 @@ class GetConfigTests(unittest.TestCase):
     def test_returns_parsed_json_when_file_exists(self):
         config_data = {"jwtSecretKey": "abc", "rconPassword": "xyz"}
         with patch("utils.os.path.isfile", return_value=True), \
-             patch("builtins.open", mock_open(read_data=json.dumps(config_data))):
+                patch("builtins.open", mock_open(read_data=json.dumps(config_data))):
             result = utils.getConfig()
         self.assertEqual(result, config_data)
 
     def test_returns_none_on_json_decode_error(self):
         with patch("utils.os.path.isfile", return_value=True), \
-             patch("builtins.open", mock_open(read_data="not valid json")):
+                patch("builtins.open", mock_open(read_data="not valid json")):
             result = utils.getConfig()
         self.assertIsNone(result)
 
@@ -56,21 +56,21 @@ class StoreConfigTests(unittest.TestCase):
 class GenerateFlaskKeyTests(unittest.TestCase):
     def test_does_nothing_when_config_is_none(self):
         with patch("utils.getConfig", return_value=None), \
-             patch("utils.storeConfig") as mock_store:
+                patch("utils.storeConfig") as mock_store:
             utils.generateFlaskKey()
         mock_store.assert_not_called()
 
     def test_does_not_overwrite_existing_key(self):
         config = {"flaskConfig": {"SECRET_KEY": "existing"}}
         with patch("utils.getConfig", return_value=config), \
-             patch("utils.storeConfig") as mock_store:
+                patch("utils.storeConfig") as mock_store:
             utils.generateFlaskKey()
         mock_store.assert_not_called()
 
     def test_generates_and_stores_new_key_when_missing(self):
         config = {"flaskConfig": {}}
         with patch("utils.getConfig", return_value=config), \
-             patch("utils.storeConfig") as mock_store:
+                patch("utils.storeConfig") as mock_store:
             utils.generateFlaskKey()
         mock_store.assert_called_once()
         stored_config = mock_store.call_args[0][0]
@@ -81,21 +81,21 @@ class GenerateFlaskKeyTests(unittest.TestCase):
 class GenerateJWTSecretKeyTests(unittest.TestCase):
     def test_does_nothing_when_config_is_none(self):
         with patch("utils.getConfig", return_value=None), \
-             patch("utils.storeConfig") as mock_store:
+                patch("utils.storeConfig") as mock_store:
             utils.generateJWTSecretKey()
         mock_store.assert_not_called()
 
     def test_does_not_overwrite_existing_key(self):
         config = {"jwtSecretKey": "already-set"}
         with patch("utils.getConfig", return_value=config), \
-             patch("utils.storeConfig") as mock_store:
+                patch("utils.storeConfig") as mock_store:
             utils.generateJWTSecretKey()
         mock_store.assert_not_called()
 
     def test_generates_and_stores_new_key_when_missing(self):
         config = {}
         with patch("utils.getConfig", return_value=config), \
-             patch("utils.storeConfig") as mock_store:
+                patch("utils.storeConfig") as mock_store:
             utils.generateJWTSecretKey()
         mock_store.assert_called_once()
         stored = mock_store.call_args[0][0]
@@ -106,21 +106,21 @@ class GenerateJWTSecretKeyTests(unittest.TestCase):
 class GenerateRconPasswordTests(unittest.TestCase):
     def test_does_nothing_when_config_is_none(self):
         with patch("utils.getConfig", return_value=None), \
-             patch("utils.storeConfig") as mock_store:
+                patch("utils.storeConfig") as mock_store:
             utils.generateRconPassword()
         mock_store.assert_not_called()
 
     def test_does_not_overwrite_existing_password(self):
         config = {"rconPassword": "already-set"}
         with patch("utils.getConfig", return_value=config), \
-             patch("utils.storeConfig") as mock_store:
+                patch("utils.storeConfig") as mock_store:
             utils.generateRconPassword()
         mock_store.assert_not_called()
 
     def test_generates_and_stores_new_password_when_missing(self):
         config = {}
         with patch("utils.getConfig", return_value=config), \
-             patch("utils.storeConfig") as mock_store:
+                patch("utils.storeConfig") as mock_store:
             utils.generateRconPassword()
         mock_store.assert_called_once()
         stored = mock_store.call_args[0][0]
@@ -138,22 +138,22 @@ class GetMaxPlayersTests(unittest.TestCase):
 
     def test_returns_20_when_properties_file_missing(self):
         with patch("utils.os.path.isfile", return_value=False), \
-             patch("utils.serverSessionsManager.serverInstances", {}):
+                patch("utils.serverSessionsManager.serverInstances", {}):
             self.assertEqual(utils.getMaxPlayers("/fake/path"), 20)
 
     def test_parses_max_players_from_properties(self):
         props_content = "server-port=25565\nmax-players=42\n"
         with patch("utils.serverSessionsManager.serverInstances", {}), \
-             patch("utils.os.path.isfile", return_value=True), \
-             patch("builtins.open", mock_open(read_data=props_content)):
+                patch("utils.os.path.isfile", return_value=True), \
+                patch("builtins.open", mock_open(read_data=props_content)):
             result = utils.getMaxPlayers("/fake/server")
         self.assertEqual(result, 42)
 
     def test_returns_20_when_max_players_key_absent(self):
         props_content = "server-port=25565\nmotd=My Server\n"
         with patch("utils.serverSessionsManager.serverInstances", {}), \
-             patch("utils.os.path.isfile", return_value=True), \
-             patch("builtins.open", mock_open(read_data=props_content)):
+                patch("utils.os.path.isfile", return_value=True), \
+                patch("builtins.open", mock_open(read_data=props_content)):
             result = utils.getMaxPlayers("/fake/server")
         self.assertEqual(result, 20)
 
@@ -163,7 +163,7 @@ class GetMaxPlayersTests(unittest.TestCase):
         mock_server.is_running.return_value = True
         mock_server.max_players = 100
         with patch("utils.serverSessionsManager.serverInstances", {"test": mock_server}), \
-             patch("utils.os.path.abspath", side_effect=lambda x: x):
+                patch("utils.os.path.abspath", side_effect=lambda x: x):
             result = utils.getMaxPlayers("/fake/server")
         self.assertEqual(result, 100)
 
@@ -230,15 +230,15 @@ class GetOnlinePlayersTests(unittest.TestCase):
 class GetLaunchCommandTests(unittest.TestCase):
     def test_returns_command_from_sh_script_on_unix(self):
         with patch("utils.os.name", "posix"), \
-             patch("utils.os.path.isfile", return_value=True), \
-             patch("builtins.open", mock_open(read_data="java -jar server.jar\n")):
+                patch("utils.os.path.isfile", return_value=True), \
+                patch("builtins.open", mock_open(read_data="java -jar server.jar\n")):
             result = utils.getLaunchCommand("/fake/server")
         self.assertEqual(result, "java -jar server.jar")
 
     def test_returns_command_from_bat_script_on_windows(self):
         with patch("utils.os.name", "nt"), \
-             patch("utils.os.path.isfile", return_value=True), \
-             patch("builtins.open", mock_open(read_data="java -jar server.jar\n")):
+                patch("utils.os.path.isfile", return_value=True), \
+                patch("builtins.open", mock_open(read_data="java -jar server.jar\n")):
             result = utils.getLaunchCommand("/fake/server")
         self.assertEqual(result, "java -jar server.jar")
 
@@ -249,7 +249,7 @@ class GetLaunchCommandTests(unittest.TestCase):
 
     def test_returns_none_on_file_read_error(self):
         with patch("utils.os.path.isfile", return_value=True), \
-             patch("builtins.open", side_effect=IOError("read error")):
+                patch("builtins.open", side_effect=IOError("read error")):
             result = utils.getLaunchCommand("/fake/server")
         self.assertIsNone(result)
 
@@ -264,35 +264,35 @@ class GetMaxMemoryMBTests(unittest.TestCase):
 
     def test_returns_negative_one_when_launch_command_missing(self):
         with patch("utils.serverSessionsManager.serverInstances", {}), \
-             patch("utils.getLaunchCommand", return_value=None):
+                patch("utils.getLaunchCommand", return_value=None):
             result = utils.getMaxMemoryMB("/fake/server")
         self.assertEqual(result, -1)
 
     def test_parses_xmx_in_megabytes(self):
         cmd = "java -Xmx2048M -jar server.jar nogui"
         with patch("utils.serverSessionsManager.serverInstances", {}), \
-             patch("utils.getLaunchCommand", return_value=cmd):
+                patch("utils.getLaunchCommand", return_value=cmd):
             result = utils.getMaxMemoryMB("/fake/server")
         self.assertEqual(result, 2048)
 
     def test_parses_xmx_in_gigabytes(self):
         cmd = "java -Xmx4G -jar server.jar nogui"
         with patch("utils.serverSessionsManager.serverInstances", {}), \
-             patch("utils.getLaunchCommand", return_value=cmd):
+                patch("utils.getLaunchCommand", return_value=cmd):
             result = utils.getMaxMemoryMB("/fake/server")
         self.assertEqual(result, 4096)
 
     def test_parses_xmx_in_bytes(self):
         cmd = "java -Xmx1073741824 -jar server.jar nogui"
         with patch("utils.serverSessionsManager.serverInstances", {}), \
-             patch("utils.getLaunchCommand", return_value=cmd):
+                patch("utils.getLaunchCommand", return_value=cmd):
             result = utils.getMaxMemoryMB("/fake/server")
         self.assertEqual(result, 1024)
 
     def test_returns_default_when_no_xmx_flag(self):
         cmd = "java -jar server.jar nogui"
         with patch("utils.serverSessionsManager.serverInstances", {}), \
-             patch("utils.getLaunchCommand", return_value=cmd):
+                patch("utils.getLaunchCommand", return_value=cmd):
             result = utils.getMaxMemoryMB("/fake/server")
         self.assertEqual(result, 1024)
 
@@ -302,7 +302,7 @@ class GetMaxMemoryMBTests(unittest.TestCase):
         mock_server.is_running.return_value = True
         mock_server.max_memory_mb = 4096
         with patch("utils.serverSessionsManager.serverInstances", {"test": mock_server}), \
-             patch("utils.os.path.abspath", side_effect=lambda x: x):
+                patch("utils.os.path.abspath", side_effect=lambda x: x):
             result = utils.getMaxMemoryMB("/fake/server")
         self.assertEqual(result, 4096)
 
@@ -457,7 +457,7 @@ class GetNewPortTests(unittest.TestCase):
 
     def test_returns_base_port_25565_for_server(self):
         with patch("utils.serverSessionsManager.usedPorts", set()), \
-             patch("utils.getNewPort.__wrapped__" if hasattr(utils.getNewPort, "__wrapped__") else "builtins.id", create=True):
+                patch("utils.getNewPort.__wrapped__" if hasattr(utils.getNewPort, "__wrapped__") else "builtins.id", create=True):
             # Patch the inner socket check so port is always free
             with patch("socket.socket") as mock_sock_cls:
                 mock_sock = MagicMock()
@@ -505,7 +505,7 @@ class GetServerStatsTests(unittest.TestCase):
     def test_returns_fresh_stats_when_force_is_true(self):
         server = self._make_server_instance()
         with patch("utils.getMaxMemoryMB", return_value=1024), \
-             patch("utils.getOnlinePlayers", return_value={"online": 1, "max": 20}):
+                patch("utils.getOnlinePlayers", return_value={"online": 1, "max": 20}):
             stats = utils.getServerStats(server, force=True)
         self.assertEqual(stats["cpu_usage_percent"], 5.0)
         self.assertEqual(stats["memory_usage_mb"], 256.0)
@@ -526,7 +526,7 @@ class GetServerStatsTests(unittest.TestCase):
         server.last_stats = {"cpu_usage_percent": 99.0}
         server.last_stats_time = 0  # Very old
         with patch("utils.getMaxMemoryMB", return_value=1024), \
-             patch("utils.getOnlinePlayers", return_value={"online": 0, "max": 20}):
+                patch("utils.getOnlinePlayers", return_value={"online": 0, "max": 20}):
             stats = utils.getServerStats(server, force=False)
         self.assertEqual(stats["cpu_usage_percent"], 5.0)
 
@@ -614,8 +614,11 @@ class GetRequiredJavaVersionTests(unittest.TestCase):
     def test_1_18_requires_java_17(self):
         self.assertEqual(utils.getRequiredJavaVersion("1.18"), 17)
 
-    def test_1_17_requires_java_17(self):
-        self.assertEqual(utils.getRequiredJavaVersion("1.17"), 17)
+    def test_1_17_requires_java_16(self):
+        self.assertEqual(utils.getRequiredJavaVersion("1.17"), 16)
+
+    def test_1_17_1_requires_java_16(self):
+        self.assertEqual(utils.getRequiredJavaVersion("1.17.1"), 16)
 
     def test_1_16_5_requires_java_8(self):
         self.assertEqual(utils.getRequiredJavaVersion("1.16.5"), 8)
@@ -639,144 +642,27 @@ class GetRequiredJavaVersionTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class GetInstalledJavaMajorVersionsTests(unittest.TestCase):
-    def test_returns_version_from_path_java(self):
-        with patch("shutil.which", return_value="/usr/bin/java"), \
-             patch("utils.os.path.isdir", return_value=False), \
-             patch("utils._getJavaMajorVersion", return_value=17):
+    def test_returns_versions_from_config(self):
+        config = {"javaRuntimes": {"8": "java", "17": "java", "21": "java"}}
+        with patch("utils.getConfig", return_value=config):
             result = utils.getInstalledJavaMajorVersions()
-        self.assertIn(17, result)
+        self.assertEqual(result, {8, 17, 21})
 
-    def test_returns_empty_set_when_no_java_found(self):
-        with patch("shutil.which", return_value=None), \
-             patch("utils.os.path.isdir", return_value=False):
+    def test_returns_empty_set_when_java_runtimes_missing(self):
+        with patch("utils.getConfig", return_value={}):
             result = utils.getInstalledJavaMajorVersions()
         self.assertEqual(result, set())
 
-    def test_discovers_jvms_under_usr_lib_jvm(self):
-        with patch("shutil.which", return_value=None), \
-             patch("utils.os.path.isdir", return_value=True), \
-             patch("utils.os.listdir", return_value=["temurin-25"]), \
-             patch("utils.os.path.isfile", return_value=True), \
-             patch("utils.os.access", return_value=True), \
-             patch("utils._getJavaMajorVersion", return_value=25):
-            result = utils.getInstalledJavaMajorVersions()
-        self.assertIn(25, result)
-
-    def test_ignores_jvm_entries_without_java_binary(self):
-        with patch("shutil.which", return_value=None), \
-             patch("utils.os.path.isdir", return_value=True), \
-             patch("utils.os.listdir", return_value=["some-dir"]), \
-             patch("utils.os.path.isfile", return_value=False):
+    def test_returns_empty_set_when_config_is_none(self):
+        with patch("utils.getConfig", return_value=None):
             result = utils.getInstalledJavaMajorVersions()
         self.assertEqual(result, set())
 
-
-class GetJavaMajorVersionTests(unittest.TestCase):
-    def _make_completed_process(self, stderr):
-        result = MagicMock()
-        result.stderr = stderr
-        result.stdout = ""
-        return result
-
-    def test_parses_java_17_version_string(self):
-        output = 'openjdk version "17.0.9" 2023-10-17'
-        with patch("subprocess.run", return_value=self._make_completed_process(output)):
-            self.assertEqual(utils._getJavaMajorVersion("java"), 17)
-
-    def test_parses_java_25_version_string(self):
-        output = 'openjdk version "25" 2025-09-16'
-        with patch("subprocess.run", return_value=self._make_completed_process(output)):
-            self.assertEqual(utils._getJavaMajorVersion("java"), 25)
-
-    def test_parses_old_java_8_version_string(self):
-        output = 'java version "1.8.0_392"'
-        with patch("subprocess.run", return_value=self._make_completed_process(output)):
-            self.assertEqual(utils._getJavaMajorVersion("java"), 8)
-
-    def test_returns_none_when_subprocess_raises(self):
-        with patch("subprocess.run", side_effect=FileNotFoundError):
-            self.assertIsNone(utils._getJavaMajorVersion("/nonexistent/java"))
-
-    def test_returns_none_on_unrecognised_output(self):
-        with patch("subprocess.run", return_value=self._make_completed_process("not java output")):
-            self.assertIsNone(utils._getJavaMajorVersion("java"))
-
-
-# ---------------------------------------------------------------------------
-# getMcVersion / saveMcVersion
-# ---------------------------------------------------------------------------
-
-class GetMcVersionTests(unittest.TestCase):
-    def test_returns_none_when_file_missing(self):
-        with patch("utils.os.path.isfile", return_value=False):
-            self.assertIsNone(utils.getMcVersion("/fake/server"))
-
-    def test_returns_version_from_metadata_file(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            meta = {"mc_version": "1.21.4"}
-            import json as _json
-            with open(os.path.join(tmpdir, "mineguardian.json"), "w") as f:
-                _json.dump(meta, f)
-            result = utils.getMcVersion(tmpdir)
-        self.assertEqual(result, "1.21.4")
-
-    def test_returns_none_on_invalid_json(self):
-        with patch("utils.os.path.isfile", return_value=True), \
-             patch("builtins.open", mock_open(read_data="bad json{")):
-            result = utils.getMcVersion("/fake/server")
-        self.assertIsNone(result)
-
-
-class SaveMcVersionTests(unittest.TestCase):
-    def _mock_abspath_for_tmpdir(self, tmpdir):
-        """Return a side-effect for os.path.abspath that maps 'servers' → tmpdir/servers.
-
-        Captures the real ``os.path.abspath`` before the patch is applied to
-        avoid infinite recursion when the fallback calls the function.
-        """
-        servers_dir = os.path.join(tmpdir, "servers")
-        _real_abspath = os.path.abspath  # saved before patch is activated
-
-        def mock_abspath(p):
-            if p == "servers":
-                return servers_dir
-            return _real_abspath(p)
-
-        return mock_abspath
-
-    def test_writes_metadata_file(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            server_dir = os.path.join(tmpdir, "servers", "test-server")
-            os.makedirs(server_dir)
-
-            with patch("utils.os.path.abspath",
-                       side_effect=self._mock_abspath_for_tmpdir(tmpdir)):
-                utils.saveMcVersion(server_dir, "1.18.2")
-
-            meta_path = os.path.join(server_dir, "mineguardian.json")
-            self.assertTrue(os.path.isfile(meta_path))
-            import json as _json
-            with open(meta_path) as f:
-                data = _json.load(f)
-            self.assertEqual(data["mc_version"], "1.18.2")
-
-    def test_does_not_raise_on_write_error(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            server_dir = os.path.join(tmpdir, "servers", "test-server")
-            os.makedirs(server_dir)
-            mock_fn = self._mock_abspath_for_tmpdir(tmpdir)
-
-            with patch("utils.os.path.abspath", side_effect=mock_fn), \
-                 patch("builtins.open", side_effect=OSError("disk full")):
-                utils.saveMcVersion(server_dir, "1.21")  # Should not raise
-
-    def test_refuses_write_outside_servers_dir(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            mock_fn = self._mock_abspath_for_tmpdir(tmpdir)
-            with patch("utils.os.path.abspath", side_effect=mock_fn), \
-                 patch("builtins.open") as mock_open_fn:
-                utils.saveMcVersion("/tmp/evil/path", "1.21")
-            mock_open_fn.assert_not_called()
+    def test_returns_all_configured_versions(self):
+        config = {"javaRuntimes": {"8": "java", "11": "java", "17": "java", "21": "java", "25": "java"}}
+        with patch("utils.getConfig", return_value=config):
+            result = utils.getInstalledJavaMajorVersions()
+        self.assertEqual(result, {8, 11, 17, 21, 25})
 
 
 if __name__ == "__main__":
