@@ -4,6 +4,9 @@ import services.emailService
 from Database.perms import SettingsPermissions, PlayersPermissions, ServersPermissions
 from Database.database import *
 from utils import getConfig
+import hmac
+import hashlib
+import time
 
 s = URLSafeTimedSerializer(getConfig()["flaskConfig"]["SECRET_KEY"])
 
@@ -108,9 +111,28 @@ class UserRepository():
         if not UserRepository.doesUserExist(userId):
             return False
         token = UserRepository.createVerificationToken(userId)
+        shortCode = UserRepository.generateShortCode(userId)
         user = db.session.query(User).filter(User.id == userId).first()
-        result = services.emailService.send_verification_email(user.email, token, user.first_name)
+        result = services.emailService.send_verification_email(user.email, token, shortCode, user.first_name)
         return result
+
+    @staticmethod
+    def generateShortCode(userId: int) -> str:
+        secret = getConfig()["flaskConfig"]["SECRET_KEY"]
+        bucket = int(time.time()) // 3600
+        msg = f"{userId}:{bucket}".encode()
+        return hmac.new(secret.encode(), msg, hashlib.sha256).hexdigest()[:8].upper()
+
+    @staticmethod
+    def verifyShortCode(userId: int, code: str) -> bool:
+        secret = getConfig()["flaskConfig"]["SECRET_KEY"]
+        now_bucket = int(time.time()) // 3600
+        for bucket in range(now_bucket - 23, now_bucket + 1):
+            msg = f"{userId}:{bucket}".encode()
+            digest = hmac.new(secret.encode(), msg, hashlib.sha256).hexdigest()
+            if digest[:8].upper() == code.upper():
+                return True
+        return False
 
 class FavoriteServersRepository():
     @staticmethod

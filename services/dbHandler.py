@@ -75,14 +75,32 @@ def sendVerificationToken(request_data=None):
 @db_blueprint.output(StatusOutputSchema, status_code=200)
 def verifyEmail():
     token = request.args.get('token')
-    if not token:
-        return {'error': 'missing token'}, 400
+    short_code = request.args.get('shortCode')
 
-    success = UserRepository.verifyEmailToken(token)
-    if not success:
-        return {'error': 'invalid or expired token'}, 400
+    if token:
+        success = UserRepository.verifyEmailToken(token)
+        if not success:
+            return {'error': 'invalid or expired token'}, 400
+        return {'status': True}, 200
 
-    return {'status': True}, 200
+    if short_code:
+        userEmail = request.args.get('userEmail')
+        if not userEmail:
+            return {'error': 'missing userId'}, 400
+
+        userId = UserRepository.getUserId(userEmail)
+
+        if not UserRepository.verifyShortCode(userId, short_code):
+            return {'error': 'invalid or expired code'}, 400
+
+        user = db.session.query(User).filter(User.id == userId).first()
+        if not user:
+            return {'error': 'user not found'}, 400
+        user.is_verified = True
+        db.session.commit()
+        return {'status': True}, 200
+
+    return {'error': 'missing token or code'}, 400
 
 @db_blueprint.route('/user', methods=['DELETE'])
 @db_blueprint.doc(**DOCS['remove_user'])

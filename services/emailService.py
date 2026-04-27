@@ -6,9 +6,11 @@ FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
 
 # noinspection PyTypeChecker
-def send_verification_email(to_email: str, token: str, first_name: str=""):
+def send_verification_email(to_email: str, token: str, shortCode: str, first_name: str=""):
     if os.environ.get("FLASK_ENV") == "development":
-        print(f"[DEV] Verification token for {to_email}: {token}")
+        print(f"[DEV] Verification token for {to_email}: {token}\n"
+              f"[DEV] Or you can use this link: {FRONTEND_URL}/verifyEmail?token={token}"
+              f"[DEV] Or use this short code: {shortCode}")
         return True
 
 
@@ -17,12 +19,13 @@ def send_verification_email(to_email: str, token: str, first_name: str=""):
         "to": [to_email],
         "subject": "Verify your MineGuardian email",
         "template": {
-            "id": "email-verification-copy",
+            "id": "email-verification",
             "variables": {
                 "company_name": "MineGuardian",
                 "company_address": "silentlab.work",
                 "first_name": first_name,
                 "verification_url": f"{FRONTEND_URL}/verifyEmail?token={token}",
+                "short_code": shortCode,
             }
         }
     })
