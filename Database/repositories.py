@@ -279,13 +279,13 @@ class SettingsRepository():
 
 class ServersRepository():
     @staticmethod
-    def addServer(userId: int, serverName: str) -> bool:
+    def addServer(userId: int, serverName: str, serverVersion: str) -> bool:
         if not UserRepository.doesUserExist(userId):
             return False
         if db.session.query(Servers).filter(Servers.owner_id == userId,Servers.name == serverName).first() is not None:
             return False
 
-        db.session.add(Servers(owner_id=userId, name=serverName))
+        db.session.add(Servers(owner_id=userId, name=serverName, server_version=serverVersion))
         db.session.commit()
         return True
 
@@ -344,7 +344,14 @@ class ServersRepository():
         if server is None:
             return ''
         return server.name
-
+    @staticmethod
+    def getServerVersion(serverId: int) -> str:
+        if not ServersRepository.doesServerExist(serverId):
+            return ''
+        server = db.session.query(Servers).filter(Servers.id == serverId).first()
+        if server is None:
+            return ''
+        return server.server_version
 
 class ServersUsersPermsRepository():
     @staticmethod

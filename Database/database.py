@@ -38,6 +38,7 @@ class Servers(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     name = db.Column(db.String)
+    server_version = db.Column(db.String)
 
 class ServersUsersPerms(db.Model):
     id = db.Column(db.Integer, primary_key=True)

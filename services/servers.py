@@ -183,7 +183,7 @@ def add_server():
     if isinstance(status, dict) and 'error' in status:
         abort(400, message=status['error'])
 
-    databaseStatus = Database.repositories.ServersRepository.addServer(userId, serverName)
+    databaseStatus = Database.repositories.ServersRepository.addServer(userId, serverName, serverVersion)
 
     if not databaseStatus:
         abort(500, message='Failed to register server in database')
