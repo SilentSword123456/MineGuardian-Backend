@@ -1,11 +1,11 @@
 {
     "startMcServerArguments": "-Xmx1024M -Xms1024M -jar server.jar nogui",
     "javaRuntimes": {
-        "8":  "java",
-        "11": "java",
-        "17": "java",
-        "21": "java",
-        "25": "java"
+        "8":  "",
+        "11": "",
+        "17": "",
+        "21": "",
+        "25": ""
     },
     "flaskConfig": {
         "SECRET_KEY": "",
