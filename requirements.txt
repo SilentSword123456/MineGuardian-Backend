@@ -15,5 +15,5 @@ pydantic==2.12.5
 requests==2.33.1
 resend==2.29.0
 SQLAlchemy==2.0.49
-Flask-Limiter==3.8.0
+Flask-Limiter==4.1.1
 questionary==2.1.1
