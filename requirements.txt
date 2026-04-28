@@ -11,7 +11,7 @@ gevent==24.11.1
 gevent-websocket==0.10.1
 python-dotenv==1.2.2
 psutil==7.2.2
-pydantic==2.12.5
+pydantic==2.13.3
 requests==2.33.1
 resend==2.29.0
 SQLAlchemy==2.0.49
