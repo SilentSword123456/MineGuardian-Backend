@@ -38,13 +38,9 @@ Run the main script to access the interactive menu:
 ```bash
 python main.py
 ```
+### Access
 
-### API Server
-
-The API can be started directly from `main.py` or by calling `api.py` (though `main.py` is the preferred way as it handles setup).
-
-- **Auto-start**: Can be enabled in `config.json` via `autoStartApiServer`.
-- **Host/Port**: Default `0.0.0.0:5000`, configurable in `config.json`.
+To access it, you will need to install the frontend. You can find those instructions here https://github.com/SilentSword123456/MineGuardian-WebPage
 
 ## Configuration (`config.json`)
 
