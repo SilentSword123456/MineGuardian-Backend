@@ -2,7 +2,7 @@ APIFlask==3.1.0
 eventlet==0.40.4
 Flask==3.1.3
 flask-cors==6.0.2
-Flask-HTTPAuth==4.8.0
+Flask-HTTPAuth==4.8.1
 Flask-JWT-Extended==4.7.1
 flask-marshmallow==1.4.0
 Flask-SocketIO==5.6.1
