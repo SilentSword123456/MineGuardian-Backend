@@ -1,88 +1,111 @@
-# MineGuardian Backend
+# MineGuardian — Backend
 
-A Python-based backend and CLI tool for managing Minecraft servers. It allows you to download, install, run, and monitor Minecraft servers through both a terminal-based interface and a Flask-SocketIO API.
+The Python backend that powers MineGuardian. It handles everything the frontend needs: downloading and installing Minecraft server jars, launching and monitoring server processes, streaming console output in real time, and managing user accounts with JWT authentication.
+
+It also ships with a standalone CLI so you can manage servers directly from a terminal without the frontend at all.
+
+---
+
+## What it does
+
+### Server process management
+Each Minecraft server runs as a closely managed subprocess. The backend spawns the process, holds a reference to it, monitors its lifecycle, and tears it down cleanly on stop. Every line written to stdout is captured the moment it's printed and immediately broadcast to connected clients over WebSockets — so the console in the frontend is a true live stream, not a poll.
+
+### Real-time resource monitoring over WebSockets
+Beyond console output, the backend continuously pushes CPU and RAM usage stats to the frontend via Socket.io. The frontend gauges always reflect what's actually happening right now — no polling, no delay.
+
+### Full database layer
+The backend uses a full relational database to persist everything:
+- **Users** — accounts, credentials, verification state
+- **Servers** — installed server records and metadata
+- **Settings** — per-user and global configuration
+- **Permissions** — access control between users and servers
+
+### User accounts & email verification
+Registration, login, and email verification are all built from scratch. On sign-up, the backend sends a verification email with a code via an email service integration. JWT tokens are issued on login and required for all protected API routes.
+
+### Multi-runtime Java support
+Different Minecraft versions require different Java versions. The backend supports configuring separate Java executables for versions 8, 11, 17, 21, and 25, and selects the right one per server automatically.
+
+### CLI interface
+`python main.py` drops you into an interactive menu for managing servers without touching the frontend — useful for headless setups or initial configuration.
+
+---
+
 ## Requirements
 
-- Python 3.13 or higher
-- Java Runtime Environment (JRE) for running Minecraft servers
+- Python 3.13+
+- Java installed (Java 21 or 25 recommended)
 - Internet connection (for downloading server jars)
+
+---
 
 ## Setup
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/SilentSword123456/MineGuardian-Backend
-   cd MineGuardian-Backend
-   ```
+```bash
+git clone https://github.com/SilentSword123456/MineGuardian-Backend
+cd MineGuardian-Backend
+```
 
-2. **Create a virtual environment (optional but recommended)**:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
+Create and activate a virtual environment (recommended):
 
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+python -m venv .venv
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
+```
 
-4. **Configuration**:
-   Ensure `config.json` is present in the root directory. It is used to define the Minecraft startup command and Flask settings.
+Install dependencies:
 
-## Usage
+```bash
+pip install -r requirements.txt
+```
 
-### CLI (Main Entry Point)
-
-Run the main script to access the interactive menu:
+Then run:
 
 ```bash
 python main.py
 ```
-### Access
 
-To access it, you will need to install the frontend. You can find those instructions here https://github.com/SilentSword123456/MineGuardian-WebPage
+On first run, an interactive configuration wizard will walk you through the setup — no manual config file editing needed.
 
-## Configuration (`config.json`)
+The only thing worth knowing in advance: **Java runtimes**. In the config, you can set absolute paths to Java executables for each supported version (8, 11, 17, 21, 25). If you only have one Java version installed, leave the others blank and the backend will fall back to the system default.
 
-The project uses a `config.json` file for settings:
+---
 
-```json
-{
-    "startMcServerArguments": "-Xmx1024M -Xms1024M -jar server.jar nogui",
-    "javaRuntimes": {
-        "8":  "",
-        "11": "",
-        "17": "",
-        "21": "",
-        "25": ""
-    },
-    "flaskConfig": {
-        "SECRET_KEY": "",
-        "SOCKETIO_CORS_ALLOWED_ORIGINS": "*"
-    },
-    "autoStartApiServer": false,
-    "defaultApiServerConfig": {
-        "host": "0.0.0.0",
-        "port": 5000,
-        "debug": true
-    },
-    "rconPassword": "",
-    "jwtSecretKey": ""
-}
-```
+## Using the frontend
 
-- `startMcServerArguments`: The arguments used to launch the Minecraft `.jar` file.
-- `javaRuntimes`: The path for eatch java version, I recommand having at least java 25 or 21 installed
-- `flaskConfig`: Standard Flask and SocketIO configurations.
-- `autoStartApiServer`: If set to `true`, the API server will start automatically when `main.py` is launched.
-- `defaultApiServerConfig`: Default settings (host, port, debug) used when the API server starts automatically.
+Once the backend is running, you have two options:
 
-## Env Vars
-`FLASK_ENV`: If this is set to `development`, the app will dispaly the verification codes in the console instead of sending them, and will enable onther feutures that helped me develop the app.
+- **Just testing it out?** Head over to **[frontend.silentlab.work](https://frontend.silentlab.work/)** — it's already connected to a live backend, no setup needed.
+- **Self-hosting?** Clone and run the frontend yourself. Instructions are in the **[MineGuardian-WebPage](https://github.com/SilentSword123456/MineGuardian-WebPage)** repo. Point it at your backend URL and you're good to go.
+
+---
+
+## Development mode
+
+Set `FLASK_ENV=development` before running to enable dev aids:
+- Verification codes are printed to the console instead of sent by email
+- Additional debug features are enabled
+
+---
 
 ## Tests
 
-Run all tests:
 ```bash
 pytest
 ```
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+| :--- | :--- |
+| Language | Python 3.13 |
+| Web framework | Flask |
+| Real-time | Flask-SocketIO |
+| Auth | JWT |
+| Email | Resend |
+| Database | SQLite |
+| Server management | subprocess + psutil |
+ 
