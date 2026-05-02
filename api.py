@@ -52,11 +52,18 @@ from services.servers import servers_bp
 from services.auth import jwt, auth_blueprint
 from Database.perms import ServersPermissions
 _db_uri = os.environ.get("DATABASE_URL") or (
+    # Four slashes are intentional: sqlite:// + /tmp/... (absolute path)
     "sqlite:////tmp/mineguardian.db" if os.environ.get("VERCEL") else "sqlite:///mineguardian.db"
 )
 app.config["SQLALCHEMY_DATABASE_URI"] = _db_uri
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY") or _config.get("jwtSecretKey", "")
+_jwt_secret = os.environ.get("JWT_SECRET_KEY") or _config.get("jwtSecretKey", "")
+if not _jwt_secret:
+    raise RuntimeError(
+        "JWT_SECRET_KEY is not configured. "
+        "Set the JWT_SECRET_KEY environment variable or add 'jwtSecretKey' to config.json."
+    )
+app.config["JWT_SECRET_KEY"] = _jwt_secret
 app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
 app.config["JWT_ACCESS_COOKIE_NAME"] = "accessToken"
 app.config["JWT_COOKIE_CSRF_PROTECT"] = False
