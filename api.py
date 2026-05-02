@@ -1,14 +1,19 @@
+import os
 try:
     from gevent import monkey, sleep
-    monkey.patch_all()
-    _GEVENT_AVAILABLE = True
+    # Vercel is a serverless platform: gevent monkey-patching is not needed
+    # (and can interfere with the runtime), so we use threading mode there.
+    if not os.environ.get("VERCEL"):
+        monkey.patch_all()
+        _GEVENT_AVAILABLE = True
+    else:
+        _GEVENT_AVAILABLE = False
 except ImportError:
     from time import sleep  # type: ignore[assignment]
     _GEVENT_AVAILABLE = False
 from flask import jsonify, request, g
 from apiflask import APIFlask, abort
 from flask.cli import load_dotenv
-import os
 load_dotenv()
 import re
 import time
