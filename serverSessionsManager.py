@@ -1,10 +1,13 @@
 import Database.repositories
 from Database.repositories import ServersRepository
-import gevent
-import gevent.pool
-from gevent.lock import Semaphore
-from gevent.threadpool import ThreadPool
-_tpool = ThreadPool(10)
+try:
+    import gevent
+    import gevent.pool
+    from gevent.lock import Semaphore
+    _GEVENT_AVAILABLE = True
+except ImportError:
+    from threading import Semaphore  # type: ignore[assignment]
+    _GEVENT_AVAILABLE = False
 import os
 import shutil
 import subprocess
@@ -15,6 +18,16 @@ from rcon import RconClient, RconError, RconAuthError
 
 serverInstances = {}
 usedPorts = set()
+
+
+def _spawn(fn, *args):
+    """Spawn a greenlet (gevent) or daemon thread (threading) depending on availability."""
+    if _GEVENT_AVAILABLE:
+        return gevent.spawn(fn, *args)
+    import threading
+    t = threading.Thread(target=fn, args=args, daemon=True)
+    t.start()
+    return t
 
 class ServerSession:
     def __init__(self, id, name, command, working_dir=None):
@@ -143,9 +156,9 @@ class ServerSession:
 
             self.running = True
 
-            self.output_thread = gevent.spawn(self._read_output)
+            self.output_thread = _spawn(self._read_output)
             # Watch process liveness independently from stdout to ensure stop/crash broadcasts.
-            self.monitor_thread = gevent.spawn(self._monitor_process_exit, self.process)
+            self.monitor_thread = _spawn(self._monitor_process_exit, self.process)
 
             print(f"Server '{self.name}' started!")
             print(f"Process ID: {self.process.pid}")
@@ -164,7 +177,7 @@ class ServerSession:
                     break
                 stripped_line = line.rstrip()
                 self._broadcast(stripped_line)
-                gevent.sleep(0)
+                gevent.sleep(0) if _GEVENT_AVAILABLE else time.sleep(0)
         except Exception as e:
             self._broadcast(f"[ERROR: {e}]")
         finally:

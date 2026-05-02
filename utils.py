@@ -2,7 +2,6 @@ from __future__ import annotations
 import os
 import re
 import secrets
-import questionary
 import requests
 import json
 import time
@@ -342,6 +341,7 @@ def createRunScript(path, serverVersion) -> str | None:
 
 
 def runMinecraftServer(serverName=None, path="servers", serverId=None):
+    import questionary
     if serverName is None:
         serverName = questionary.select("Select a server to run:", choices=[name for name in os.listdir(path)
         if os.path.isdir(os.path.join(path, name))]).ask()
@@ -455,6 +455,7 @@ def setupServerInstance(path, serverName, serverId):
 
 
 def attachToServer():
+    import questionary
     if not serverSessionsManager.serverInstances:
         print("No running servers to attach to.")
         return
